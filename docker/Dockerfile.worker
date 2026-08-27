@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock ./
+COPY src ./src
+COPY README.md ./
+
+RUN uv pip install --system --no-cache .
+
+# Bake the ~325MB Kokoro model into the image so executions don't re-download
+# it every run; ensure_model_files() caches under $LOCALAPPDATA/book2audio/models
+# on Windows or ~/.cache on Linux, so we pin it here for a predictable layer.
+ENV LOCALAPPDATA=/root/.cache
+RUN python -c "from book2audio.tts.models_cache import ensure_model_files; ensure_model_files()"
+
+CMD ["python", "-m", "book2audio.worker.entrypoint"]
