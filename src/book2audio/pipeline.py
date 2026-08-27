@@ -26,7 +26,7 @@ from rich.progress import (
 
 from book2audio.assemble.audio import concat_with_gaps, normalize_rms, write_wav
 from book2audio.assemble.audiobook import ChapterAudio, build_m4b
-from book2audio.assemble.music import LOOP_SECONDS, generate_ambient_bed, mix_music_bed
+from book2audio.assemble.music import LOOP_SECONDS, generate_bed_for_preset, mix_music_bed
 from book2audio.attribution import HeuristicAttributor
 from book2audio.config import Config
 from book2audio.epub import ParsedChapter, parse_epub
@@ -85,7 +85,7 @@ class Pipeline:
         self._report_plan(book, selected, cast)
 
         engine = self._load_engine(book.metadata)
-        self._music_bed = generate_ambient_bed() if cfg.music else None
+        self._music_bed = generate_bed_for_preset(cfg.music_preset) if cfg.music else None
         outputs = self._render_and_assemble(
             selected, book.metadata, engine, cast, state, chapters_dir
         )
@@ -127,6 +127,8 @@ class Pipeline:
         cast = VoiceCast(
             narrator_voice=self.config.narrator_voice,
             overrides=dict(self.config.voice_overrides),
+            male_voice=self.config.male_voice,
+            female_voice=self.config.female_voice,
         )
         cast.cast(self._characters, getattr(self, "_genders", {}))
         return cast
@@ -233,7 +235,7 @@ class Pipeline:
             chapter.title,
             f"speed={cfg.speed}",
             f"chapter_gap={cfg.chapter_gap}",
-            f"music={cfg.music}:{cfg.music_volume}",
+            f"music={cfg.music}:{cfg.music_volume}:{cfg.music_preset}",
             f"expressive={cfg.expressive}",
         ]
         for seg in chapter.segments:

@@ -10,6 +10,8 @@ length so the generated clip tiles with zero click at the seam.
 
 from __future__ import annotations
 
+from typing import Callable
+
 import numpy as np
 
 from book2audio.tts.engine import SAMPLE_RATE
@@ -25,6 +27,14 @@ _CHORD = (
     (246.94, 0.15),  # major ninth, adds shimmer without dissonance
 )
 
+# A lower, sparser voicing than _CHORD — fewer partials, longer LFO periods,
+# for a still, held drone rather than a "breathing" pad.
+_DRONE_CHORD = (
+    (36.71, 0.40),  # low D, sub warmth
+    (73.42, 0.30),  # octave up
+    (110.0, 0.15),  # perfect fifth above the octave
+)
+
 _DETUNE_CENTS = 4.0  # per partial, for a soft chorus width
 
 
@@ -34,14 +44,20 @@ def _snap_to_loop(freq_hz: float) -> float:
     return round(freq_hz * LOOP_SECONDS) / LOOP_SECONDS
 
 
-def generate_ambient_bed(seed: int = 0) -> np.ndarray:
-    """Return one seamlessly loopable ``LOOP_SECONDS`` clip, peak-safe."""
+def _generate_chord_bed(
+    chord: tuple[tuple[float, float], ...], seed: int, noise_amount: float = 0.04
+) -> np.ndarray:
+    """Shared synthesis: sine partials over ``chord`` plus filtered noise air.
+
+    Factored out of ``generate_ambient_bed`` so other presets (drone, etc.)
+    can reuse the exact same loop-safe technique with a different voicing.
+    """
     n = int(LOOP_SECONDS * SAMPLE_RATE)
     t = np.arange(n, dtype=np.float64) / SAMPLE_RATE
     rng = np.random.default_rng(seed)
 
     bed = np.zeros(n, dtype=np.float64)
-    for root_hz, amp in _CHORD:
+    for root_hz, amp in chord:
         # Snap every partial — root AND its detuned companion — to an exact
         # integer number of cycles over the loop, so each is perfectly
         # periodic at LOOP_SECONDS and the pair tiles with no seam click.
@@ -67,10 +83,66 @@ def generate_ambient_bed(seed: int = 0) -> np.ndarray:
     kernel = np.zeros(n)
     kernel[:64] = 1.0 / 64
     air = np.fft.irfft(np.fft.rfft(noise) * np.fft.rfft(kernel), n=n)
-    bed += 0.04 * air
+    bed += noise_amount * air
 
     peak = np.max(np.abs(bed)) or 1.0
     return (bed / peak * 0.7).astype(np.float32)
+
+
+def generate_ambient_bed(seed: int = 0) -> np.ndarray:
+    """Return one seamlessly loopable ``LOOP_SECONDS`` clip, peak-safe."""
+    return _generate_chord_bed(_CHORD, seed)
+
+
+def generate_drone_bed(seed: int = 0) -> np.ndarray:
+    """A lower, stiller bed than the default ambient pad — fewer partials,
+    slower movement, less noise air, for a held-drone feel."""
+    return _generate_chord_bed(_DRONE_CHORD, seed, noise_amount=0.02)
+
+
+def generate_rain_bed(seed: int = 0) -> np.ndarray:
+    """Filtered broadband noise shaped into a rain/hiss texture with slow
+    "gusts", using the same circular-FFT-filter and loop-safe-LFO techniques
+    as the tonal presets above."""
+    n = int(LOOP_SECONDS * SAMPLE_RATE)
+    t = np.arange(n, dtype=np.float64) / SAMPLE_RATE
+    rng = np.random.default_rng(seed)
+
+    # Tighter kernel than the ambient bed's "air" filter -> more high-frequency
+    # content survives, giving a hiss texture instead of a soft shimmer.
+    noise = rng.standard_normal(n)
+    kernel = np.zeros(n)
+    kernel[:8] = 1.0 / 8
+    rain = np.fft.irfft(np.fft.rfft(noise) * np.fft.rfft(kernel), n=n)
+
+    # Slow "gusts": an integer-cycle LFO over the loop length keeps the
+    # amplitude swell loop-safe, same trick as the tonal presets' pad LFOs.
+    gust_cycles = max(1, round(rng.uniform(2, 4)))
+    gust_freq = gust_cycles / LOOP_SECONDS
+    gust_phase = rng.uniform(0, 2 * np.pi)
+    gust = 0.75 + 0.25 * np.sin(2 * np.pi * gust_freq * t + gust_phase)
+    rain = rain * gust
+
+    peak = np.max(np.abs(rain)) or 1.0
+    return (rain / peak * 0.7).astype(np.float32)
+
+
+MUSIC_PRESETS: dict[str, Callable[[int], np.ndarray]] = {
+    "ambient": generate_ambient_bed,
+    "drone": generate_drone_bed,
+    "rain": generate_rain_bed,
+}
+
+
+def generate_bed_for_preset(preset: str, seed: int = 0) -> np.ndarray:
+    """Dispatch to the named preset's generator. Raises on an unknown name."""
+    try:
+        generator = MUSIC_PRESETS[preset]
+    except KeyError:
+        raise ValueError(
+            f"Unknown music_preset {preset!r}. Known: {', '.join(sorted(MUSIC_PRESETS))}"
+        ) from None
+    return generator(seed)
 
 
 def mix_music_bed(

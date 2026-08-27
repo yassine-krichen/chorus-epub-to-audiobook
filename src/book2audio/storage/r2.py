@@ -8,9 +8,17 @@ same config surface without importing each other.
 from __future__ import annotations
 
 import os
+import re
 
 import boto3
 from botocore.client import Config as BotoConfig
+
+# Characters that could break out of the quoted filename="..." parameter or
+# inject extra header/response content (CRLF etc). Callers (e.g.
+# api.jobs.filenames.render_filename) are expected to have already
+# sanitized the filename -- this is a second, independent layer so this
+# module never trusts a caller's sanitization blindly.
+_UNSAFE_DISPOSITION_CHARS = re.compile(r'["\\\x00-\x1f]')
 
 
 def _bucket() -> str:
@@ -46,16 +54,45 @@ def presign_put(key: str, expires: int = 600) -> str:
     )
 
 
-def presign_get(key: str, expires: int = 600) -> str:
+def presign_get(key: str, expires: int = 600, *, download_filename: str | None = None) -> str:
+    params: dict[str, str] = {"Bucket": _bucket(), "Key": key}
+    if download_filename is not None:
+        params["ResponseContentDisposition"] = _content_disposition(download_filename)
     return _client().generate_presigned_url(
         "get_object",
-        Params={"Bucket": _bucket(), "Key": key},
+        Params=params,
         ExpiresIn=expires,
     )
 
 
+def _content_disposition(filename: str) -> str:
+    """RFC 6266 ``Content-Disposition``, with an ASCII fallback for clients
+    that only understand the legacy ``filename=`` parameter.
+
+    Raises ``ValueError`` if ``filename`` contains characters that could
+    break out of the quoted ``filename="..."`` parameter or inject extra
+    header content -- defense in depth, independent of whatever sanitization
+    the caller already did.
+    """
+    import urllib.parse
+
+    if _UNSAFE_DISPOSITION_CHARS.search(filename):
+        raise ValueError(f"Unsafe characters in download filename: {filename!r}")
+
+    ascii_fallback = filename.encode("ascii", "replace").decode("ascii")
+    encoded = urllib.parse.quote(filename)
+    return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{encoded}"
+
+
 def upload_file(local_path: str, key: str) -> None:
     _client().upload_file(local_path, _bucket(), key)
+
+
+def upload_bytes(data: bytes, key: str, *, content_type: str | None = None) -> None:
+    kwargs = {"Bucket": _bucket(), "Key": key, "Body": data}
+    if content_type is not None:
+        kwargs["ContentType"] = content_type
+    _client().put_object(**kwargs)
 
 
 def download_file(key: str, local_path: str) -> None:

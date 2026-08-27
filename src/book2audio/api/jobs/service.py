@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from book2audio.api.jobs import cloud_run
+from book2audio.api.jobs.filenames import render_filename
 from book2audio.api.jobs.schemas import (
     ChapterProgress,
     CreateJobRequest,
@@ -175,20 +176,41 @@ def _to_summary(job: Job) -> JobSummary:
 
 
 def to_detail(job: Job) -> JobDetail:
-    parts = [_to_part_progress(p) for p in job.parts]
+    parts = [_to_part_progress(p, job) for p in job.parts]
     return JobDetail(
         **_to_summary(job).model_dump(),
         epub_object_key=job.epub_object_key,
         config=job.config,
-        chapters=[ChapterProgress(**c) for c in job.chapters],
+        chapters=[_to_chapter_progress(c) for c in job.chapters],
         parts=parts,
         error_message=job.error_message,
     )
 
 
-def _to_part_progress(part: dict) -> PartProgress:
-    download_url = presign_get(part["r2_key"]) if part.get("status") == "done" else None
+def _to_part_progress(part: dict, job: Job) -> PartProgress:
+    download_url = None
+    if part.get("status") == "done":
+        template = job.config.get("filename_template")
+        download_filename = (
+            render_filename(template, title=job.title, part=part["part_number"])
+            if template
+            else None
+        )
+        download_url = presign_get(part["r2_key"], download_filename=download_filename)
     return PartProgress(**part, download_url=download_url)
+
+
+def _to_chapter_progress(chapter: dict) -> ChapterProgress:
+    thumbnail_url = None
+    if chapter.get("thumbnail_status") == "ready" and chapter.get("thumbnail_r2_key"):
+        thumbnail_url = presign_get(chapter["thumbnail_r2_key"])
+    return ChapterProgress(
+        index=chapter["index"],
+        title=chapter["title"],
+        status=chapter["status"],
+        thumbnail_status=chapter.get("thumbnail_status"),
+        thumbnail_url=thumbnail_url,
+    )
 
 
 def _progress_percent(job: Job) -> float:

@@ -19,6 +19,7 @@ from book2audio.config import Config
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
 from book2audio.epub import parse_epub
+from book2audio.images.freellmapi import require_freellmapi_configured
 from book2audio.pipeline import Pipeline
 from book2audio.storage.r2 import download_file
 from book2audio.worker.progress import build_progress_hooks
@@ -41,10 +42,16 @@ def main() -> int:
     try:
         epub_path = _download_inputs(epub_object_key, object_prefix, scratch_dir)
         config = _build_config(epub_path, scratch_dir, job_config)
-        _set_total_chapters(job_id, config)
+        if config.thumbnails:
+            require_freellmapi_configured()
+        book_title = _set_total_chapters(job_id, config)
 
         on_chapter_done, on_part_ready = build_progress_hooks(
-            job_id, scratch_dir, object_prefix
+            job_id,
+            scratch_dir,
+            object_prefix,
+            thumbnails_enabled=config.thumbnails,
+            book_title=book_title,
         )
         pipeline = Pipeline(
             config,
@@ -93,16 +100,23 @@ def _build_config(epub_path: str, scratch_dir: str, job_config: dict) -> Config:
     return Config(epub_path=epub_path, output_path=output_path, work_dir=scratch_dir, **kwargs)
 
 
-def _set_total_chapters(job_id: uuid.UUID, config: Config) -> None:
-    _, parsed = parse_epub(config.epub_path, cover_dir=config.work_dir)
+def _set_total_chapters(job_id: uuid.UUID, config: Config) -> str:
+    """Record the book's total chapter count and return its title.
+
+    Parses the EPUB once here rather than a second time in the pipeline's own
+    parse, purely to size the progress bar and (when thumbnails are enabled)
+    thread the title into the progress hooks.
+    """
+    metadata, parsed = parse_epub(config.epub_path, cover_dir=config.work_dir)
     total = len(parsed) if config.chapter_limit <= 0 else min(config.chapter_limit, len(parsed))
     with SessionLocal() as session:
         job = session.get(Job, job_id)
         if job is None:
-            return
+            return metadata.title
         job.total_chapters = total
         job.last_heartbeat_at = datetime.now(timezone.utc)
         session.commit()
+    return metadata.title
 
 
 def _mark_succeeded(job_id: uuid.UUID) -> None:

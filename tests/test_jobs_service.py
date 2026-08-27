@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import httpx
@@ -80,6 +81,27 @@ def test_create_job_persists_the_submitted_config_as_the_jsonb_config(db_session
 
     assert job.config["narrator_voice"] == "am_michael"
     assert job.config["speed"] == 1.25
+
+
+def test_create_job_persists_thumbnails_true_in_the_jsonb_config(db_session, monkeypatch):
+    """Regression test: JobConfig previously had no thumbnails field, so
+    Config.thumbnails (worker/entrypoint.py's _build_config) could never be
+    set to True by an API client -- the feature was unreachable."""
+    monkeypatch.setattr(
+        service.cloud_run,
+        "run_job_execution",
+        MagicMock(return_value={"metadata": {"name": "exec-2"}}),
+    )
+    user = _make_user(db_session)
+    payload = CreateJobRequest(
+        epub_object_key="uploads/book.epub",
+        title="A Book",
+        config=JobConfig(thumbnails=True),
+    )
+
+    job = service.create_job(db_session, user.id, payload)
+
+    assert job.config["thumbnails"] is True
 
 
 def test_create_job_marks_the_job_failed_when_cloud_run_trigger_raises(db_session, monkeypatch):
@@ -225,3 +247,104 @@ def test_cancel_job_returns_none_when_the_job_belongs_to_a_different_user(db_ses
     job = _make_job(db_session, owner.id)
 
     assert service.cancel_job(db_session, other.id, job.id) is None
+
+
+# --- _to_part_progress / _to_chapter_progress ----------------------------
+
+
+def test_to_part_progress_renders_the_download_filename_from_the_job_config_template(monkeypatch):
+    presign_get = MagicMock(return_value="https://signed-url")
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    job = SimpleNamespace(title="My Book", config={"filename_template": "{title} - Part {part:02d}"})
+    part = {
+        "part_number": 3,
+        "first_index": 1,
+        "last_index": 5,
+        "r2_key": "jobs/1/part-03.m4b",
+        "status": "done",
+    }
+
+    result = service._to_part_progress(part, job)
+
+    assert result.download_url == "https://signed-url"
+    presign_get.assert_called_once_with(
+        "jobs/1/part-03.m4b", download_filename="My Book - Part 03.m4b"
+    )
+
+
+def test_to_part_progress_omits_a_download_filename_when_no_template_is_configured(monkeypatch):
+    presign_get = MagicMock(return_value="https://signed-url")
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    job = SimpleNamespace(title="My Book", config={})
+    part = {
+        "part_number": 1,
+        "first_index": 1,
+        "last_index": 1,
+        "r2_key": "jobs/1/part-01.m4b",
+        "status": "done",
+    }
+
+    service._to_part_progress(part, job)
+
+    presign_get.assert_called_once_with("jobs/1/part-01.m4b", download_filename=None)
+
+
+def test_to_part_progress_does_not_presign_a_part_that_is_not_yet_done(monkeypatch):
+    presign_get = MagicMock()
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    job = SimpleNamespace(title="My Book", config={})
+    part = {
+        "part_number": 1,
+        "first_index": 1,
+        "last_index": 1,
+        "r2_key": "jobs/1/part-01.m4b",
+        "status": "rendering",
+    }
+
+    result = service._to_part_progress(part, job)
+
+    assert result.download_url is None
+    presign_get.assert_not_called()
+
+
+def test_to_chapter_progress_presigns_the_thumbnail_url_when_status_is_ready(monkeypatch):
+    presign_get = MagicMock(return_value="https://signed-thumb-url")
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    chapter = {
+        "index": 1,
+        "title": "One",
+        "status": "done",
+        "thumbnail_status": "ready",
+        "thumbnail_r2_key": "jobs/1/thumbnails/chapter-0001.png",
+    }
+
+    result = service._to_chapter_progress(chapter)
+
+    assert result.thumbnail_url == "https://signed-thumb-url"
+    presign_get.assert_called_once_with("jobs/1/thumbnails/chapter-0001.png")
+
+
+def test_to_chapter_progress_leaves_thumbnail_fields_none_for_a_chapter_with_no_thumbnail(
+    monkeypatch,
+):
+    presign_get = MagicMock()
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    chapter = {"index": 1, "title": "One", "status": "done"}
+
+    result = service._to_chapter_progress(chapter)
+
+    assert result.thumbnail_status is None
+    assert result.thumbnail_url is None
+    presign_get.assert_not_called()
+
+
+def test_to_chapter_progress_does_not_presign_when_thumbnail_status_is_failed(monkeypatch):
+    presign_get = MagicMock()
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    chapter = {"index": 1, "title": "One", "status": "done", "thumbnail_status": "failed"}
+
+    result = service._to_chapter_progress(chapter)
+
+    assert result.thumbnail_status == "failed"
+    assert result.thumbnail_url is None
+    presign_get.assert_not_called()

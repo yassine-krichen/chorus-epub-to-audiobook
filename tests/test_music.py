@@ -1,6 +1,15 @@
 import numpy as np
+import pytest
 
-from book2audio.assemble.music import LOOP_SECONDS, generate_ambient_bed, mix_music_bed
+from book2audio.assemble.music import (
+    LOOP_SECONDS,
+    MUSIC_PRESETS,
+    generate_ambient_bed,
+    generate_bed_for_preset,
+    generate_drone_bed,
+    generate_rain_bed,
+    mix_music_bed,
+)
 from book2audio.tts.engine import SAMPLE_RATE
 
 
@@ -67,3 +76,74 @@ def test_tiling_handles_narration_shorter_than_the_loop():
     bed = generate_ambient_bed()
     mix = mix_music_bed(narration, bed, volume=0.1)
     assert mix.shape[0] == narration.shape[0]
+
+
+def test_drone_bed_has_the_expected_loop_length():
+    bed = generate_drone_bed()
+    assert bed.shape[0] == int(LOOP_SECONDS * SAMPLE_RATE)
+
+
+def test_drone_bed_never_clips():
+    bed = generate_drone_bed()
+    assert np.max(np.abs(bed)) <= 1.0
+
+
+def test_drone_bed_loop_boundary_is_seamless():
+    bed = generate_drone_bed()
+    wrap_step = abs(float(bed[0]) - float(bed[-1]))
+    typical_step = float(np.mean(np.abs(np.diff(bed[:1000]))))
+    assert wrap_step < max(typical_step * 20, 0.02)
+
+
+def test_drone_bed_generation_is_deterministic_for_a_given_seed():
+    assert np.array_equal(generate_drone_bed(seed=1), generate_drone_bed(seed=1))
+
+
+def test_drone_bed_differs_from_the_ambient_bed_for_the_same_seed():
+    assert not np.array_equal(generate_drone_bed(seed=0), generate_ambient_bed(seed=0))
+
+
+def test_rain_bed_has_the_expected_loop_length():
+    bed = generate_rain_bed()
+    assert bed.shape[0] == int(LOOP_SECONDS * SAMPLE_RATE)
+
+
+def test_rain_bed_never_clips():
+    bed = generate_rain_bed()
+    assert np.max(np.abs(bed)) <= 1.0
+
+
+def test_rain_bed_loop_boundary_is_seamless():
+    bed = generate_rain_bed()
+    wrap_step = abs(float(bed[0]) - float(bed[-1]))
+    typical_step = float(np.mean(np.abs(np.diff(bed[:1000]))))
+    assert wrap_step < max(typical_step * 20, 0.02)
+
+
+def test_rain_bed_generation_is_deterministic_for_a_given_seed():
+    assert np.array_equal(generate_rain_bed(seed=1), generate_rain_bed(seed=1))
+
+
+def test_rain_bed_differs_from_the_ambient_bed_for_the_same_seed():
+    assert not np.array_equal(generate_rain_bed(seed=0), generate_ambient_bed(seed=0))
+
+
+def test_music_presets_registry_contains_exactly_ambient_drone_and_rain():
+    assert set(MUSIC_PRESETS) == {"ambient", "drone", "rain"}
+
+
+def test_generate_bed_for_preset_dispatches_to_the_ambient_generator():
+    assert np.array_equal(generate_bed_for_preset("ambient", seed=3), generate_ambient_bed(seed=3))
+
+
+def test_generate_bed_for_preset_dispatches_to_the_drone_generator():
+    assert np.array_equal(generate_bed_for_preset("drone", seed=3), generate_drone_bed(seed=3))
+
+
+def test_generate_bed_for_preset_dispatches_to_the_rain_generator():
+    assert np.array_equal(generate_bed_for_preset("rain", seed=3), generate_rain_bed(seed=3))
+
+
+def test_generate_bed_for_preset_raises_value_error_for_an_unknown_preset():
+    with pytest.raises(ValueError, match="Unknown music_preset"):
+        generate_bed_for_preset("orchestral")

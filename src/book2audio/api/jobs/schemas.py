@@ -6,7 +6,11 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from book2audio.api.jobs.filenames import validate_filename_template
+from book2audio.assemble.music import MUSIC_PRESETS
+from book2audio.tts.voices import FEMALE_VOICES, MALE_VOICES
 
 
 class UploadUrlRequest(BaseModel):
@@ -28,6 +32,8 @@ class JobConfig(BaseModel):
 
     narrator_voice: str | None = None
     voice_overrides: dict[str, str] = Field(default_factory=dict)
+    male_voice: str | None = None
+    female_voice: str | None = None
     speed: float = 1.0
     bitrate: str = "64k"
     chapter_limit: int = 0
@@ -35,7 +41,44 @@ class JobConfig(BaseModel):
     chapter_gap: float = 1.8
     music: bool = True
     music_volume: float = 0.22
+    music_preset: str = "ambient"
     expressive: bool = True
+    filename_template: str | None = None
+    thumbnails: bool = False
+
+    @field_validator("filename_template")
+    @classmethod
+    def _validate_filename_template(cls, value: str | None) -> str | None:
+        if value is not None:
+            validate_filename_template(value)
+        return value
+
+    @field_validator("male_voice")
+    @classmethod
+    def _validate_male_voice(cls, value: str | None) -> str | None:
+        if value is not None and value not in MALE_VOICES:
+            raise ValueError(
+                f"Unknown male_voice {value!r}. Known: {', '.join(sorted(MALE_VOICES))}"
+            )
+        return value
+
+    @field_validator("female_voice")
+    @classmethod
+    def _validate_female_voice(cls, value: str | None) -> str | None:
+        if value is not None and value not in FEMALE_VOICES:
+            raise ValueError(
+                f"Unknown female_voice {value!r}. Known: {', '.join(sorted(FEMALE_VOICES))}"
+            )
+        return value
+
+    @field_validator("music_preset")
+    @classmethod
+    def _validate_music_preset(cls, value: str) -> str:
+        if value not in MUSIC_PRESETS:
+            raise ValueError(
+                f"Unknown music_preset {value!r}. Known: {', '.join(sorted(MUSIC_PRESETS))}"
+            )
+        return value
 
 
 class CreateJobRequest(BaseModel):
@@ -53,6 +96,8 @@ class ChapterProgress(BaseModel):
     index: int
     title: str
     status: str
+    thumbnail_status: str | None = None
+    thumbnail_url: str | None = None
 
 
 class PartProgress(BaseModel):

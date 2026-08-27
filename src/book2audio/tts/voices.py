@@ -48,6 +48,8 @@ class VoiceCast:
 
     narrator_voice: str = DEFAULT_NARRATOR_VOICE
     overrides: dict[str, str] = field(default_factory=dict)
+    male_voice: str | None = None
+    female_voice: str | None = None
     _assignments: dict[str, str] = field(default_factory=dict)
 
     def cast(self, characters: list[str], genders: dict[str, str] | None = None) -> None:
@@ -58,14 +60,16 @@ class VoiceCast:
         collisions between the two leads who trade lines every page). When a
         ``genders`` guess is available, each character draws from the matching
         gender pool first; otherwise from the full pool. Voices only repeat once
-        a pool is exhausted.
+        a pool is exhausted. When ``male_voice``/``female_voice`` are set, that
+        voice is tried first within its gender pool — a casting bias, not a
+        hard pin (it still yields to distinctness once already used).
         """
         genders = genders or {}
         used = set(self._assignments.values()) | set(self.overrides.values())
         cursors = {"m": 0, "f": 0, "any": 0}
         pools = {
-            "m": self._rotate(MALE_VOICES, used),
-            "f": self._rotate(FEMALE_VOICES, used),
+            "m": self._rotate(self._prioritized(MALE_VOICES, self.male_voice), used),
+            "f": self._rotate(self._prioritized(FEMALE_VOICES, self.female_voice), used),
             "any": self._rotate(CHARACTER_VOICE_POOL, used),
         }
         for name in characters:
@@ -80,6 +84,17 @@ class VoiceCast:
     def _rotate(pool: tuple[str, ...], used: set[str]) -> list[str]:
         """Voices not yet used first, then the rest, so distinct wins early."""
         return [v for v in pool if v not in used] + [v for v in pool if v in used]
+
+    @staticmethod
+    def _prioritized(pool: tuple[str, ...], preferred: str | None) -> tuple[str, ...]:
+        """Move ``preferred`` to the front of ``pool`` if it's a member.
+
+        Leaves the pool unchanged when ``preferred`` is ``None`` or not in it,
+        so the default (both biases unset) is byte-identical to today.
+        """
+        if preferred is None or preferred not in pool:
+            return pool
+        return (preferred,) + tuple(v for v in pool if v != preferred)
 
     def voice_for(self, speaker: str) -> str:
         """Return the voice id for a speaker, casting on demand if needed."""

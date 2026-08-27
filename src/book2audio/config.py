@@ -9,7 +9,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from book2audio.tts.voices import CHARACTER_VOICE_POOL, DEFAULT_NARRATOR_VOICE
+from book2audio.assemble.music import MUSIC_PRESETS
+from book2audio.tts.voices import (
+    CHARACTER_VOICE_POOL,
+    DEFAULT_NARRATOR_VOICE,
+    FEMALE_VOICES,
+    MALE_VOICES,
+)
 
 # Every voice the engine can use, for validating overrides up front.
 _KNOWN_VOICES = frozenset(CHARACTER_VOICE_POOL) | {DEFAULT_NARRATOR_VOICE}
@@ -23,6 +29,10 @@ class Config:
 
     narrator_voice: str = DEFAULT_NARRATOR_VOICE
     voice_overrides: dict[str, str] = field(default_factory=dict)
+    # Casting bias: prefer this voice for male/female-guessed characters
+    # before falling back to the rest of the gender pool.
+    male_voice: str | None = None
+    female_voice: str | None = None
     speed: float = 1.0
     bitrate: str = "64k"
 
@@ -42,10 +52,15 @@ class Config:
     # Procedural ambient music bed, mixed under the narration.
     music: bool = True
     music_volume: float = 0.22  # bed RMS as a fraction of the narration's RMS
+    music_preset: str = "ambient"
 
     # Punctuation-driven pacing/energy (a coarse substitute for real prosody;
     # Kokoro has no per-word emphasis control).
     expressive: bool = True
+
+    # Per-chapter cover thumbnails via freellmapi. Off by default; enabling it
+    # without freellmapi credentials configured fails fast at worker startup.
+    thumbnails: bool = False
 
     def validate(self) -> None:
         import os
@@ -56,6 +71,21 @@ class Config:
             raise ValueError(
                 f"Unknown narrator voice {self.narrator_voice!r}. "
                 f"Known: {', '.join(sorted(_KNOWN_VOICES))}"
+            )
+        if self.male_voice is not None and self.male_voice not in MALE_VOICES:
+            raise ValueError(
+                f"Unknown male_voice {self.male_voice!r}. "
+                f"Known: {', '.join(sorted(MALE_VOICES))}"
+            )
+        if self.female_voice is not None and self.female_voice not in FEMALE_VOICES:
+            raise ValueError(
+                f"Unknown female_voice {self.female_voice!r}. "
+                f"Known: {', '.join(sorted(FEMALE_VOICES))}"
+            )
+        if self.music_preset not in MUSIC_PRESETS:
+            raise ValueError(
+                f"Unknown music_preset {self.music_preset!r}. "
+                f"Known: {', '.join(sorted(MUSIC_PRESETS))}"
             )
         if not 0.5 <= self.speed <= 2.0:
             raise ValueError(f"speed must be between 0.5 and 2.0, got {self.speed}")
