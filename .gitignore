@@ -12,3 +12,6 @@ wheels/
 # Sample data and generated outputs
 epubs/
 output/
+
+# Local-only deployment notes, deleted by the user once deployed
+DEPLOYMENT.md
