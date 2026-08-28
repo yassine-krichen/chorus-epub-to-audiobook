@@ -15,3 +15,6 @@ output/
 
 # Local secrets, never commit
 .env
+
+# Local dev tools (MinIO, cloudflared binaries + data)
+.local-tools/
