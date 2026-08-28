@@ -72,5 +72,6 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    artifacts_swept_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     user: Mapped[User] = relationship(back_populates="jobs")

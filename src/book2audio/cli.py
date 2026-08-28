@@ -15,7 +15,9 @@ import sys
 
 from rich.console import Console
 
+from book2audio.assemble.music import MUSIC_PRESETS
 from book2audio.config import Config
+from book2audio.images.freellmapi import require_freellmapi_configured
 from book2audio.pipeline import Pipeline
 
 
@@ -91,6 +93,27 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Parse, attribute, and cast without synthesizing audio",
     )
+    gen.add_argument(
+        "--male-voice", default=None, help="Preferred voice for male-guessed characters"
+    )
+    gen.add_argument(
+        "--female-voice", default=None, help="Preferred voice for female-guessed characters"
+    )
+    gen.add_argument(
+        "--music-preset",
+        default="ambient",
+        help=f"Background music style (default: ambient). Known: {', '.join(sorted(MUSIC_PRESETS))}",
+    )
+    gen.add_argument(
+        "--thumbnails",
+        action="store_true",
+        default=False,
+        help=(
+            "Enable per-chapter cover thumbnails. Validates freellmapi credentials but "
+            "does not yet generate local thumbnail files — that machinery currently only "
+            "exists via the hosted worker's R2-backed job pipeline."
+        ),
+    )
     return parser
 
 
@@ -115,10 +138,16 @@ def _run_generate(args: argparse.Namespace, console: Console) -> int:
         chapter_gap=args.chapter_gap,
         music=args.music,
         music_volume=args.music_volume,
+        music_preset=args.music_preset,
         expressive=args.expressive,
+        male_voice=args.male_voice,
+        female_voice=args.female_voice,
+        thumbnails=args.thumbnails,
     )
 
     try:
+        if config.thumbnails:
+            require_freellmapi_configured()
         pipeline = Pipeline(config, console)
         if args.dry_run:
             _dry_run(pipeline, console)

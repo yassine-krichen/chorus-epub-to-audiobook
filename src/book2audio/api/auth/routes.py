@@ -8,11 +8,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from book2audio.api.auth.rate_limit import enforce_login_rate_limit, enforce_refresh_rate_limit
 from book2audio.api.auth.schemas import (
     LoginRequest,
     LogoutRequest,
@@ -52,7 +53,10 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
 
 
 @router.post("/login", response_model=TokenPairResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPairResponse:
+def login(
+    payload: LoginRequest, request: Request, db: Session = Depends(get_db)
+) -> TokenPairResponse:
+    enforce_login_rate_limit(request, payload.email)
     user = db.scalar(select(User).where(User.email == payload.email))
     if user is None:
         # Still pay the Argon2 cost so a nonexistent email doesn't return
@@ -65,7 +69,10 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPairResp
 
 
 @router.post("/refresh", response_model=TokenPairResponse)
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPairResponse:
+def refresh(
+    payload: RefreshRequest, request: Request, db: Session = Depends(get_db)
+) -> TokenPairResponse:
+    enforce_refresh_rate_limit(request)
     token_hash = hash_refresh_token(payload.refresh_token)
     stored = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
     if stored is None or not _refresh_token_is_valid(stored):

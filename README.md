@@ -64,6 +64,8 @@ book2audio generate <epub> [options]
       --work-dir PATH   Scratch dir for chapter audio + resume state
       --narrator VOICE  Narrator voice id (default: am_michael)
       --voice NAME=VOICE  Override a character's voice (repeatable)
+      --male-voice VOICE    Preferred voice for male-guessed characters
+      --female-voice VOICE  Preferred voice for female-guessed characters
       --speed FLOAT     Speaking speed 0.5–2.0 (default: 1.0)
       --bitrate STR     AAC bitrate (default: 64k)
       --limit N         Only render the first N chapters
@@ -71,8 +73,12 @@ book2audio generate <epub> [options]
       --chapter-gap SECONDS  Pause between chapters (default: 1.8)
       --no-music        Disable the ambient background music bed
       --music-volume 0-1  Background music loudness relative to narration (default: 0.22)
+      --music-preset NAME    Background music style: ambient, drone, rain (default: ambient)
       --no-expressive   Disable punctuation-driven pacing/energy variation
       --dry-run         Parse, attribute, and cast without synthesizing
+      --thumbnails      Enable per-chapter cover thumbnails (validates freellmapi
+                         credentials only; actual thumbnail files are currently
+                         produced by the hosted worker, not this CLI)
 ```
 
 ### Audio production

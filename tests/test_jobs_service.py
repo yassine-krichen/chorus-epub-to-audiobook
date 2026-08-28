@@ -255,7 +255,11 @@ def test_cancel_job_returns_none_when_the_job_belongs_to_a_different_user(db_ses
 def test_to_part_progress_renders_the_download_filename_from_the_job_config_template(monkeypatch):
     presign_get = MagicMock(return_value="https://signed-url")
     monkeypatch.setattr(service, "presign_get", presign_get)
-    job = SimpleNamespace(title="My Book", config={"filename_template": "{title} - Part {part:02d}"})
+    job = SimpleNamespace(
+        title="My Book",
+        config={"filename_template": "{title} - Part {part:02d}"},
+        artifacts_swept_at=None,
+    )
     part = {
         "part_number": 3,
         "first_index": 1,
@@ -275,7 +279,7 @@ def test_to_part_progress_renders_the_download_filename_from_the_job_config_temp
 def test_to_part_progress_omits_a_download_filename_when_no_template_is_configured(monkeypatch):
     presign_get = MagicMock(return_value="https://signed-url")
     monkeypatch.setattr(service, "presign_get", presign_get)
-    job = SimpleNamespace(title="My Book", config={})
+    job = SimpleNamespace(title="My Book", config={}, artifacts_swept_at=None)
     part = {
         "part_number": 1,
         "first_index": 1,
@@ -292,7 +296,7 @@ def test_to_part_progress_omits_a_download_filename_when_no_template_is_configur
 def test_to_part_progress_does_not_presign_a_part_that_is_not_yet_done(monkeypatch):
     presign_get = MagicMock()
     monkeypatch.setattr(service, "presign_get", presign_get)
-    job = SimpleNamespace(title="My Book", config={})
+    job = SimpleNamespace(title="My Book", config={}, artifacts_swept_at=None)
     part = {
         "part_number": 1,
         "first_index": 1,
@@ -317,8 +321,9 @@ def test_to_chapter_progress_presigns_the_thumbnail_url_when_status_is_ready(mon
         "thumbnail_status": "ready",
         "thumbnail_r2_key": "jobs/1/thumbnails/chapter-0001.png",
     }
+    job = SimpleNamespace(artifacts_swept_at=None)
 
-    result = service._to_chapter_progress(chapter)
+    result = service._to_chapter_progress(chapter, job)
 
     assert result.thumbnail_url == "https://signed-thumb-url"
     presign_get.assert_called_once_with("jobs/1/thumbnails/chapter-0001.png")
@@ -330,8 +335,9 @@ def test_to_chapter_progress_leaves_thumbnail_fields_none_for_a_chapter_with_no_
     presign_get = MagicMock()
     monkeypatch.setattr(service, "presign_get", presign_get)
     chapter = {"index": 1, "title": "One", "status": "done"}
+    job = SimpleNamespace(artifacts_swept_at=None)
 
-    result = service._to_chapter_progress(chapter)
+    result = service._to_chapter_progress(chapter, job)
 
     assert result.thumbnail_status is None
     assert result.thumbnail_url is None
@@ -342,9 +348,99 @@ def test_to_chapter_progress_does_not_presign_when_thumbnail_status_is_failed(mo
     presign_get = MagicMock()
     monkeypatch.setattr(service, "presign_get", presign_get)
     chapter = {"index": 1, "title": "One", "status": "done", "thumbnail_status": "failed"}
+    job = SimpleNamespace(artifacts_swept_at=None)
 
-    result = service._to_chapter_progress(chapter)
+    result = service._to_chapter_progress(chapter, job)
 
     assert result.thumbnail_status == "failed"
     assert result.thumbnail_url is None
+    presign_get.assert_not_called()
+
+
+# --- artifacts_swept_at guard: never hand out a URL to a deleted object ---
+#
+# Core correctness guarantee of the cleanup sweep feature: once a job's R2
+# artifacts have been deleted, no part/chapter of that job may ever get a
+# presigned URL again -- regardless of what status is still stored on the
+# part/chapter itself (a stale "done"/"ready" status must not matter).
+
+
+def test_to_part_progress_omits_download_url_once_the_jobs_artifacts_are_swept(monkeypatch):
+    presign_get = MagicMock(return_value="https://signed-url")
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    job = SimpleNamespace(
+        title="My Book",
+        config={},
+        artifacts_swept_at=datetime.now(timezone.utc),
+    )
+    part = {
+        "part_number": 1,
+        "first_index": 1,
+        "last_index": 1,
+        "r2_key": "jobs/1/part-01.m4b",
+        "status": "done",  # still stored as done -- the object itself is gone
+    }
+
+    result = service._to_part_progress(part, job)
+
+    assert result.download_url is None
+    presign_get.assert_not_called()
+
+
+def test_to_chapter_progress_omits_thumbnail_url_once_the_jobs_artifacts_are_swept(monkeypatch):
+    presign_get = MagicMock(return_value="https://signed-thumb-url")
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    job = SimpleNamespace(artifacts_swept_at=datetime.now(timezone.utc))
+    chapter = {
+        "index": 1,
+        "title": "One",
+        "status": "done",
+        "thumbnail_status": "ready",  # still stored as ready -- object is gone
+        "thumbnail_r2_key": "jobs/1/thumbnails/chapter-0001.png",
+    }
+
+    result = service._to_chapter_progress(chapter, job)
+
+    assert result.thumbnail_status == "ready"  # status field itself is untouched
+    assert result.thumbnail_url is None
+    presign_get.assert_not_called()
+
+
+def test_to_detail_omits_every_download_and_thumbnail_url_once_the_jobs_artifacts_are_swept(
+    db_session, monkeypatch
+):
+    """End-to-end through to_detail(), against a real Job row -- not just the
+    private helpers in isolation."""
+    presign_get = MagicMock(return_value="https://signed-url")
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    user = _make_user(db_session)
+    job = _make_job(
+        db_session,
+        user.id,
+        status="canceled",
+        artifacts_swept_at=datetime.now(timezone.utc),
+        parts=[
+            {
+                "part_number": 1,
+                "first_index": 1,
+                "last_index": 1,
+                "r2_key": "jobs/1/part-01.m4b",
+                "status": "done",
+            }
+        ],
+        chapters=[
+            {
+                "index": 1,
+                "title": "One",
+                "status": "done",
+                "thumbnail_status": "ready",
+                "thumbnail_r2_key": "jobs/1/thumbnails/chapter-0001.png",
+            }
+        ],
+    )
+
+    detail = service.to_detail(job)
+
+    assert detail.parts[0].download_url is None
+    assert detail.chapters[0].thumbnail_url is None
     presign_get.assert_not_called()

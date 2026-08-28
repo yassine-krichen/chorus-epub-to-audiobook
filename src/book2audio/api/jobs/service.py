@@ -172,6 +172,7 @@ def _to_summary(job: Job) -> JobSummary:
         created_at=job.created_at,
         started_at=job.started_at,
         finished_at=job.finished_at,
+        artifacts_swept_at=job.artifacts_swept_at,
     )
 
 
@@ -181,7 +182,7 @@ def to_detail(job: Job) -> JobDetail:
         **_to_summary(job).model_dump(),
         epub_object_key=job.epub_object_key,
         config=job.config,
-        chapters=[_to_chapter_progress(c) for c in job.chapters],
+        chapters=[_to_chapter_progress(c, job) for c in job.chapters],
         parts=parts,
         error_message=job.error_message,
     )
@@ -189,7 +190,7 @@ def to_detail(job: Job) -> JobDetail:
 
 def _to_part_progress(part: dict, job: Job) -> PartProgress:
     download_url = None
-    if part.get("status") == "done":
+    if part.get("status") == "done" and job.artifacts_swept_at is None:
         template = job.config.get("filename_template")
         download_filename = (
             render_filename(template, title=job.title, part=part["part_number"])
@@ -200,9 +201,13 @@ def _to_part_progress(part: dict, job: Job) -> PartProgress:
     return PartProgress(**part, download_url=download_url)
 
 
-def _to_chapter_progress(chapter: dict) -> ChapterProgress:
+def _to_chapter_progress(chapter: dict, job: Job) -> ChapterProgress:
     thumbnail_url = None
-    if chapter.get("thumbnail_status") == "ready" and chapter.get("thumbnail_r2_key"):
+    if (
+        job.artifacts_swept_at is None
+        and chapter.get("thumbnail_status") == "ready"
+        and chapter.get("thumbnail_r2_key")
+    ):
         thumbnail_url = presign_get(chapter["thumbnail_r2_key"])
     return ChapterProgress(
         index=chapter["index"],

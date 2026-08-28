@@ -42,7 +42,9 @@ def _uuid_as_char_on_sqlite(element, compiler, **kw):  # noqa: ANN001
     return "CHAR(32)"
 
 
+import book2audio.api.auth.rate_limit as rate_limit_module  # noqa: E402
 import book2audio.db.session as db_session_module  # noqa: E402
+import book2audio.worker.cleanup as worker_cleanup_module  # noqa: E402
 import book2audio.worker.entrypoint as worker_entrypoint_module  # noqa: E402
 import book2audio.worker.progress as worker_progress_module  # noqa: E402
 from book2audio.db.models import Base  # noqa: E402
@@ -54,11 +56,13 @@ from book2audio.db.models import Base  # noqa: E402
 # across every thread instead, which is what an in-memory test DB needs.
 #
 # db.session's own ``get_session()`` reads ``SessionLocal`` as a module global
-# at call time, so overwriting the attribute is enough there. worker/progress.py
-# and worker/entrypoint.py did ``from book2audio.db.session import SessionLocal``,
-# which bound their *own* module-level name at import time — that name has to
-# be repointed too, or those modules would keep using the original (broken)
-# per-thread engine.
+# at call time, so overwriting the attribute is enough there. worker/progress.py,
+# worker/entrypoint.py, and worker/cleanup.py all did
+# ``from book2audio.db.session import SessionLocal``, which bound their *own*
+# module-level name at import time — that name has to be repointed too, or
+# those modules would keep using the original engine, which has no tables
+# created on it (Base.metadata.create_all below only runs against *this*
+# module's engine) and would raise "no such table" the moment a query ran.
 engine = create_engine(
     "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
 )
@@ -68,6 +72,7 @@ db_session_module.engine = engine
 db_session_module.SessionLocal = SessionLocal
 worker_progress_module.SessionLocal = SessionLocal
 worker_entrypoint_module.SessionLocal = SessionLocal
+worker_cleanup_module.SessionLocal = SessionLocal
 
 Base.metadata.create_all(engine)
 
@@ -81,6 +86,14 @@ def _clean_database():
     with engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):
             conn.execute(table.delete())
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Module-level limiter state would otherwise leak across the whole test
+    session and eventually start 429-ing unrelated login/refresh tests."""
+    yield
+    rate_limit_module.reset_all()
 
 
 @pytest.fixture

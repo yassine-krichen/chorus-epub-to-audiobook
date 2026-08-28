@@ -118,6 +118,7 @@ class JobSummary(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    artifacts_swept_at: datetime | None = None
 
 
 class JobDetail(JobSummary):

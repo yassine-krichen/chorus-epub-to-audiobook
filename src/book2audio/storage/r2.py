@@ -97,3 +97,48 @@ def upload_bytes(data: bytes, key: str, *, content_type: str | None = None) -> N
 
 def download_file(key: str, local_path: str) -> None:
     _client().download_file(_bucket(), key, local_path)
+
+
+def list_objects(prefix: str) -> list[str]:
+    """Return every object key under ``prefix``, paginating as needed."""
+    client = _client()
+    bucket = _bucket()
+    keys: list[str] = []
+    continuation_token: str | None = None
+    while True:
+        kwargs = {"Bucket": bucket, "Prefix": prefix}
+        if continuation_token is not None:
+            kwargs["ContinuationToken"] = continuation_token
+        response = client.list_objects_v2(**kwargs)
+        keys.extend(obj["Key"] for obj in response.get("Contents", []))
+        if not response.get("IsTruncated"):
+            break
+        continuation_token = response.get("NextContinuationToken")
+    return keys
+
+
+def delete_objects(keys: list[str]) -> None:
+    """Batch-delete ``keys``, chunked to R2/S3's 1000-key-per-request limit.
+
+    Raises ``RuntimeError`` if any chunk's response reports per-object
+    ``Errors`` (e.g. a transient failure deleting one key out of a chunk) --
+    ``delete_objects`` can partially fail without raising on its own, so
+    callers must not assume every key was actually removed just because the
+    call returned. Matches this module's existing convention of raising
+    ``RuntimeError`` for failure conditions (see ``_bucket``/``_client``)
+    rather than returning a status object.
+    """
+    if not keys:
+        return
+    client = _client()
+    bucket = _bucket()
+    for i in range(0, len(keys), 1000):
+        chunk = keys[i : i + 1000]
+        response = client.delete_objects(
+            Bucket=bucket,
+            Delete={"Objects": [{"Key": key} for key in chunk]},
+        )
+        errors = response.get("Errors")
+        if errors:
+            failed_keys = [error.get("Key") for error in errors]
+            raise RuntimeError(f"Failed to delete R2 object(s): {failed_keys}")

@@ -14,6 +14,10 @@ from book2audio.storage import r2
 @pytest.fixture
 def fake_client(monkeypatch):
     client = MagicMock()
+    # Mirror the real delete_objects response shape (a dict, no "Errors" key
+    # on full success) so delete_objects()'s response.get("Errors") check
+    # doesn't misread an unconfigured MagicMock return value as an error.
+    client.delete_objects.return_value = {}
     monkeypatch.setattr(r2.boto3, "client", MagicMock(return_value=client))
     return client
 
@@ -162,3 +166,123 @@ def test_presign_get_rejects_a_download_filename_containing_a_backslash(fake_cli
         r2.presign_get("k", download_filename="a\\b.m4b")
 
     fake_client.generate_presigned_url.assert_not_called()
+
+
+# --- list_objects: pages through list_objects_v2 ---------------------------
+
+
+def test_list_objects_returns_all_keys_from_a_single_page(fake_client):
+    fake_client.list_objects_v2.return_value = {
+        "Contents": [{"Key": "jobs/1/part-01.m4b"}, {"Key": "jobs/1/part-02.m4b"}],
+        "IsTruncated": False,
+    }
+
+    keys = r2.list_objects("jobs/1/")
+
+    assert keys == ["jobs/1/part-01.m4b", "jobs/1/part-02.m4b"]
+    fake_client.list_objects_v2.assert_called_once_with(
+        Bucket="test-bucket", Prefix="jobs/1/"
+    )
+
+
+def test_list_objects_returns_an_empty_list_when_the_prefix_has_no_objects(fake_client):
+    fake_client.list_objects_v2.return_value = {"IsTruncated": False}
+
+    keys = r2.list_objects("jobs/missing/")
+
+    assert keys == []
+
+
+def test_list_objects_follows_the_continuation_token_across_multiple_pages(fake_client):
+    fake_client.list_objects_v2.side_effect = [
+        {
+            "Contents": [{"Key": "jobs/1/a"}],
+            "IsTruncated": True,
+            "NextContinuationToken": "token-1",
+        },
+        {
+            "Contents": [{"Key": "jobs/1/b"}],
+            "IsTruncated": True,
+            "NextContinuationToken": "token-2",
+        },
+        {
+            "Contents": [{"Key": "jobs/1/c"}],
+            "IsTruncated": False,
+        },
+    ]
+
+    keys = r2.list_objects("jobs/1/")
+
+    assert keys == ["jobs/1/a", "jobs/1/b", "jobs/1/c"]
+    assert fake_client.list_objects_v2.call_count == 3
+    second_call_kwargs = fake_client.list_objects_v2.call_args_list[1].kwargs
+    assert second_call_kwargs["ContinuationToken"] == "token-1"
+    third_call_kwargs = fake_client.list_objects_v2.call_args_list[2].kwargs
+    assert third_call_kwargs["ContinuationToken"] == "token-2"
+
+
+def test_list_objects_omits_continuation_token_on_the_first_request(fake_client):
+    fake_client.list_objects_v2.return_value = {"Contents": [], "IsTruncated": False}
+
+    r2.list_objects("jobs/1/")
+
+    _, kwargs = fake_client.list_objects_v2.call_args
+    assert "ContinuationToken" not in kwargs
+
+
+# --- delete_objects: chunked batch deletion ---------------------------------
+
+
+def test_delete_objects_is_a_no_op_for_an_empty_list(fake_client):
+    r2.delete_objects([])
+
+    fake_client.delete_objects.assert_not_called()
+
+
+def test_delete_objects_issues_a_single_request_when_under_the_chunk_limit(fake_client):
+    keys = ["jobs/1/a", "jobs/1/b", "jobs/1/c"]
+
+    r2.delete_objects(keys)
+
+    fake_client.delete_objects.assert_called_once_with(
+        Bucket="test-bucket",
+        Delete={"Objects": [{"Key": k} for k in keys]},
+    )
+
+
+def test_delete_objects_chunks_at_1000_keys_per_request(fake_client):
+    keys = [f"jobs/1/thumbnails/chapter-{i:04d}.png" for i in range(2500)]
+
+    r2.delete_objects(keys)
+
+    assert fake_client.delete_objects.call_count == 3
+    chunk_sizes = [
+        len(call.kwargs["Delete"]["Objects"])
+        for call in fake_client.delete_objects.call_args_list
+    ]
+    assert chunk_sizes == [1000, 1000, 500]
+
+
+def test_delete_objects_uses_the_configured_bucket_for_every_chunk(fake_client):
+    keys = [f"k{i}" for i in range(1500)]
+
+    r2.delete_objects(keys)
+
+    for call in fake_client.delete_objects.call_args_list:
+        assert call.kwargs["Bucket"] == "test-bucket"
+
+
+def test_delete_objects_raises_when_the_response_reports_partial_failures(fake_client):
+    fake_client.delete_objects.return_value = {
+        "Deleted": [{"Key": "jobs/1/a"}],
+        "Errors": [{"Key": "jobs/1/b", "Code": "InternalError", "Message": "transient"}],
+    }
+
+    with pytest.raises(RuntimeError, match="jobs/1/b"):
+        r2.delete_objects(["jobs/1/a", "jobs/1/b"])
+
+
+def test_delete_objects_succeeds_silently_when_the_response_has_no_errors(fake_client):
+    fake_client.delete_objects.return_value = {"Deleted": [{"Key": "jobs/1/a"}]}
+
+    r2.delete_objects(["jobs/1/a"])  # no exception raised
