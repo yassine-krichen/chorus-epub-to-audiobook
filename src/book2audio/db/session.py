@@ -19,6 +19,17 @@ def _database_url() -> str:
     url = os.environ.get("DATABASE_URL")
     if not url:
         raise RuntimeError("DATABASE_URL environment variable is not set")
+    return _use_psycopg_driver(url)
+
+
+def _use_psycopg_driver(url: str) -> str:
+    # A bare postgres(ql):// URL (what Neon and most providers hand out) makes
+    # SQLAlchemy default to psycopg2, which this project doesn't depend on —
+    # it depends on psycopg (v3). Force the right driver explicitly.
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://") :]
     return url
 
 

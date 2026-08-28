@@ -15,3 +15,6 @@ output/
 
 # Local-only deployment notes, deleted by the user once deployed
 DEPLOYMENT.md
+
+# Local secrets, never commit
+.env

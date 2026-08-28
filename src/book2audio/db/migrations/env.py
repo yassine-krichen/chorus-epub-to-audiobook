@@ -7,6 +7,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from book2audio.db.models import Base
+from book2audio.db.session import _use_psycopg_driver
 
 config = context.config
 
@@ -20,7 +21,7 @@ def _database_url() -> str:
     url = os.environ.get("DATABASE_URL")
     if not url:
         raise RuntimeError("DATABASE_URL environment variable is not set")
-    return url
+    return _use_psycopg_driver(url)
 
 
 def run_migrations_offline() -> None:
