@@ -18,3 +18,6 @@ output/
 
 # Local dev tools (MinIO, cloudflared binaries + data)
 .local-tools/
+
+# Active working deploy notes, local-only
+DEPLOYMENT-HYBRID.md
