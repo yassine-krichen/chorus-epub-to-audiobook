@@ -28,17 +28,29 @@ def _bucket() -> str:
     return bucket
 
 
-def _client():
+def _endpoint_url() -> str:
+    # Hybrid mode points this at a local MinIO instance (exposed via a
+    # Cloudflare Tunnel) instead of R2 -- everything else in this module is
+    # unaware of which backend it's talking to, since both are S3-compatible.
+    override = os.environ.get("R2_ENDPOINT_URL")
+    if override:
+        return override
     account_id = os.environ.get("R2_ACCOUNT_ID")
+    if not account_id:
+        raise RuntimeError(
+            "R2_ENDPOINT_URL or R2_ACCOUNT_ID environment variable must be set"
+        )
+    return f"https://{account_id}.r2.cloudflarestorage.com"
+
+
+def _client():
     access_key = os.environ.get("R2_ACCESS_KEY_ID")
     secret_key = os.environ.get("R2_SECRET_ACCESS_KEY")
-    if not (account_id and access_key and secret_key):
-        raise RuntimeError(
-            "R2_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must all be set"
-        )
+    if not (access_key and secret_key):
+        raise RuntimeError("R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must both be set")
     return boto3.client(
         "s3",
-        endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+        endpoint_url=_endpoint_url(),
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
         config=BotoConfig(signature_version="s3v4"),

@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from book2audio.api.auth.routes import router as auth_router
+from book2audio.api.jobs import service as jobs_service
 from book2audio.api.jobs.routes import router as jobs_router
 from book2audio.api.voices.routes import router as voices_router
 
@@ -22,6 +23,8 @@ def create_app() -> FastAPI:
         raise RuntimeError(
             "CORS_ORIGINS must not contain '*' while allow_credentials is enabled"
         )
+    # Fail fast on a bad WORKER_MODE at startup, not on first job creation.
+    jobs_service.worker_mode()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

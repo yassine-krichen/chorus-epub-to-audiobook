@@ -42,6 +42,20 @@ def _cloud_run_job_name() -> str:
     return name
 
 
+def worker_mode() -> str:
+    """Which render worker triggers jobs: Cloud Run (default) or a local daemon.
+
+    Hybrid deployments run the render worker on the user's own machine, polling
+    the DB instead of being triggered here -- see ``worker.local_daemon``.
+    """
+    mode = os.environ.get("WORKER_MODE", "cloud_run")
+    if mode not in ("cloud_run", "local"):
+        raise RuntimeError(
+            f"WORKER_MODE must be 'cloud_run' or 'local', got {mode!r}"
+        )
+    return mode
+
+
 def create_job(db: Session, user_id: uuid.UUID, payload: CreateJobRequest) -> Job:
     job = Job(
         user_id=user_id,
@@ -55,6 +69,10 @@ def create_job(db: Session, user_id: uuid.UUID, payload: CreateJobRequest) -> Jo
     db.add(job)
     db.commit()
     db.refresh(job)
+
+    if worker_mode() == "local":
+        # A local daemon polls for "queued" jobs itself -- nothing to trigger.
+        return job
 
     try:
         execution = _trigger_render(job)
@@ -123,7 +141,14 @@ def cancel_job(db: Session, user_id: uuid.UUID, job_id: uuid.UUID) -> Job | None
     if job.status in ("succeeded", "failed", "canceled"):
         return job
 
-    if job.status == "running" and job.cloud_run_execution_name:
+    if worker_mode() == "local":
+        # Set unconditionally, not just for "running" jobs: a job that's still
+        # "queued" right now can be claimed by the local daemon a moment later
+        # (see local_daemon.py::_claim_next_job) -- without this, that race
+        # lets the daemon render a job the API already canceled, with no way
+        # to notice mid-render.
+        job.cancel_requested_at = datetime.now(timezone.utc)
+    elif job.status == "running" and job.cloud_run_execution_name:
         try:
             cloud_run.cancel_execution(job.cloud_run_execution_name)
         except (httpx.HTTPError, google.auth.exceptions.GoogleAuthError):
@@ -137,7 +162,7 @@ def cancel_job(db: Session, user_id: uuid.UUID, job_id: uuid.UUID) -> Job | None
 
 
 def _reconcile_if_stale(db: Session, job: Job) -> None:
-    if job.status != "running" or not job.cloud_run_execution_name:
+    if job.status != "running":
         return
     heartbeat = job.last_heartbeat_at
     if heartbeat is None:
@@ -145,6 +170,17 @@ def _reconcile_if_stale(db: Session, job: Job) -> None:
     if heartbeat.tzinfo is None:
         heartbeat = heartbeat.replace(tzinfo=timezone.utc)
     if datetime.now(timezone.utc) - heartbeat < _STALE_HEARTBEAT:
+        return
+
+    if job.cloud_run_execution_name is None:
+        if worker_mode() == "local":
+            job.status = "failed"
+            job.error_message = (
+                "local worker did not report progress in time -- it may have crashed"
+            )
+            job.finished_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(job)
         return
 
     try:

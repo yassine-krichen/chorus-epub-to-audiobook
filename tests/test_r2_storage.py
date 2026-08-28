@@ -82,6 +82,46 @@ def test_bucket_raises_a_clear_error_when_r2_bucket_env_var_is_missing(monkeypat
         r2.presign_put("k")
 
 
+# --- _endpoint_url: hybrid mode points this at a local MinIO instance ------
+#
+# R2_ENDPOINT_URL overrides the R2_ACCOUNT_ID-derived endpoint so the worker
+# can talk to a local MinIO (via a Cloudflare Tunnel) instead of real R2 --
+# see worker/local_daemon.py.
+
+
+def test_endpoint_url_uses_the_override_verbatim_when_r2_endpoint_url_is_set(monkeypatch):
+    monkeypatch.setenv("R2_ENDPOINT_URL", "https://minio.tunnel.example.com")
+
+    assert r2._endpoint_url() == "https://minio.tunnel.example.com"
+
+
+def test_endpoint_url_falls_back_to_the_account_id_derived_url_when_no_override_is_set(
+    monkeypatch,
+):
+    monkeypatch.delenv("R2_ENDPOINT_URL", raising=False)
+
+    assert r2._endpoint_url() == "https://test-account.r2.cloudflarestorage.com"
+
+
+def test_endpoint_url_raises_when_neither_override_nor_account_id_is_set(monkeypatch):
+    monkeypatch.delenv("R2_ENDPOINT_URL", raising=False)
+    monkeypatch.delenv("R2_ACCOUNT_ID", raising=False)
+
+    with pytest.raises(RuntimeError, match="R2_ENDPOINT_URL or R2_ACCOUNT_ID"):
+        r2._endpoint_url()
+
+
+def test_client_uses_the_r2_endpoint_url_override_when_set(monkeypatch):
+    monkeypatch.setenv("R2_ENDPOINT_URL", "https://minio.tunnel.example.com")
+    boto_client = MagicMock(return_value=MagicMock())
+    monkeypatch.setattr(r2.boto3, "client", boto_client)
+
+    r2.presign_put("k")
+
+    _, kwargs = boto_client.call_args
+    assert kwargs["endpoint_url"] == "https://minio.tunnel.example.com"
+
+
 def test_upload_bytes_puts_the_object_at_the_given_key(fake_client):
     r2.upload_bytes(b"raw-bytes", "jobs/1/thumbnails/chapter-0001.png")
 

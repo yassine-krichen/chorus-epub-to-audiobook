@@ -47,6 +47,28 @@ def _make_job(db_session, user_id, **overrides) -> Job:
     return job
 
 
+# --- worker_mode(): cloud_run (default) vs local dispatch ------------------
+
+
+def test_worker_mode_defaults_to_cloud_run_when_the_env_var_is_unset(monkeypatch):
+    monkeypatch.delenv("WORKER_MODE", raising=False)
+
+    assert service.worker_mode() == "cloud_run"
+
+
+def test_worker_mode_returns_local_when_explicitly_set(monkeypatch):
+    monkeypatch.setenv("WORKER_MODE", "local")
+
+    assert service.worker_mode() == "local"
+
+
+def test_worker_mode_raises_for_an_unrecognized_value(monkeypatch):
+    monkeypatch.setenv("WORKER_MODE", "on-prem")
+
+    with pytest.raises(RuntimeError, match="WORKER_MODE"):
+        service.worker_mode()
+
+
 def test_create_job_starts_running_with_a_cloud_run_execution_recorded(db_session, monkeypatch):
     monkeypatch.setattr(
         service.cloud_run,
@@ -126,6 +148,21 @@ def test_create_job_marks_the_job_failed_when_cloud_run_trigger_raises(db_sessio
     assert job.cloud_run_execution_name is None
 
 
+def test_create_job_in_local_mode_never_triggers_cloud_run_and_stays_queued(db_session, monkeypatch):
+    monkeypatch.setenv("WORKER_MODE", "local")
+    run_job_execution = MagicMock()
+    monkeypatch.setattr(service.cloud_run, "run_job_execution", run_job_execution)
+    user = _make_user(db_session)
+    payload = CreateJobRequest(epub_object_key="uploads/book.epub", title="A Book")
+
+    job = service.create_job(db_session, user.id, payload)
+
+    run_job_execution.assert_not_called()
+    assert job.status == "queued"
+    assert job.cloud_run_execution_name is None
+    assert job.started_at is None
+
+
 def test_get_job_with_a_fresh_heartbeat_does_not_call_cloud_run(db_session, monkeypatch):
     get_execution = MagicMock()
     monkeypatch.setattr(service.cloud_run, "get_execution", get_execution)
@@ -202,6 +239,74 @@ def test_get_job_with_a_stale_heartbeat_but_still_running_execution_leaves_job_r
     get_execution.assert_called_once()
 
 
+# --- _reconcile_if_stale: local-mode branch ---------------------------------
+#
+# A local-mode job has no cloud_run_execution_name to poll -- if its
+# heartbeat goes stale, the only reasonable conclusion is that the local
+# worker crashed, so it's marked failed directly instead of calling Cloud Run.
+
+
+def test_get_job_in_local_mode_marks_a_stale_running_job_with_no_execution_name_failed(
+    db_session, monkeypatch
+):
+    monkeypatch.setenv("WORKER_MODE", "local")
+    get_execution = MagicMock()
+    monkeypatch.setattr(service.cloud_run, "get_execution", get_execution)
+    user = _make_user(db_session)
+    job = _make_job(
+        db_session,
+        user.id,
+        cloud_run_execution_name=None,
+        last_heartbeat_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+    )
+
+    result = service.get_job(db_session, user.id, job.id)
+
+    assert result.status == "failed"
+    assert result.error_message
+    assert result.finished_at is not None
+    get_execution.assert_not_called()
+
+
+def test_get_job_in_local_mode_leaves_a_freshly_heartbeating_job_running(db_session, monkeypatch):
+    monkeypatch.setenv("WORKER_MODE", "local")
+    user = _make_user(db_session)
+    job = _make_job(
+        db_session,
+        user.id,
+        cloud_run_execution_name=None,
+        last_heartbeat_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+    )
+
+    result = service.get_job(db_session, user.id, job.id)
+
+    assert result.status == "running"
+
+
+def test_get_job_in_cloud_run_mode_never_applies_the_local_stale_branch_even_with_no_execution_name(
+    db_session, monkeypatch
+):
+    """The local-mode reconciliation branch must be strictly gated on
+    worker_mode() -- a running job with no cloud_run_execution_name
+    (shouldn't happen in practice under cloud_run mode) must be left alone,
+    not marked failed, and Cloud Run must never be called since there's no
+    execution to poll."""
+    get_execution = MagicMock()
+    monkeypatch.setattr(service.cloud_run, "get_execution", get_execution)
+    user = _make_user(db_session)
+    job = _make_job(
+        db_session,
+        user.id,
+        cloud_run_execution_name=None,
+        last_heartbeat_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+    )
+
+    result = service.get_job(db_session, user.id, job.id)
+
+    assert result.status == "running"
+    get_execution.assert_not_called()
+
+
 def test_get_job_returns_none_when_the_job_belongs_to_a_different_user(db_session, monkeypatch):
     monkeypatch.setattr(service.cloud_run, "get_execution", MagicMock())
     owner = _make_user(db_session)
@@ -227,6 +332,34 @@ def test_cancel_job_marks_a_running_job_canceled_and_calls_cloud_run(db_session,
     assert result.status == "canceled"
     assert result.finished_at is not None
     cancel_execution.assert_called_once_with(job.cloud_run_execution_name)
+
+
+def test_cancel_job_in_cloud_run_mode_does_not_set_cancel_requested_at(db_session, monkeypatch):
+    monkeypatch.setattr(service.cloud_run, "cancel_execution", MagicMock(return_value={}))
+    user = _make_user(db_session)
+    job = _make_job(db_session, user.id, status="running")
+
+    result = service.cancel_job(db_session, user.id, job.id)
+
+    assert result.status == "canceled"
+    assert result.cancel_requested_at is None
+
+
+def test_cancel_job_in_local_mode_sets_cancel_requested_at_and_never_calls_cloud_run(
+    db_session, monkeypatch
+):
+    monkeypatch.setenv("WORKER_MODE", "local")
+    cancel_execution = MagicMock()
+    monkeypatch.setattr(service.cloud_run, "cancel_execution", cancel_execution)
+    user = _make_user(db_session)
+    job = _make_job(db_session, user.id, status="running", cloud_run_execution_name=None)
+
+    result = service.cancel_job(db_session, user.id, job.id)
+
+    assert result.status == "canceled"
+    assert result.cancel_requested_at is not None
+    assert result.finished_at is not None
+    cancel_execution.assert_not_called()
 
 
 def test_cancel_job_leaves_an_already_terminal_job_unchanged(db_session, monkeypatch):
