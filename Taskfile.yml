@@ -1,0 +1,22 @@
+version: '3'
+
+tasks:
+  worker:
+    desc: Start local worker (MinIO + Cloudflare tunnel + render daemon). Ctrl+C stops all three.
+    cmds:
+      - powershell -ExecutionPolicy Bypass -File scripts/local-worker.ps1
+
+  install:
+    desc: Install Python dependencies with uv
+    cmds:
+      - uv sync
+
+  test:
+    desc: Run the test suite
+    cmds:
+      - uv run pytest
+
+  help:
+    desc: List available tasks
+    cmds:
+      - task --list
