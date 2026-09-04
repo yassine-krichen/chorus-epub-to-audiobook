@@ -20,7 +20,7 @@ export function ChapterGrid({ totalChapters, chapters }: ChapterGridProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {Array.from({ length: totalChapters }, (_, index) => (
-        <ChapterCard key={index} index={index} chapter={chaptersByIndex.get(index)} />
+        <ChapterCard key={index} index={index} chapter={chaptersByIndex.get(index + 1)} />
       ))}
     </div>
   );

@@ -17,8 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { JobProgressBar } from "@/components/jobs/job-progress-bar";
+import { JobRenderStage } from "@/components/jobs/job-render-stage";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { cancelJob } from "@/lib/api/jobs";
+import { deriveRenderStage } from "@/lib/jobs/render-stage";
 import { ACTIVE_JOB_STATUSES, type JobDetail } from "@/types/job";
 
 export function JobDetailHeader({ job }: { job: JobDetail }) {
@@ -74,6 +76,7 @@ export function JobDetailHeader({ job }: { job: JobDetail }) {
         )}
       </div>
       <JobProgressBar percent={job.progress_percent} />
+      {isActive && <JobRenderStage stage={deriveRenderStage(job)} />}
     </div>
   );
 }
