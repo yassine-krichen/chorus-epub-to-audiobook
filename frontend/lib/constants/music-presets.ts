@@ -6,3 +6,10 @@
 export const MUSIC_PRESETS = ["ambient", "drone", "rain"] as const;
 
 export type MusicPreset = (typeof MUSIC_PRESETS)[number];
+
+/** Short, one-line descriptions shown next to each preset in the picker. */
+export const MUSIC_PRESET_DESCRIPTIONS: Record<MusicPreset, string> = {
+  ambient: "warm, breathing pad — default",
+  drone: "a lower, more still held tone",
+  rain: "rain/hiss ambience with slow gusts",
+};

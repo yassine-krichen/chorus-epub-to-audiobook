@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { MUSIC_PRESETS } from "@/lib/constants/music-presets";
+import { MUSIC_PRESETS, MUSIC_PRESET_DESCRIPTIONS } from "@/lib/constants/music-presets";
 import type { JobConfig } from "@/types/job";
 
 // Client-side UX convenience only — the backend does not enforce these
@@ -30,6 +30,7 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Label>Speed ({config.speed.toFixed(2)}x)</Label>
+        <p className="text-xs text-muted-foreground">1.0x is natural pace.</p>
         <Slider
           min={0.5}
           max={2.0}
@@ -41,6 +42,10 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
 
       <div className="flex flex-col gap-2">
         <Label>Bitrate</Label>
+        <p className="text-xs text-muted-foreground">
+          64k is fine for speech-only narration. Go higher (128k+) mainly if background music is
+          on and you notice compression artifacts.
+        </p>
         <Select
           value={isCustomBitrate ? "custom" : config.bitrate}
           onValueChange={(value) => {
@@ -95,6 +100,10 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="batch-size">Batch size</Label>
+        <p className="text-xs text-muted-foreground">
+          How many chapters get bundled into each downloadable part. Lower = parts finish sooner
+          but more files to manage. 0 = single file for the whole book.
+        </p>
         <Input
           id="batch-size"
           type="number"
@@ -106,6 +115,7 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
 
       <div className="flex flex-col gap-2">
         <Label>Chapter gap ({config.chapter_gap.toFixed(1)}s)</Label>
+        <p className="text-xs text-muted-foreground">Pause length between chapters.</p>
         <Slider
           min={0}
           max={5}
@@ -136,7 +146,12 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
               <SelectContent>
                 {MUSIC_PRESETS.map((preset) => (
                   <SelectItem key={preset} value={preset}>
-                    {preset}
+                    <div className="flex flex-col">
+                      <span>{preset}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {MUSIC_PRESET_DESCRIPTIONS[preset]}
+                      </span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -144,6 +159,10 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
           </div>
           <div className="flex flex-col gap-2">
             <Label>Music volume ({Math.round(config.music_volume * 100)}%)</Label>
+            <p className="text-xs text-muted-foreground">
+              Loudness of the background music bed relative to narration. Default (22%) is tuned
+              to sit under speech without competing.
+            </p>
             <Slider
               min={0}
               max={1}

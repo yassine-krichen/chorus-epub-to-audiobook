@@ -52,6 +52,11 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
 
   return (
     <div className="flex flex-col gap-4">
+      <p className="text-xs text-muted-foreground">
+        Narrator voice reads all narration. Male/female pickers bias (not force) character
+        casting when a character&apos;s gender is guessed from context. Defaults work fine if you
+        leave these alone.
+      </p>
       <div className="flex flex-col gap-2">
         <Label>Narrator voice</Label>
         <VoicePicker
