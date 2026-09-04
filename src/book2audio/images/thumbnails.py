@@ -29,8 +29,12 @@ def build_prompt(book_title: str, chapter: Chapter) -> str:
     title, and a short excerpt of the chapter's text."""
     excerpt = _excerpt(chapter)
     prompt = (
+        "Premium webnovel/light-novel book cover illustration, painterly digital art, "
+        "dramatic moody cinematic lighting, anime/manhwa-inspired character rendering, "
+        "rich saturated fantasy color palette, dynamic composition. "
         f"Book cover style illustration for a chapter of '{book_title}', "
         f"titled '{chapter.title}'. Scene inspired by: {excerpt}"
+        " No text, no watermark, no logos."
     )
     return prompt
 
