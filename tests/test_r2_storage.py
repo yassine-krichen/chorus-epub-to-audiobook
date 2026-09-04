@@ -7,6 +7,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from botocore.exceptions import ClientError
 
 from book2audio.storage import r2
 
@@ -326,3 +327,34 @@ def test_delete_objects_succeeds_silently_when_the_response_has_no_errors(fake_c
     fake_client.delete_objects.return_value = {"Deleted": [{"Key": "jobs/1/a"}]}
 
     r2.delete_objects(["jobs/1/a"])  # no exception raised
+
+
+# --- object_exists: head_object existence check -----------------------------
+
+
+def test_object_exists_returns_true_when_head_object_succeeds(fake_client):
+    fake_client.head_object.return_value = {}
+
+    assert r2.object_exists("voice-samples/am_adam.wav") is True
+    fake_client.head_object.assert_called_once_with(
+        Bucket="test-bucket", Key="voice-samples/am_adam.wav"
+    )
+
+
+def test_object_exists_returns_false_when_head_object_reports_a_404(fake_client):
+    fake_client.head_object.side_effect = ClientError(
+        {"Error": {"Code": "404"}, "ResponseMetadata": {"HTTPStatusCode": 404}},
+        "HeadObject",
+    )
+
+    assert r2.object_exists("voice-samples/missing.wav") is False
+
+
+def test_object_exists_re_raises_a_client_error_that_is_not_a_404(fake_client):
+    fake_client.head_object.side_effect = ClientError(
+        {"Error": {"Code": "403"}, "ResponseMetadata": {"HTTPStatusCode": 403}},
+        "HeadObject",
+    )
+
+    with pytest.raises(ClientError):
+        r2.object_exists("voice-samples/am_adam.wav")

@@ -9,6 +9,7 @@ class VoiceInfo(BaseModel):
     id: str
     gender: str
     is_default_narrator: bool
+    sample_url: str | None = None
 
 
 class VoicesResponse(BaseModel):

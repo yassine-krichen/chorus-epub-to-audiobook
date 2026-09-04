@@ -12,6 +12,7 @@ import re
 
 import boto3
 from botocore.client import Config as BotoConfig
+from botocore.exceptions import ClientError
 
 # Characters that could break out of the quoted filename="..." parameter or
 # inject extra header/response content (CRLF etc). Callers (e.g.
@@ -75,6 +76,27 @@ def presign_get(key: str, expires: int = 600, *, download_filename: str | None =
         Params=params,
         ExpiresIn=expires,
     )
+
+
+def object_exists(key: str) -> bool:
+    """Whether ``key`` exists in the configured bucket.
+
+    Uses ``head_object`` rather than ``list_objects``/``get_object`` since it
+    doesn't transfer any object data. Only a genuine "not found" response is
+    swallowed into ``False`` -- matched on the HTTP status code rather than
+    the boto3 error code, since S3-compatible services (e.g. MinIO in hybrid
+    mode) don't always return the same error code string as real R2/S3 for a
+    missing key, but they do agree on the 404 status. Any other error
+    (auth, network, misconfiguration) propagates so callers don't mistake a
+    broken config for a missing object.
+    """
+    try:
+        _client().head_object(Bucket=_bucket(), Key=key)
+    except ClientError as exc:
+        if exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+            return False
+        raise
+    return True
 
 
 def _content_disposition(filename: str) -> str:
