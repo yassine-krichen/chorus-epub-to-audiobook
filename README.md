@@ -191,4 +191,3 @@ not-yet-built:
 Kokoro voice ids follow `<accent><gender>_<name>` — e.g. `am_michael` (American
 male), `bf_emma` (British female). The character pool and default narrator live
 in `src/book2audio/tts/voices.py`.
- 
