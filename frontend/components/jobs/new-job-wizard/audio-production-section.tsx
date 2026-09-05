@@ -99,6 +99,21 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
       </div>
 
       <div className="flex flex-col gap-2">
+        <Label htmlFor="start-chapter">Start at chapter</Label>
+        <p className="text-xs text-muted-foreground">
+          Skip chapters before this one — e.g. resume partway through, or skip front matter your
+          EPUB didn&apos;t mark properly.
+        </p>
+        <Input
+          id="start-chapter"
+          type="number"
+          min={1}
+          value={config.start_chapter}
+          onChange={(event) => onChange({ start_chapter: Number(event.target.value) })}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Label htmlFor="batch-size">Batch size</Label>
         <p className="text-xs text-muted-foreground">
           How many chapters get bundled into each downloadable part. Lower = parts finish sooner

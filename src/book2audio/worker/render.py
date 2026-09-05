@@ -98,7 +98,8 @@ def _set_total_chapters(job_id: uuid.UUID, config: Config) -> str:
     thread the title into the progress hooks.
     """
     metadata, parsed = parse_epub(config.epub_path, cover_dir=config.work_dir)
-    total = len(parsed) if config.chapter_limit <= 0 else min(config.chapter_limit, len(parsed))
+    start_pos, end_pos = config.selection_bounds(len(parsed))
+    total = max(0, end_pos - start_pos)
     with SessionLocal() as session:
         job = session.get(Job, job_id)
         if job is None:

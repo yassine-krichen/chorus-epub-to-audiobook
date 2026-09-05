@@ -37,6 +37,7 @@ class JobConfig(BaseModel):
     speed: float = 1.0
     bitrate: str = "64k"
     chapter_limit: int = 0
+    start_chapter: int = 1
     batch_size: int = 10
     chapter_gap: float = 1.8
     music: bool = True
@@ -51,6 +52,13 @@ class JobConfig(BaseModel):
     def _validate_filename_template(cls, value: str | None) -> str | None:
         if value is not None:
             validate_filename_template(value)
+        return value
+
+    @field_validator("start_chapter")
+    @classmethod
+    def _validate_start_chapter(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError(f"start_chapter must be >= 1, got {value}")
         return value
 
     @field_validator("male_voice")

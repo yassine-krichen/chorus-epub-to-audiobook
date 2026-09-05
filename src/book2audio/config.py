@@ -45,6 +45,12 @@ class Config:
     # Optional cap on chapters, for quick previews (0 = whole book).
     chapter_limit: int = 0
 
+    # 1-based chapter to start rendering from (matches ``Chapter.index``'s
+    # own 1-based convention), for resuming partway through a book or
+    # skipping front matter. ``chapter_limit`` counts from here, not from the
+    # book's beginning.
+    start_chapter: int = 1
+
     # Emit a playable .m4b every ``batch_size`` chapters so listening can start
     # long before the whole book finishes (0 = one file for the whole book).
     batch_size: int = 10
@@ -91,9 +97,22 @@ class Config:
             raise ValueError(f"speed must be between 0.5 and 2.0, got {self.speed}")
         if self.chapter_limit < 0:
             raise ValueError("chapter_limit cannot be negative")
+        if self.start_chapter < 1:
+            raise ValueError("start_chapter must be >= 1")
         if self.batch_size < 0:
             raise ValueError("batch_size cannot be negative")
         if self.chapter_gap < 0:
             raise ValueError("chapter_gap cannot be negative")
         if not 0.0 <= self.music_volume <= 1.0:
             raise ValueError(f"music_volume must be between 0.0 and 1.0, got {self.music_volume}")
+
+    def selection_bounds(self, total: int) -> tuple[int, int]:
+        """0-based ``[start, end)`` slice bounds for a chapter list of length ``total``.
+
+        Single source of truth for combining ``start_chapter`` and
+        ``chapter_limit`` — both ``pipeline.py`` and ``worker/render.py`` must
+        use this instead of recomputing the same arithmetic independently.
+        """
+        start_pos = max(0, self.start_chapter - 1)
+        end_pos = start_pos + self.chapter_limit if self.chapter_limit > 0 else total
+        return start_pos, min(end_pos, total)

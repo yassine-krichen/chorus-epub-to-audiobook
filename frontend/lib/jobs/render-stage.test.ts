@@ -32,6 +32,10 @@ function withBatchSize(batchSize: number): JobConfig {
   return { ...DEFAULT_JOB_CONFIG, batch_size: batchSize };
 }
 
+function withBatchSizeAndStartChapter(batchSize: number, startChapter: number): JobConfig {
+  return { ...DEFAULT_JOB_CONFIG, batch_size: batchSize, start_chapter: startChapter };
+}
+
 function makeChapters(count: number): ChapterProgress[] {
   return Array.from({ length: count }, (_, i) => ({
     index: i + 1,
@@ -256,6 +260,145 @@ describe("deriveRenderStage", () => {
         kind: "synthesizing-chapter",
         chapterNumber: 4,
         totalChapters: 7,
+      });
+    });
+  });
+
+  describe("start_chapter offset (start_chapter > 1)", () => {
+    it("returns casting-voices when total_chapters is known but no chapters have started yet, offset from start_chapter", () => {
+      const job = baseJob({
+        status: "running",
+        total_chapters: 5,
+        config: withBatchSizeAndStartChapter(10, 10),
+        chapters: [],
+      });
+      expect(deriveRenderStage(job)).toEqual({ kind: "casting-voices" });
+    });
+
+    it("reports absolute chapter 11 of 5 (selection starting at chapter 10) after the first selected chapter completes", () => {
+      const job = baseJob({
+        status: "running",
+        total_chapters: 5,
+        config: withBatchSizeAndStartChapter(10, 10),
+        chapters: makeChapters(1),
+      });
+      expect(deriveRenderStage(job)).toEqual({
+        kind: "synthesizing-chapter",
+        chapterNumber: 11,
+        totalChapters: 5,
+      });
+    });
+
+    it("reports absolute chapter 13 of 10 mid-render in single-batch mode starting at chapter 10", () => {
+      const job = baseJob({
+        status: "running",
+        total_chapters: 10,
+        config: withBatchSizeAndStartChapter(10, 10),
+        chapters: makeChapters(3),
+      });
+      expect(deriveRenderStage(job)).toEqual({
+        kind: "synthesizing-chapter",
+        chapterNumber: 13,
+        totalChapters: 10,
+      });
+    });
+
+    it("reports absolute chapter 12 of 5 when batch_size is 0 (single-file mode) starting at chapter 10", () => {
+      const job = baseJob({
+        status: "running",
+        total_chapters: 5,
+        config: withBatchSizeAndStartChapter(0, 10),
+        chapters: makeChapters(2),
+      });
+      expect(deriveRenderStage(job)).toEqual({
+        kind: "synthesizing-chapter",
+        chapterNumber: 12,
+        totalChapters: 5,
+      });
+    });
+
+    it("moves straight into the next batch's first absolute chapter once a non-final batch completes, offset from start_chapter", () => {
+      // selection = absolute chapters 10-16 (total=7), batch_size=3 =>
+      // batches [10-12], [13-15], [16-16]. First batch is fully done (3
+      // chapters), so this should read as absolute chapter 13, not an
+      // intermediate assembling stage.
+      const job = baseJob({
+        status: "running",
+        total_chapters: 7,
+        config: withBatchSizeAndStartChapter(3, 10),
+        chapters: makeChapters(3),
+        parts: [],
+      });
+      expect(deriveRenderStage(job)).toEqual({
+        kind: "synthesizing-chapter",
+        chapterNumber: 13,
+        totalChapters: 7,
+      });
+    });
+
+    it("does not report assembling-part for an intermediate batch even when that batch's own chapters are all complete, offset from start_chapter", () => {
+      // Same total/batch_size as above, but only the first batch (absolute
+      // chapters 10-12) is done; the last batch (16-16) has zero chapters
+      // done, so batchChaptersDone is false and this must not read as
+      // assembling.
+      const job = baseJob({
+        status: "running",
+        total_chapters: 7,
+        config: withBatchSizeAndStartChapter(3, 10),
+        chapters: makeChapters(3),
+        parts: [makePart(1, 10, 12)],
+      });
+      expect(deriveRenderStage(job)).toEqual({
+        kind: "synthesizing-chapter",
+        chapterNumber: 13,
+        totalChapters: 7,
+      });
+    });
+
+    it("reports assembling part 2 of 2 once the final batch's chapters are all done but its part hasn't appeared yet, offset from start_chapter", () => {
+      // selection = absolute chapters 10-15 (total=6), batch_size=3 =>
+      // batches [10-12] part 1, [13-15] part 2.
+      const job = baseJob({
+        status: "running",
+        total_chapters: 6,
+        config: withBatchSizeAndStartChapter(3, 10),
+        chapters: makeChapters(6),
+        parts: [],
+      });
+      expect(deriveRenderStage(job)).toEqual({
+        kind: "assembling-part",
+        partNumber: 2,
+        totalParts: 2,
+      });
+    });
+
+    it("falls back to synthesizing-chapter once the final batch's part has appeared in job.parts, offset from start_chapter", () => {
+      const job = baseJob({
+        status: "running",
+        total_chapters: 6,
+        config: withBatchSizeAndStartChapter(3, 10),
+        chapters: makeChapters(6),
+        parts: [makePart(1, 10, 12), makePart(2, 13, 15)],
+      });
+      expect(deriveRenderStage(job)).toEqual({
+        kind: "synthesizing-chapter",
+        chapterNumber: 16,
+        totalChapters: 6,
+      });
+    });
+
+    it("reports assembling part 1 of 1 for a single-batch job (batch_size 0) offset from start_chapter once all chapters are done and no part exists yet", () => {
+      const job = baseJob({
+        status: "running",
+        total_chapters: 5,
+        config: withBatchSizeAndStartChapter(0, 10),
+        chapters: makeChapters(5),
+        parts: [],
+      });
+      expect(deriveRenderStage(job)).toEqual({
+        kind: "assembling-part",
+        partNumber: 1,
+        totalParts: 1,
       });
     });
   });

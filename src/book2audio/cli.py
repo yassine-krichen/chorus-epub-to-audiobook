@@ -54,6 +54,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--limit", type=int, default=0, metavar="N", help="Only render the first N chapters"
     )
     gen.add_argument(
+        "--start-chapter",
+        type=int,
+        default=1,
+        metavar="N",
+        help="1-based chapter to start rendering from (default: 1)",
+    )
+    gen.add_argument(
         "--batch",
         type=int,
         default=10,
@@ -134,6 +141,7 @@ def _run_generate(args: argparse.Namespace, console: Console) -> int:
         speed=args.speed,
         bitrate=args.bitrate,
         chapter_limit=args.limit,
+        start_chapter=args.start_chapter,
         batch_size=args.batch,
         chapter_gap=args.chapter_gap,
         music=args.music,

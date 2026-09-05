@@ -34,7 +34,11 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">Chapters</h2>
-        <ChapterGrid totalChapters={job.total_chapters} chapters={job.chapters} />
+        <ChapterGrid
+          totalChapters={job.total_chapters}
+          chapters={job.chapters}
+          startChapter={job.config.start_chapter}
+        />
       </div>
 
       <div className="flex flex-col gap-3">

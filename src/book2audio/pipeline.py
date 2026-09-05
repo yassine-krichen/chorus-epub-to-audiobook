@@ -146,9 +146,14 @@ class Pipeline:
         return state
 
     def _select_chapters(self, book: Book) -> list[Chapter]:
-        if self.config.chapter_limit > 0:
-            return book.chapters[: self.config.chapter_limit]
-        return book.chapters
+        start_pos, end_pos = self.config.selection_bounds(len(book.chapters))
+        chapters = book.chapters[start_pos:end_pos]
+        if not chapters:
+            raise ValueError(
+                f"start_chapter={self.config.start_chapter} is beyond this book's "
+                f"{len(book.chapters)} chapter(s); nothing to render"
+            )
+        return chapters
 
     def _load_engine(self, metadata: BookMetadata) -> KokoroEngine:
         lang = _LANG_MAP.get(metadata.language.lower(), "en-us")

@@ -146,6 +146,34 @@ def test_set_total_chapters_caps_the_count_at_the_configured_chapter_limit(
     assert job.total_chapters == 2
 
 
+def test_set_total_chapters_matches_selection_bounds_for_a_start_chapter_and_chapter_limit_combo(
+    db_session, monkeypatch, tmp_path
+):
+    """Regression guard: _set_total_chapters must derive its count from
+    Config.selection_bounds rather than recomputing start_chapter/chapter_limit
+    arithmetic itself -- these two have drifted apart once before."""
+    job = _make_job(db_session)
+    parsed = list(range(20))  # a 20-chapter book; contents are irrelevant here
+    monkeypatch.setattr(
+        render_module,
+        "parse_epub",
+        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), parsed)),
+    )
+    config = Config(
+        epub_path="book.epub",
+        output_path=str(tmp_path / "book.m4b"),
+        work_dir=str(tmp_path),
+        start_chapter=10,
+        chapter_limit=5,
+    )
+    start_pos, end_pos = config.selection_bounds(len(parsed))
+
+    render_module._set_total_chapters(job.id, config)
+
+    db_session.refresh(job)
+    assert job.total_chapters == end_pos - start_pos
+
+
 def test_set_total_chapters_does_not_raise_when_the_job_row_no_longer_exists(
     monkeypatch, tmp_path
 ):
