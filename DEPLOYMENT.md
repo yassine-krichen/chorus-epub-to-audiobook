@@ -171,16 +171,14 @@ OpenAI-compatible endpoint. You still need:
 2. Real API keys from an actual image-generation provider, configured
    inside freellmapi's own dashboard.
 
-Until that exists, **leave `thumbnails` off** on every job — everything
-else in the app works completely independently of it (it's the one
-feature gated behind its own env vars, checked fail-fast only when a job
-opts in — `worker/entrypoint.py`).
+This is the one feature gated behind its own env vars, checked fail-fast
+only when a job opts in — `worker/entrypoint.py`.
 
-The client code in `src/book2audio/images/freellmapi.py` is written
-against the documented OpenAI Images API contract
-(`POST {base}/v1/images/generations`) and has never been exercised against
-a real freellmapi deployment. Test it against a real instance before
-trusting it in production.
+The client code in `src/book2audio/images/freellmapi.py` follows the
+OpenAI SDK convention: `FREELLMAPI_BASE_URL` already includes the `/v1`
+prefix, and the client appends bare paths like `/images/generations` on
+top of it. Verified 2026-09-05 against a real freellmapi deployment
+(`https://<your-router>.onrender.com/v1`) — thumbnails generate correctly.
 
 ---
 

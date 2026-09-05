@@ -1,12 +1,13 @@
 """Generic OpenAI-compatible image-generation client (freellmapi).
 
-NOTE: this contract is implemented against OpenAI's documented Images API
-shape (``POST /v1/images/generations``, ``data[0].b64_json`` or
-``data[0].url``). It has NOT been exercised against a live freellmapi
-deployment — no real credentials were available at implementation time. This
-is deferred verification, not a known defect; the worker-startup fail-fast
-check in :func:`require_freellmapi_configured` at least guarantees a job
-never gets partway through a render before discovering misconfiguration.
+Follows the OpenAI SDK convention: ``FREELLMAPI_BASE_URL`` already includes
+the ``/v1`` prefix (e.g. ``https://your-router.example.com/v1``), and this
+client appends bare resource paths like ``/images/generations`` on top of
+it -- it must NOT add a second ``/v1``. Verified 2026-09-05 against a real
+freellmapi deployment: an earlier version double-prefixed the path
+(``{base}/v1/images/generations`` where base already ended in ``/v1``),
+which 404'd silently (thumbnails just never appeared, no request ever
+reached the configured provider).
 """
 
 from __future__ import annotations
@@ -69,7 +70,7 @@ def _request_image(prompt: str, *, size: str, timeout: float) -> bytes:
     model = os.environ["FREELLMAPI_IMAGE_MODEL"]
 
     response = httpx.post(
-        f"{base_url}/v1/images/generations",
+        f"{base_url}/images/generations",
         json={"model": model, "prompt": prompt, "size": size, "n": 1},
         headers={"Authorization": f"Bearer {api_key}"},
         timeout=timeout,
