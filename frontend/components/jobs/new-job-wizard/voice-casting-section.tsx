@@ -31,8 +31,8 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
     );
   }
 
-  const maleVoices = voices.voices.filter((v) => v.gender === "male");
-  const femaleVoices = voices.voices.filter((v) => v.gender === "female");
+  const maleVoices = voices.voices.filter((v) => v.gender === "male" && !v.is_default_narrator);
+  const femaleVoices = voices.voices.filter((v) => v.gender === "female" && !v.is_default_narrator);
   const overrides = Object.entries(config.voice_overrides);
 
   function addOverride() {
