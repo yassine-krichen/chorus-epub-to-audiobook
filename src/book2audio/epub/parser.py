@@ -8,6 +8,7 @@ just the one book we are targeting first.
 
 from __future__ import annotations
 
+import logging
 import posixpath
 import re
 import zipfile
@@ -17,6 +18,8 @@ from xml.etree import ElementTree as ET
 from bs4 import BeautifulSoup
 
 from book2audio.models import BookMetadata
+
+logger = logging.getLogger(__name__)
 
 # XML namespaces used across the OPF / container files.
 _NS = {
@@ -51,6 +54,22 @@ class ParsedChapter:
     paragraphs: list[str] = field(default_factory=list)
 
 
+@dataclass
+class _ManifestItem:
+    """A manifest entry: archive path plus its OPF ``properties`` attribute."""
+
+    href: str
+    properties: str = ""
+
+
+@dataclass
+class _SpineItem:
+    """A spine ``<itemref>``: which manifest id, and its ``linear`` flag."""
+
+    idref: str
+    linear: str | None = None
+
+
 def parse_epub(epub_path: str, cover_dir: str) -> tuple[BookMetadata, list[ParsedChapter]]:
     """Read ``epub_path`` and return its metadata and narratable chapters.
 
@@ -64,20 +83,27 @@ def parse_epub(epub_path: str, cover_dir: str) -> tuple[BookMetadata, list[Parse
 
         metadata = _read_metadata(opf_root)
         manifest = _read_manifest(opf_root, opf_dir)
-        spine_ids = _read_spine(opf_root)
+        spine_items = _read_spine(opf_root)
 
         metadata.cover_path = _extract_cover(zf, opf_root, manifest, cover_dir)
 
         chapters: list[ParsedChapter] = []
-        for item_id in spine_ids:
-            href = manifest.get(item_id)
-            if href is None:
+        for spine_item in spine_items:
+            # EPUB OPF spec: linear="no" marks non-linear content (e.g. footnote
+            # popups) that isn't part of the main reading order.
+            if spine_item.linear == "no":
+                continue
+            item = manifest.get(spine_item.idref)
+            if item is None:
+                continue
+            # EPUB3 nav documents occasionally appear in the spine too.
+            if "nav" in item.properties.split():
                 continue
             try:
-                html = zf.read(href).decode("utf-8", errors="replace")
+                html = zf.read(item.href).decode("utf-8", errors="replace")
             except KeyError:
                 continue
-            chapter = _parse_document(html, href, index=len(chapters) + 1)
+            chapter = _parse_document(html, item.href, index=len(chapters) + 1)
             if chapter is not None:
                 chapters.append(chapter)
 
@@ -106,20 +132,23 @@ def _read_metadata(opf_root: ET.Element) -> BookMetadata:
     )
 
 
-def _read_manifest(opf_root: ET.Element, opf_dir: str) -> dict[str, str]:
-    """Map manifest item id -> archive path (resolved against the OPF dir)."""
-    manifest: dict[str, str] = {}
+def _read_manifest(opf_root: ET.Element, opf_dir: str) -> dict[str, _ManifestItem]:
+    """Map manifest item id -> its archive path and OPF ``properties``."""
+    manifest: dict[str, _ManifestItem] = {}
     for item in opf_root.findall(".//opf:manifest/opf:item", _NS):
         item_id = item.get("id")
         href = item.get("href")
         if item_id and href:
-            manifest[item_id] = _join(opf_dir, href)
+            manifest[item_id] = _ManifestItem(
+                href=_join(opf_dir, href),
+                properties=item.get("properties") or "",
+            )
     return manifest
 
 
-def _read_spine(opf_root: ET.Element) -> list[str]:
+def _read_spine(opf_root: ET.Element) -> list[_SpineItem]:
     return [
-        ref.get("idref")
+        _SpineItem(idref=ref.get("idref"), linear=ref.get("linear"))
         for ref in opf_root.findall(".//opf:spine/opf:itemref", _NS)
         if ref.get("idref")
     ]
@@ -128,7 +157,7 @@ def _read_spine(opf_root: ET.Element) -> list[str]:
 def _extract_cover(
     zf: zipfile.ZipFile,
     opf_root: ET.Element,
-    manifest: dict[str, str],
+    manifest: dict[str, _ManifestItem],
     cover_dir: str,
 ) -> str | None:
     """Write the cover image to ``cover_dir`` and return its path, or None."""
@@ -144,7 +173,8 @@ def _extract_cover(
     if cover_href is None:
         meta = opf_root.find(".//opf:metadata/opf:meta[@name='cover']", _NS)
         if meta is not None:
-            cover_href = manifest.get(meta.get("content", ""))
+            manifest_item = manifest.get(meta.get("content", ""))
+            cover_href = manifest_item.href if manifest_item else None
 
     if cover_href is None:
         return None
@@ -161,8 +191,11 @@ def _extract_cover(
     return out_path
 
 
-def _resolve_manifest_href(item_id: str | None, manifest: dict[str, str]) -> str | None:
-    return manifest.get(item_id) if item_id else None
+def _resolve_manifest_href(item_id: str | None, manifest: dict[str, _ManifestItem]) -> str | None:
+    if not item_id:
+        return None
+    item = manifest.get(item_id)
+    return item.href if item else None
 
 
 def _parse_document(html: str, href: str, index: int) -> ParsedChapter | None:
@@ -171,12 +204,15 @@ def _parse_document(html: str, href: str, index: int) -> ParsedChapter | None:
     ``href`` is the archive path, used to recognize front matter by filename.
     """
     if _SKIP.search(posixpath.basename(href)):
+        logger.info("Skipping front-matter document %r (matched title/filename pattern)", href)
         return None
 
     soup = BeautifulSoup(html, "html.parser")
 
     # Read the title from the body heading only. The <head><title> is often
-    # empty or a placeholder ("Unknown") in scraped EPUBs.
+    # empty or a placeholder ("Unknown") in scraped EPUBs. Clean before the
+    # _SKIP check so invisible Unicode noise (e.g. a soft hyphen splitting
+    # "Con\xadtents") can't hide a title we'd otherwise recognize as front matter.
     body = soup.find("body") or soup
     heading = body.find(["h1", "h2", "h3"])
     title = _clean(heading.get_text()) if heading else ""
@@ -191,6 +227,7 @@ def _parse_document(html: str, href: str, index: int) -> ParsedChapter | None:
     if words < _MIN_CHAPTER_WORDS:
         return None
     if title and _SKIP.search(title):
+        logger.info("Skipping front-matter document %r (matched title/filename pattern)", href)
         return None
 
     return ParsedChapter(
@@ -201,8 +238,19 @@ def _parse_document(html: str, href: str, index: int) -> ParsedChapter | None:
 
 
 def _clean(text: str) -> str:
-    """Collapse whitespace; EPUB text is full of newlines and non-breaking spaces."""
-    return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
+    """Collapse whitespace and strip invisible Unicode noise.
+
+    EPUB text is full of newlines, non-breaking spaces, soft hyphens, and
+    zero-width characters (often from scraped/converted sources) that would
+    otherwise split words apart and let front matter like "Con\xadtents" slip
+    past the _SKIP filename/title check.
+    """
+    text = text.replace("\xa0", " ")
+    # Soft hyphen, zero-width space/non-joiner/joiner, BOM: invisible, so drop
+    # them entirely rather than replacing with a space.
+    for invisible in ("­", "​", "‌", "‍", "﻿"):
+        text = text.replace(invisible, "")
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _join(base: str, href: str) -> str:

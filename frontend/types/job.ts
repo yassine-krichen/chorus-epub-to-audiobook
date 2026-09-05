@@ -10,6 +10,7 @@ export interface JobConfig {
   speed: number;
   bitrate: string;
   chapter_limit: number;
+  start_chapter: number;
   batch_size: number;
   chapter_gap: number;
   music: boolean;
@@ -31,6 +32,7 @@ export const DEFAULT_JOB_CONFIG: JobConfig = {
   speed: 1.0,
   bitrate: "64k",
   chapter_limit: 0,
+  start_chapter: 1,
   batch_size: 10,
   chapter_gap: 1.8,
   music: true,

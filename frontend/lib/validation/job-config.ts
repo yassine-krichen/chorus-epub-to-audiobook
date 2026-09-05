@@ -18,6 +18,7 @@ export const jobConfigSchema = z.object({
   speed: z.number().min(0.5).max(2.0),
   bitrate: z.string().min(1),
   chapter_limit: z.number().int().min(0),
+  start_chapter: z.number().int().min(1),
   batch_size: z.number().int().min(1),
   chapter_gap: z.number().min(0),
   music: z.boolean(),

@@ -141,3 +141,38 @@ def test_validate_raises_when_music_volume_is_above_one(tmp_path):
 @pytest.mark.parametrize("volume", [0.0, 1.0])
 def test_validate_accepts_music_volume_at_the_inclusive_boundaries(tmp_path, volume):
     _config(tmp_path, music_volume=volume).validate()  # must not raise
+
+
+# --- Config.selection_bounds ------------------------------------------------
+#
+# Single source of truth for combining start_chapter (1-based offset) with
+# chapter_limit (count from that offset) into 0-based [start, end) slice
+# bounds. Both pipeline.py and worker/render.py depend on this method
+# agreeing with itself -- see test_worker_render.py's drift-regression test.
+
+
+def test_selection_bounds_selects_from_start_chapter_to_the_end_with_no_chapter_limit(tmp_path):
+    config = _config(tmp_path, start_chapter=10)
+    assert config.selection_bounds(20) == (9, 20)
+
+
+def test_selection_bounds_combines_start_chapter_and_chapter_limit(tmp_path):
+    # start_chapter=10, chapter_limit=5 on a 20-chapter book selects
+    # chapters 10-14 (5 chapters), i.e. 0-based bounds (9, 14).
+    config = _config(tmp_path, start_chapter=10, chapter_limit=5)
+    assert config.selection_bounds(20) == (9, 14)
+
+
+def test_selection_bounds_caps_the_end_at_total_when_chapter_limit_overshoots(tmp_path):
+    config = _config(tmp_path, start_chapter=18, chapter_limit=10)
+    assert config.selection_bounds(20) == (17, 20)
+
+
+def test_selection_bounds_at_the_books_last_chapter_selects_a_single_chapter(tmp_path):
+    config = _config(tmp_path, start_chapter=20)
+    assert config.selection_bounds(20) == (19, 20)
+
+
+def test_selection_bounds_defaults_to_the_whole_book_when_start_chapter_is_1(tmp_path):
+    config = _config(tmp_path)
+    assert config.selection_bounds(20) == (0, 20)

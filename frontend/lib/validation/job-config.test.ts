@@ -11,6 +11,7 @@ function validConfig() {
     speed: 1.0,
     bitrate: "128k",
     chapter_limit: 0,
+    start_chapter: 1,
     batch_size: 1,
     chapter_gap: 0,
     music: false,
