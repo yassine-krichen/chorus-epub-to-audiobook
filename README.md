@@ -1,6 +1,6 @@
 # Chorus
 
-(repo: epub-to-audio-book)
+(repo: chorus-epub-to-audiobook)
 
 *Turns an EPUB into a multi-voice `.m4b` audiobook with chapters, cover art and metadata, using a local CPU-only TTS model.*
 
