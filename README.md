@@ -1,162 +1,184 @@
-# book2audio
+# Chorus
 
-Turn an EPUB into a natural, **multi-voice audiobook** (`.m4b` with chapters,
-cover art, and metadata) with a single command — fully local, no API keys, no
-per-minute billing.
+(repo: epub-to-audio-book)
+
+*Turns an EPUB into a multi-voice `.m4b` audiobook with chapters, cover art and metadata, using a local CPU-only TTS model.*
+
+![Python](https://img.shields.io/badge/Python-3.12-blue)
+![Kokoro](https://img.shields.io/badge/TTS-Kokoro%20ONNX-informational)
+![License](https://img.shields.io/badge/license-PolyForm%20Strict%201.0.0-lightgrey)
 
 ```bash
 book2audio generate "mybook.epub"
 ```
 
-The narrator gets one voice; each detected character gets their own, kept
-consistent for the whole book. Dialogue and narration are separated
-automatically — no manual speaker tagging.
+Commercial AI audiobook tools are cloud-only, billed per minute, and take your library to someone else's servers. Chorus (CLI name `book2audio`) runs the [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) model through ONNX Runtime on CPU, so the render path needs no PyTorch, no GPU and no API key.
 
----
+The narrator gets one voice. Each detected character gets another, assigned once and kept for the whole book. Dialogue is separated from narration, and speakers are attributed from dialogue tags, pronoun resolution and two-speaker alternation, with no manual tagging.
 
-## Why
+Every stage between the EPUB and the audio works on plain data, so segmentation, attribution and casting are unit-tested without loading a model. The same pipeline runs from the CLI and from a hosted job worker (FastAPI, Postgres, R2, Next.js frontend) through one shared render module.
 
-Commercial AI audiobook tools are cloud-only, priced per minute, and send your
-library to someone else's servers. `book2audio` runs entirely on your machine
-using the [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) neural TTS model
-(ONNX — no PyTorch, no GPU required) and `ffmpeg`. A ~140k-word novel renders to
-a finished, chapterized audiobook for the cost of some electricity.
+## Measured performance
 
----
+CPU only, default settings (multi-voice, music bed on), Intel Core i5-12500H (12 cores / 16 threads), Windows 11:
 
-## Requirements
+| Run | Audio | Wall time | Real-time factor |
+| --- | --- | --- | --- |
+| 1 | 725.4 s | 7:17 | 1.66x |
+| 2 | 725.4 s | 6:20 | 1.91x |
 
-- **Python 3.12** (managed automatically if you use [`uv`](https://docs.astral.sh/uv/))
-- **ffmpeg** on your `PATH` (for AAC/M4B muxing and chapter markers)
+Input: chapter 1 of *Alice's Adventures in Wonderland* (Project Gutenberg, public domain), 2,181 words and 11,281 characters. Wall time is the CLI progress timer with the model already loaded, on a machine that was not idle. Audio length is the ffprobe duration of the output file and includes the title, pauses and music tail.
 
-The Kokoro model files (~325 MB) download automatically on first run and are
-cached under `%LOCALAPPDATA%\book2audio\models` (or `~/.cache` on Unix).
+## Features
 
----
+**Multi-voice casting** — gives each character a stable Kokoro voice, busiest speakers first so leads never share one, gender-matched when pronouns in dialogue tags reveal it (`tts/voices.py`).
 
-## Quickstart
+**Speaker attribution** — heuristic `Attributor` using dialogue tags, pronoun resolution and two-speaker alternation; nicknames fold into full names (`attribution/heuristic.py`).
+
+**Chapterized `.m4b`** — `ffmpeg` muxes chapter WAVs into AAC with chapter markers, extracted cover art and tags.
+
+**Resumable renders** — per-chapter state lives in the work directory; re-running the same command skips finished chapters and repeats only the interrupted one.
+
+**Progressive output** — writes a playable `<name>-part-NN.m4b` every 10 chapters (`--batch`, `0` for one file), so listening starts before the book finishes.
+
+**Audio production** — per-line loudness normalization, punctuation-driven pacing ("!" faster and louder, "..." slower and softer), a procedurally synthesized ambient music bed mixed relative to speech RMS, and a 1.8 s gap between chapters.
+
+**Hosted mode** — FastAPI service with JWT auth (argon2 password hashes, login rate limiting), job queue in Postgres, EPUB and audio in Cloudflare R2, rendering on a Cloud Run Job or a local polling daemon, and a Next.js frontend.
+
+## How it works
+
+```mermaid
+graph LR
+  A[EPUB] -->|spine + headings| B[epub/parser]
+  B -->|paragraphs| C[text/segmenter]
+  C -->|narration and dialogue runs| D[attribution/heuristic]
+  D -->|speaker per line| E[tts/voices cast]
+  E -->|voice per character| F[tts/engine Kokoro]
+  F -->|24 kHz mono audio| G[assemble/audio + music]
+  G -->|chapter WAVs| H[ffmpeg mux]
+  H --> I[.m4b parts]
+```
+
+```mermaid
+graph TD
+  UI[Next.js frontend] -->|REST + JWT| API[FastAPI]
+  API -->|SQLAlchemy| PG[(Postgres)]
+  API -->|presigned upload URL| R2[(R2 or MinIO)]
+  API -->|trigger| CR[Cloud Run Job]
+  LD[local_daemon] -->|poll queued jobs| PG
+  CR --> RJ[worker/render]
+  LD --> RJ
+  RJ -->|download EPUB| R2
+  RJ -->|run| P[book2audio.pipeline]
+  RJ -->|progress + heartbeat| PG
+  RJ -->|upload parts| R2
+```
+
+1. **Parse** (`epub/`) reads the spine for reading order, pulls each chapter's heading and paragraphs, extracts the cover and skips front matter.
+2. **Segment** (`text/`) splits paragraphs into ordered narration and dialogue runs and marks scene breaks.
+3. **Attribute** (`attribution/`) decides who speaks each line behind an `Attributor` interface.
+4. **Cast** (`tts/voices.py`) assigns voices from a fixed pool.
+5. **Synthesize** (`tts/engine.py`) chunks long text on sentence boundaries, because Kokoro synthesizes a bounded number of tokens per call.
+6. **Assemble** (`assemble/`) joins segments with pauses, normalizes loudness, mixes the music bed and muxes with `ffmpeg`.
+
+### Key decisions
+
+- **Local ONNX TTS**: Kokoro on ONNX Runtime over a cloud TTS API, because the render path then needs no keys, has no per-minute cost and never uploads the library. The price is CPU-bound speed (about 1.7-1.9x real time, measured above).
+- **Heuristic attribution behind an interface**: dialogue-tag and pronoun rules over an LLM labeller, because they are deterministic, free and unit-testable. The `Attributor` interface leaves room for an LLM strategy.
+- **Synthesized music bed**: detuned sine partials and filtered noise generated in code over bundled audio files, so there are no assets or licences to carry. Level is set relative to the narration's own RMS.
+- **One shared render module**: `worker/render.py` serves both the Cloud Run entrypoint and the local daemon so the two cannot drift apart.
+- **In-process login rate limiter**: a sliding window in `api/auth/rate_limit.py` over an external store. It is per-instance and does not coordinate across API replicas.
+
+## Tech stack
+
+| Technology | Role | Why |
+| --- | --- | --- |
+| Python 3.12 | CLI, pipeline, API | — |
+| kokoro-onnx | Speech synthesis | ONNX Runtime on CPU, no PyTorch or GPU |
+| ffmpeg | AAC/M4B muxing, chapter markers | — |
+| BeautifulSoup | EPUB XHTML parsing | — |
+| FastAPI, SQLAlchemy, Alembic | Hosted API and migrations | — |
+| Postgres (psycopg) | Users, refresh tokens, jobs | — |
+| Cloudflare R2 (boto3) | EPUB and audio storage | MinIO substitutes in hybrid mode |
+| Next.js 16, React 19, Tailwind 4 | Frontend | — |
+| pytest | Tests | — |
+
+## Getting started
+
+Requirements: Python 3.12 (managed by [`uv`](https://docs.astral.sh/uv/)) and `ffmpeg` on `PATH`. The Kokoro model files (about 325 MB) download on first run into `%LOCALAPPDATA%\book2audio\models` (`~/.cache` on Unix).
 
 ```bash
-# install deps into an isolated env
 uv sync
 
-# preview: chapters, detected characters, and the voice cast — no audio (seconds)
+# chapters, detected characters and voice cast, no audio
 uv run book2audio generate "epubs/mybook.epub" --dry-run
 
-# render the whole book to output/mybook.m4b
+# whole book to output/mybook.m4b
 uv run book2audio generate "epubs/mybook.epub"
 
-# render just the first 3 chapters (fast sanity check)
+# first 3 chapters only
 uv run book2audio generate "epubs/mybook.epub" --limit 3
 ```
 
-Rendering is **resumable**: interrupt it any time and re-run the same command —
-completed chapters are skipped, and only the chapter that was mid-render repeats.
-
----
-
-## Usage
+### CLI options
 
 ```
 book2audio generate <epub> [options]
 
-  -o, --out PATH        Output .m4b path (default: ./output/<name>.m4b)
-      --work-dir PATH   Scratch dir for chapter audio + resume state
-      --narrator VOICE  Narrator voice id (default: am_michael)
+  -o, --out PATH          Output .m4b path (default: ./output/<name>.m4b)
+      --work-dir PATH     Scratch dir for chapter audio + resume state
+      --narrator VOICE    Narrator voice id (default: am_michael)
       --voice NAME=VOICE  Override a character's voice (repeatable)
-      --male-voice VOICE    Preferred voice for male-guessed characters
-      --female-voice VOICE  Preferred voice for female-guessed characters
-      --speed FLOAT     Speaking speed 0.5–2.0 (default: 1.0)
-      --bitrate STR     AAC bitrate (default: 64k)
-      --limit N         Only render the first N chapters
-      --batch N         Emit a playable .m4b every N chapters (default 10; 0 = one file)
-      --chapter-gap SECONDS  Pause between chapters (default: 1.8)
-      --no-music        Disable the ambient background music bed
-      --music-volume 0-1  Background music loudness relative to narration (default: 0.22)
-      --music-preset NAME    Background music style: ambient, drone, rain (default: ambient)
-      --no-expressive   Disable punctuation-driven pacing/energy variation
-      --dry-run         Parse, attribute, and cast without synthesizing
-      --thumbnails      Enable per-chapter cover thumbnails (validates freellmapi
-                         credentials only; actual thumbnail files are currently
-                         produced by the hosted worker, not this CLI)
+      --male-voice VOICE / --female-voice VOICE
+      --speed FLOAT       0.5-2.0 (default 1.0)
+      --bitrate STR       AAC bitrate (default 64k)
+      --limit N           Only render the first N chapters
+      --batch N           Playable .m4b every N chapters (default 10; 0 = one file)
+      --chapter-gap SEC   Pause between chapters (default 1.8)
+      --no-music / --music-volume 0-1 / --music-preset ambient|drone|rain
+      --no-expressive     Disable punctuation-driven pacing
+      --dry-run           Parse, attribute and cast without synthesizing
+      --thumbnails        Validates freellmapi credentials; thumbnail files are
+                          produced by the hosted worker, not this CLI
 ```
 
-### Audio production
+Run `--dry-run` first to see detected character names, then pin voices with `--voice NAME=VOICE`. Kokoro voice ids follow `<accent><gender>_<name>`, for example `am_michael` or `bf_emma`; the pool lives in `src/book2audio/tts/voices.py`.
 
-Three things shape how "produced" the result feels, all on by default:
-
-- **Chapter pause** — a 1.8s beat of silence between chapters (`--chapter-gap`),
-  so a chapter change is audibly clear instead of running straight into the next.
-- **Ambient music bed** — a warm, procedurally generated pad (no external audio
-  files — synthesized detuned sine partials over a low chord, with slow
-  amplitude movement and a touch of filtered noise for atmosphere) mixed
-  under the narration, swelling in at the start of a chapter and fading out
-  through the chapter-gap pause. Loudness is set *relative* to the narration's
-  own volume (`--music-volume`, default 0.22 = 22% of speech RMS). `--no-music`
-  turns it off entirely.
-- **Loudness normalization + pacing** — every synthesized line is normalized to
-  a consistent volume (raw TTS output varies clip to clip, which reads as
-  "flat/uneven" as much as monotone), then nudged by its punctuation: a line
-  ending in "!" is read slightly faster and louder, one trailing off in "…"
-  slightly slower and softer. `--no-expressive` disables the pacing nudge (the
-  loudness normalization always applies).
-
-**Ceiling, honestly:** Kokoro takes plain text — there's no SSML, no way to
-mark one specific *word* for emphasis. The above measurably reduces the flat,
-sample-to-sample sameness that reads as robotic; it doesn't produce real
-word-level emphasis. That needs a different TTS backend, which is a separate
-cost/local-vs-cloud decision, not implemented here.
-
-### Progressive output
-
-By default the book is delivered **part by part**: a playable `.m4b` is written
-every 10 chapters (`<name>-part-01.m4b`, `-part-02.m4b`, …) the moment that
-batch finishes, so you can start listening while the rest still renders. Each
-part carries its own chapter list and a title like *"… — Part 2 (Ch 11-20)"*.
-Use `--batch 0` for a single file, or a smaller `--batch` to start listening
-sooner.
-
-Example with overrides:
+### Hosted mode
 
 ```bash
-book2audio generate book.epub \
-  --narrator bm_george \
-  --voice Sunny=am_adam \
-  --voice Nephis=bf_emma \
-  --speed 1.1
+uvicorn book2audio.api.main:app           # API (docker/Dockerfile.api)
+python -m book2audio.worker.entrypoint    # Cloud Run Job worker
+python -m book2audio.worker.local_daemon  # local polling worker
 ```
 
-Run `--dry-run` first to see the detected character names, then pin any voice
-you want with `--voice NAME=VOICE`.
+See `DEPLOYMENT.md` for the Neon / Render / Vercel / R2 setup.
 
----
+## Configuration (hosted mode)
 
-## How it works
+The CLI needs no environment variables. These names are read in `src/`.
 
-A straight pipeline, each stage pure and independently testable:
+| Variable | Used by | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | API, worker, Alembic | Postgres connection string; raises if unset |
+| `JWT_SECRET` | API auth | Token signing secret; raises if unset |
+| `CORS_ORIGINS` | API | Allowed frontend origins |
+| `R2_BUCKET`, `R2_ACCOUNT_ID`, `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | storage | R2, or MinIO via endpoint URL |
+| `CLOUD_RUN_JOB_NAME` | job service | Job triggered per render |
+| `JOB_CONFIG`, `WORKER_MODE` | worker entrypoint | Job payload and mode |
+| `LOCAL_WORKER_POLL_INTERVAL_SECONDS` | local daemon | Poll interval |
+| `CLEANUP_GRACE_PERIOD_DAYS` | cleanup job | Artifact retention |
+| `FREELLMAPI_API_KEY`, `FREELLMAPI_BASE_URL`, `FREELLMAPI_IMAGE_MODEL` | thumbnails | Optional chapter images |
 
-```
-EPUB ─▶ parse ─▶ segment ─▶ attribute ─▶ cast ─▶ synthesize ─▶ assemble ─▶ .m4b
-       (epub/)  (text/)   (attribution/) (tts/)   (tts/)      (assemble/)
-```
+## API
 
-1. **Parse** (`epub/`) — read the spine for reading order, pull each chapter's
-   heading and paragraphs, extract the cover, and skip front matter.
-2. **Segment** (`text/`) — split every paragraph into ordered narration and
-   dialogue runs (`"…"`), and mark scene breaks (`***`).
-3. **Attribute** (`attribution/`) — decide who speaks each line using dialogue
-   tags ("… said Sunny"), pronoun resolution, and two-speaker alternation.
-   Nicknames fold into full names; character gender is guessed from tag pronouns.
-   The `Attributor` interface is swappable — an LLM strategy can drop in later.
-4. **Cast** (`tts/voices.py`) — assign a stable voice per character, busiest
-   speakers first so the leads never share a voice; gender-matched when known.
-5. **Synthesize** (`tts/engine.py`) — Kokoro renders each segment; long text is
-   chunked on sentence boundaries for clean prosody.
-6. **Assemble** (`assemble/`) — join segments with natural pauses, normalize
-   loudness, mix in the ambient music bed, then `ffmpeg` muxes chapter WAVs
-   into `.m4b` file(s) with chapter markers, cover, and tags.
+`POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout` — account and token lifecycle.
 
----
+`POST /jobs/upload-url` — presigned URL for the EPUB upload.
+
+`POST /jobs` — creates a render job. `GET /jobs`, `GET /jobs/{id}`, `DELETE /jobs/{id}` — list, inspect, delete.
+
+`GET /voices` — available voices.
 
 ## Testing
 
@@ -164,30 +186,26 @@ EPUB ─▶ parse ─▶ segment ─▶ attribute ─▶ cast ─▶ synthesize 
 uv run pytest
 ```
 
-Tests cover the deterministic core — segmentation, speaker attribution, voice
-casting, text normalization, and EPUB parsing. TTS/ffmpeg are exercised via the
-`--limit` render path rather than mocked.
-
----
+380 tests are collected (`pytest --collect-only -q`). They cover segmentation, attribution, voice casting, normalization, music, EPUB parsing, pipeline batching and callbacks, config, auth and rate limiting, job ownership and the worker entrypoints. Real synthesis is exercised through the `--limit` render path rather than mocked.
 
 ## Roadmap
 
-This is the automated core of a larger vision (see `DESC.md`). Designed-for-but-
-not-yet-built:
+| Status | Item |
+| --- | --- |
+| Done | CLI pipeline, multi-voice casting, resumable and batched `.m4b` output, music bed, hosted API and worker |
+| Planned | LLM attribution and casting by personality, age and role, behind the existing `Attributor` interface |
+| Planned | Word-level emphasis, which needs a TTS backend with SSML/prosody control; Kokoro takes plain text only |
+| Planned | Chapter images, pending a local-vs-cloud decision on GPU, latency and cost |
+| Planned | Library, player and voice-preview GUI |
 
-- **LLM attribution & casting** — swap the heuristic `Attributor` for an
-  LLM that labels speakers and casts by personality/age/role.
-- **True word-level emphasis** — needs a TTS backend with SSML/prosody control;
-  a cost/local-vs-cloud decision, not a quick swap.
-- **AI-generated chapter images** — deferred pending a local-vs-cloud decision
-  (GPU/latency/cost/privacy tradeoffs).
-- **Library, player, and GUI** — browse, review characters, preview voices,
-  regenerate sections.
+## License
 
----
+**Source-available, not open source.** Chorus (book2audio) is published under the
+[PolyForm Strict License 1.0.0](LICENSE) so you can read the code, run it, and learn
+from it for personal, research, or evaluation use.
 
-## Voices
+You may **not** use it commercially, redistribute it, rebrand it, or publish modified
+versions without written permission. Copyright (c) 2026 Yassine Krichen. All rights
+not granted by the license are reserved.
 
-Kokoro voice ids follow `<accent><gender>_<name>` — e.g. `am_michael` (American
-male), `bf_emma` (British female). The character pool and default narrator live
-in `src/book2audio/tts/voices.py`.
+For commercial licensing or collaboration: krichenyassine22@gmail.com
