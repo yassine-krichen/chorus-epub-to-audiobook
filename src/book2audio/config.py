@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from book2audio.assemble.music import MUSIC_PRESETS
+from book2audio.attribution.base import ATTRIBUTOR_MODES
 from book2audio.tts.voices import (
     CHARACTER_VOICE_POOL,
     DEFAULT_NARRATOR_VOICE,
@@ -68,6 +69,14 @@ class Config:
     # without freellmapi credentials configured fails fast at worker startup.
     thumbnails: bool = False
 
+    # Who speaks each line: the offline heuristic, or an LLM (``llm`` asks about
+    # every line, ``hybrid`` only about lines the heuristic had to guess). LLM
+    # modes need freellmapi credentials and stop calling after
+    # ``attribution_max_calls`` windows (a retried request is not counted again),
+    # keeping heuristic labels for the rest.
+    attributor: str = "heuristic"
+    attribution_max_calls: int = 150
+
     def validate(self) -> None:
         import os
 
@@ -95,6 +104,12 @@ class Config:
             )
         if not 0.5 <= self.speed <= 2.0:
             raise ValueError(f"speed must be between 0.5 and 2.0, got {self.speed}")
+        if self.attributor not in ATTRIBUTOR_MODES:
+            raise ValueError(
+                f"Unknown attributor {self.attributor!r}. Known: {', '.join(ATTRIBUTOR_MODES)}"
+            )
+        if self.attribution_max_calls < 0:
+            raise ValueError("attribution_max_calls cannot be negative")
         if self.chapter_limit < 0:
             raise ValueError("chapter_limit cannot be negative")
         if self.start_chapter < 1:

@@ -60,6 +60,28 @@ def build_progress_hooks(
     return on_chapter_done, on_part_ready
 
 
+def build_heartbeat(job_id: uuid.UUID) -> Callable[[], None]:
+    """A closure that bumps the job's ``last_heartbeat_at``.
+
+    Used while the pipeline is doing slow work that finishes no chapter (LLM
+    speaker attribution), so the API does not mistake a busy worker for a dead
+    one. Never raises: a failed heartbeat must not abort the render.
+    """
+
+    def heartbeat() -> None:
+        try:
+            with SessionLocal() as session:
+                job = session.get(Job, job_id)
+                if job is None:
+                    return
+                job.last_heartbeat_at = datetime.now(timezone.utc)
+                session.commit()
+        except Exception:  # noqa: BLE001 - liveness reporting is best-effort
+            logger.warning("could not record heartbeat for job %s", job_id, exc_info=True)
+
+    return heartbeat
+
+
 def _upsert_chapter(chapters: list[dict], chapter: Chapter, thumbnail_fields: dict) -> list[dict]:
     entry = {"index": chapter.index, "title": chapter.title, "status": "done", **thumbnail_fields}
     updated = [c for c in chapters if c.get("index") != chapter.index]

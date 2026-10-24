@@ -13,6 +13,9 @@ wheels/
 epubs/
 output/
 
+# Downloaded evaluation EPUBs (re-fetched by evals/attribution/build_sheet.py)
+evals/attribution/data/
+
 # Local secrets, never commit
 .env
 

@@ -176,3 +176,28 @@ def test_selection_bounds_at_the_books_last_chapter_selects_a_single_chapter(tmp
 def test_selection_bounds_defaults_to_the_whole_book_when_start_chapter_is_1(tmp_path):
     config = _config(tmp_path)
     assert config.selection_bounds(20) == (0, 20)
+
+
+def test_attributor_defaults_to_heuristic_with_a_150_call_budget(tmp_path):
+    config = _config(tmp_path)
+    assert config.attributor == "heuristic"
+    assert config.attribution_max_calls == 150
+
+
+@pytest.mark.parametrize("mode", ["heuristic", "llm", "hybrid"])
+def test_validate_accepts_every_known_attributor(tmp_path, mode):
+    _config(tmp_path, attributor=mode).validate()  # must not raise
+
+
+def test_validate_raises_for_an_unknown_attributor(tmp_path):
+    with pytest.raises(ValueError, match="Unknown attributor"):
+        _config(tmp_path, attributor="gpt").validate()
+
+
+def test_validate_raises_for_a_negative_attribution_budget(tmp_path):
+    with pytest.raises(ValueError, match="attribution_max_calls"):
+        _config(tmp_path, attribution_max_calls=-1).validate()
+
+
+def test_validate_accepts_a_zero_attribution_budget_for_cache_only_runs(tmp_path):
+    _config(tmp_path, attributor="hybrid", attribution_max_calls=0).validate()

@@ -9,6 +9,7 @@ test_r2_storage.py's job respectively).
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -52,11 +53,14 @@ class _FakePipeline:
     on run(), fires on_chapter_done once -- enough to prove render_job wires
     (and optionally wraps) the hook correctly, without a real render."""
 
-    def __init__(self, config, console, on_chapter_done=None, on_part_ready=None):
+    def __init__(
+        self, config, console, on_chapter_done=None, on_part_ready=None, on_attribution_progress=None
+    ):
         self.config = config
         self.console = console
         self.on_chapter_done = on_chapter_done
         self.on_part_ready = on_part_ready
+        self.on_attribution_progress = on_attribution_progress
 
     def run(self) -> None:
         if self.on_chapter_done is not None:
@@ -276,3 +280,74 @@ def test_render_job_does_not_check_freellmapi_config_when_thumbnails_are_disable
     render_module.render_job(job.id, job.epub_object_key, {}, Console(), str(tmp_path))
 
     require_configured.assert_not_called()
+
+
+def test_render_job_requires_llm_attribution_configured_when_the_attributor_is_llm_based(
+    db_session, monkeypatch, tmp_path
+):
+    job = _make_job(db_session)
+    monkeypatch.setattr(render_module, "download_file", MagicMock())
+    monkeypatch.setattr(
+        render_module,
+        "parse_epub",
+        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), [1])),
+    )
+    require_configured = MagicMock(side_effect=RuntimeError("FREELLMAPI_API_KEY not set"))
+    monkeypatch.setattr(render_module, "require_llm_attribution_configured", require_configured)
+
+    with pytest.raises(RuntimeError, match="FREELLMAPI_API_KEY"):
+        render_module.render_job(
+            job.id, job.epub_object_key, {"attributor": "hybrid"}, Console(), str(tmp_path)
+        )
+
+    require_configured.assert_called_once()
+
+
+def test_render_job_does_not_check_llm_config_for_the_heuristic_attributor(
+    db_session, monkeypatch, tmp_path
+):
+    job = _make_job(db_session)
+    require_configured = MagicMock()
+    monkeypatch.setattr(render_module, "require_llm_attribution_configured", require_configured)
+    _mock_common_deps(monkeypatch)
+
+    render_module.render_job(job.id, job.epub_object_key, {}, Console(), str(tmp_path))
+
+    require_configured.assert_not_called()
+
+
+# --- attribution heartbeat wiring ------------------------------------------
+
+
+class _CapturingPipeline(_FakePipeline):
+    instances: list = []
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        type(self).instances.append(self)
+
+
+def test_render_job_wires_a_heartbeat_into_the_pipeline_for_slow_attribution(
+    db_session, monkeypatch, tmp_path
+):
+    """Attribution runs before the first chapter finishes; without this the API's
+    15-minute stale-heartbeat check would fail a busy local-worker job."""
+    stale = datetime.now(timezone.utc) - timedelta(hours=1)
+    job = _make_job(db_session, last_heartbeat_at=stale)
+    _mock_common_deps(monkeypatch)
+    _CapturingPipeline.instances = []
+    monkeypatch.setattr(render_module, "Pipeline", _CapturingPipeline)
+    # _set_total_chapters stamps a heartbeat itself; make it stale again afterwards.
+    render_module.render_job(job.id, job.epub_object_key, {}, Console(), str(tmp_path))
+    job.last_heartbeat_at = stale
+    db_session.commit()
+
+    heartbeat = _CapturingPipeline.instances[0].on_attribution_progress
+    assert heartbeat is not None
+    heartbeat()
+
+    db_session.refresh(job)
+    refreshed = job.last_heartbeat_at
+    if refreshed.tzinfo is None:
+        refreshed = refreshed.replace(tzinfo=timezone.utc)
+    assert datetime.now(timezone.utc) - refreshed < timedelta(minutes=1)

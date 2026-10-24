@@ -95,6 +95,11 @@ def _clear_freellmapi_env(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+def _clear_llm_env(monkeypatch):
+    for name in ("FREELLMAPI_BASE_URL", "FREELLMAPI_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+
+
 def _set_freellmapi_env(monkeypatch):
     monkeypatch.setenv("FREELLMAPI_BASE_URL", "https://freellmapi.example.com")
     monkeypatch.setenv("FREELLMAPI_API_KEY", "test-key")
@@ -252,3 +257,102 @@ def test_generate_with_an_invalid_music_preset_fails_via_config_validate(
     assert exit_code == 1
     output = capsys.readouterr().out
     assert "Unknown music_preset" in output
+
+
+# --- --attributor / --attribution-max-calls -------------------------------
+
+
+def test_parser_defaults_attributor_to_heuristic_with_a_150_call_budget():
+    args = _build_parser().parse_args(["generate", "book.epub"])
+    assert args.attributor == "heuristic"
+    assert args.attribution_max_calls == 150
+
+
+def test_parser_parses_attributor_and_budget():
+    args = _build_parser().parse_args(
+        ["generate", "book.epub", "--attributor", "hybrid", "--attribution-max-calls", "40"]
+    )
+    assert args.attributor == "hybrid"
+    assert args.attribution_max_calls == 40
+
+
+def test_parser_rejects_an_unknown_attributor():
+    with pytest.raises(SystemExit):
+        _build_parser().parse_args(["generate", "book.epub", "--attributor", "gpt"])
+
+
+def test_generate_passes_attributor_and_budget_through_to_config(monkeypatch, epub, tmp_path):
+    _set_freellmapi_env(monkeypatch)
+
+    exit_code, config_kwargs = _run_and_capture_config(
+        monkeypatch,
+        _generate_argv(epub, tmp_path, "--attributor", "hybrid", "--attribution-max-calls", "7"),
+    )
+
+    assert exit_code == 0
+    assert config_kwargs["attributor"] == "hybrid"
+    assert config_kwargs["attribution_max_calls"] == 7
+
+
+def test_llm_attributor_without_credentials_exits_non_zero_without_leaking_values(
+    monkeypatch, epub, tmp_path, capsys
+):
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("FREELLMAPI_BASE_URL", "https://very-secret-host.example/v1")
+
+    exit_code = main(_generate_argv(epub, tmp_path, "--attributor", "llm"))
+
+    assert exit_code == 1
+    output = capsys.readouterr().out
+    assert "FREELLMAPI_API_KEY" in output
+    assert "very-secret-host" not in output
+
+
+def test_hybrid_attributor_with_no_credentials_at_all_exits_non_zero(
+    monkeypatch, epub, tmp_path, capsys
+):
+    _clear_llm_env(monkeypatch)
+
+    exit_code = main(_generate_argv(epub, tmp_path, "--attributor", "hybrid"))
+
+    assert exit_code == 1
+    assert "FREELLMAPI_BASE_URL" in capsys.readouterr().out
+
+
+def test_default_attributor_needs_no_llm_credentials(monkeypatch, epub, tmp_path):
+    _clear_llm_env(monkeypatch)
+
+    assert main(_generate_argv(epub, tmp_path)) == 0
+
+
+def test_dry_run_with_an_llm_attributor_estimates_windows_and_makes_no_request(
+    monkeypatch, epub, tmp_path, capsys
+):
+    from unittest.mock import MagicMock
+
+    from book2audio.attribution import llm_client
+
+    _set_freellmapi_env(monkeypatch)
+    post = MagicMock()
+    monkeypatch.setattr(llm_client.httpx, "post", post)
+
+    exit_code = main(_generate_argv(epub, tmp_path, "--attributor", "llm"))
+
+    assert exit_code == 0
+    post.assert_not_called()
+    assert "estimate" in capsys.readouterr().out
+
+
+def test_a_present_api_key_is_never_echoed_when_another_variable_is_missing(
+    monkeypatch, epub, tmp_path, capsys
+):
+    fake_key = "sk-test-SECRET-9f3a"
+    monkeypatch.delenv("FREELLMAPI_BASE_URL", raising=False)
+    monkeypatch.setenv("FREELLMAPI_API_KEY", fake_key)
+
+    exit_code = main(_generate_argv(epub, tmp_path, "--attributor", "hybrid"))
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "FREELLMAPI_BASE_URL" in captured.out
+    assert fake_key not in captured.out + captured.err

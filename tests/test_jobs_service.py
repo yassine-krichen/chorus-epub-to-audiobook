@@ -577,3 +577,84 @@ def test_to_detail_omits_every_download_and_thumbnail_url_once_the_jobs_artifact
     assert detail.parts[0].download_url is None
     assert detail.chapters[0].thumbnail_url is None
     presign_get.assert_not_called()
+
+
+# --- hosted LLM attribution gate ------------------------------------------------
+
+
+def _llm_payload(mode="hybrid"):
+    return CreateJobRequest(
+        epub_object_key="uploads/book.epub", title="A Book", config=JobConfig(attributor=mode)
+    )
+
+
+@pytest.mark.parametrize("mode", ["llm", "hybrid"])
+def test_create_job_rejects_llm_attribution_by_default_and_creates_nothing(
+    db_session, monkeypatch, mode
+):
+    monkeypatch.delenv("HOSTED_LLM_ATTRIBUTION", raising=False)
+    run_job_execution = MagicMock()
+    monkeypatch.setattr(service.cloud_run, "run_job_execution", run_job_execution)
+    user = _make_user(db_session)
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.create_job(db_session, user.id, _llm_payload(mode))
+
+    assert exc_info.value.status_code == 403
+    assert "not enabled" in exc_info.value.detail
+    run_job_execution.assert_not_called()
+    assert db_session.scalar(service.select(Job).where(Job.user_id == user.id)) is None
+
+
+def test_create_job_rejects_llm_attribution_when_the_flag_is_empty(db_session, monkeypatch):
+    monkeypatch.setenv("HOSTED_LLM_ATTRIBUTION", "")
+    user = _make_user(db_session)
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.create_job(db_session, user.id, _llm_payload())
+
+    assert exc_info.value.status_code == 403
+
+
+def test_create_job_allows_llm_attribution_when_the_flag_is_enabled(db_session, monkeypatch):
+    monkeypatch.setenv("HOSTED_LLM_ATTRIBUTION", "enabled")
+    monkeypatch.setenv("WORKER_MODE", "local")
+    user = _make_user(db_session)
+
+    job = service.create_job(db_session, user.id, _llm_payload("llm"))
+
+    assert job.status == "queued"
+    assert job.config["attributor"] == "llm"
+
+
+@pytest.mark.parametrize("typo", ["Enabled", "ENABLED", "true", "1", "enable", "enabled ", "disabled"])
+def test_a_mistyped_flag_rejects_llm_jobs_and_fails_startup(db_session, monkeypatch, typo):
+    from book2audio.api.main import create_app
+
+    monkeypatch.setenv("HOSTED_LLM_ATTRIBUTION", typo)
+    monkeypatch.setenv("WORKER_MODE", "local")
+    user = _make_user(db_session)
+
+    with pytest.raises(RuntimeError, match="HOSTED_LLM_ATTRIBUTION"):
+        service.create_job(db_session, user.id, _llm_payload())
+    assert db_session.scalar(service.select(Job).where(Job.user_id == user.id)) is None
+    with pytest.raises(RuntimeError, match="HOSTED_LLM_ATTRIBUTION"):
+        create_app()
+
+
+def test_heuristic_jobs_never_depend_on_the_flag(db_session, monkeypatch):
+    monkeypatch.setenv("HOSTED_LLM_ATTRIBUTION", "not-a-valid-value")
+    monkeypatch.setenv("WORKER_MODE", "local")
+    user = _make_user(db_session)
+    payload = CreateJobRequest(epub_object_key="uploads/book.epub", title="A Book")
+
+    job = service.create_job(db_session, user.id, payload)
+
+    assert job.status == "queued"
+
+
+def test_hosted_llm_attribution_enabled_only_for_the_exact_value(monkeypatch):
+    monkeypatch.delenv("HOSTED_LLM_ATTRIBUTION", raising=False)
+    assert service.hosted_llm_attribution_enabled() is False
+    monkeypatch.setenv("HOSTED_LLM_ATTRIBUTION", "enabled")
+    assert service.hosted_llm_attribution_enabled() is True

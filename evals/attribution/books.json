@@ -1,0 +1,82 @@
+{
+  "books": {
+    "alice": {
+      "title": "Alice's Adventures in Wonderland",
+      "author": "Lewis Carroll",
+      "gutenberg_id": 11,
+      "url": "https://www.gutenberg.org/ebooks/11.epub.noimages",
+      "file": "alice-pg11.epub",
+      "sha256": "08a2de3a58226311915bd87056e59ed4ee49a284dcb5e722fef415bca4032a4b",
+      "cast": {
+        "5": [
+          "Alice",
+          "Caterpillar",
+          "Pigeon"
+        ],
+        "6": [
+          "Alice",
+          "Footman",
+          "Duchess",
+          "Cook",
+          "Cheshire Cat"
+        ],
+        "7": [
+          "Alice",
+          "Mad Hatter",
+          "March Hare",
+          "Dormouse"
+        ],
+        "9": [
+          "Alice",
+          "Duchess",
+          "Queen",
+          "Gryphon",
+          "Mock Turtle"
+        ]
+      }
+    },
+    "penrod": {
+      "title": "Penrod",
+      "author": "Booth Tarkington",
+      "gutenberg_id": 402,
+      "url": "https://www.gutenberg.org/ebooks/402.epub.noimages",
+      "file": "penrod-pg402.epub",
+      "sha256": "6b0479be46490c7a0deeb877a6fb859f872e535218fc4d11d90470d49fe39251",
+      "cast": {
+        "5": [
+          "Penrod",
+          "Sam Williams",
+          "Herman",
+          "Verman",
+          "Roddy",
+          "Mrs. Bitts",
+          "Mrs. Williams",
+          "Mr. Williams",
+          "Mrs. Schofield",
+          "Mr. Schofield",
+          "Margaret",
+          "Robert Williams",
+          "Marjorie",
+          "Mitchy-Mitch"
+        ]
+      }
+    }
+  },
+  "splits": {
+    "test": {
+      "alice": [
+        5,
+        7,
+        9
+      ],
+      "penrod": [
+        5
+      ]
+    },
+    "dev": {
+      "alice": [
+        6
+      ]
+    }
+  }
+}

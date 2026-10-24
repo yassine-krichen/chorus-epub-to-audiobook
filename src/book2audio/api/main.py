@@ -25,6 +25,8 @@ def create_app() -> FastAPI:
         )
     # Fail fast on a bad WORKER_MODE at startup, not on first job creation.
     jobs_service.worker_mode()
+    # Same for the flag that lets hosted jobs spend the LLM key.
+    jobs_service.hosted_llm_attribution_enabled()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

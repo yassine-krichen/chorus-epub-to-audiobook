@@ -1,0 +1,7 @@
+Characters per chapter (hand-written from the text, not from any model).
+Special speaker values: Narrator (quoted words no character says aloud), SKIP (cannot be decided; excluded from scoring).
+
+alice chapter 5 (CHAPTER V. Advice from a Caterpillar): Alice; Caterpillar; Pigeon
+alice chapter 7 (CHAPTER VII. A Mad Tea-Party): Alice; Mad Hatter; March Hare; Dormouse
+alice chapter 9 (CHAPTER IX. The Mock Turtle’s Story): Alice; Duchess; Queen; Gryphon; Mock Turtle
+penrod chapter 5 (CHAPTER XVII RETIRING FROM THE SHOW BUSINESS): Penrod; Sam Williams; Herman; Verman; Roddy; Mrs. Bitts; Mrs. Williams; Mr. Williams; Mrs. Schofield; Mr. Schofield; Margaret; Robert Williams; Marjorie; Mitchy-Mitch

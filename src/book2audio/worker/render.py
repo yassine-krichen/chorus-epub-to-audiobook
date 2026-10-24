@@ -15,6 +15,7 @@ from typing import Callable
 
 from rich.console import Console
 
+from book2audio.attribution import require_llm_attribution_configured
 from book2audio.config import Config
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
@@ -23,7 +24,7 @@ from book2audio.images.freellmapi import require_freellmapi_configured
 from book2audio.models import Chapter
 from book2audio.pipeline import Pipeline
 from book2audio.storage.r2 import download_file
-from book2audio.worker.progress import build_progress_hooks
+from book2audio.worker.progress import build_heartbeat, build_progress_hooks
 
 
 def render_job(
@@ -41,6 +42,8 @@ def render_job(
     config = _build_config(epub_path, scratch_dir, job_config)
     if config.thumbnails:
         require_freellmapi_configured()
+    if config.attributor != "heuristic":
+        require_llm_attribution_configured()
     book_title = _set_total_chapters(job_id, config)
 
     on_chapter_done, on_part_ready = build_progress_hooks(
@@ -62,6 +65,7 @@ def render_job(
         console,
         on_chapter_done=on_chapter_done,
         on_part_ready=on_part_ready,
+        on_attribution_progress=build_heartbeat(job_id),
     )
     pipeline.run()
 

@@ -6,6 +6,9 @@ from typing import Protocol
 
 from book2audio.models import Chapter
 
+# Selectable attribution strategies (``Config.attributor``, ``--attributor``).
+ATTRIBUTOR_MODES = ("heuristic", "llm", "hybrid")
+
 
 class Attributor(Protocol):
     """Assigns a ``speaker`` to every segment across a book's chapters.

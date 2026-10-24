@@ -68,21 +68,27 @@ class HeuristicAttributor:
 
     def __init__(self) -> None:
         self.genders: dict[str, str] = {}
+        # How each dialogue line was resolved, keyed by ``(chapter.index,
+        # position in chapter.segments)``. Kept beside the segments (not on
+        # Segment) so the shared model stays free of attribution internals.
+        self.tiers: dict[tuple[int, int], str] = {}
 
     def attribute(self, chapters: list[Chapter]) -> list[str]:
+        self.tiers = {}
         discovered: dict[str, None] = {}  # insertion-ordered set of names
         for chapter in chapters:
-            self._attribute_chapter(chapter.segments, discovered)
-        names = self._merge_aliases(list(discovered), chapters)
-        self._infer_genders(names, chapters)
+            self._attribute_chapter(chapter, discovered)
+        names = self.merge_aliases(list(discovered), chapters)
+        self.infer_genders(names, chapters)
         return names
 
-    def _infer_genders(self, names: list[str], chapters: list[Chapter]) -> None:
+    def infer_genders(self, names: list[str], chapters: list[Chapter]) -> dict[str, str]:
         """Vote each character's gender from pronouns in their dialogue tags.
 
         For every line a character speaks, the surrounding tag ("...he said")
         usually carries a matching pronoun. Majority vote across the book is a
-        reliable signal for main characters, who speak most.
+        reliable signal for main characters, who speak most. Public so another
+        attributor can recompute genders after it changes speakers.
         """
         known = set(names)
         votes: dict[str, list[int]] = {n: [0, 0] for n in names}
@@ -103,9 +109,10 @@ class HeuristicAttributor:
                 self.genders[name] = "m"
             elif female > male:
                 self.genders[name] = "f"
+        return self.genders
 
     @staticmethod
-    def _merge_aliases(names: list[str], chapters: list[Chapter]) -> list[str]:
+    def merge_aliases(names: list[str], chapters: list[Chapter]) -> list[str]:
         """Fold obvious nicknames into their full name (``Neph`` -> ``Nephis``).
 
         Rule: a short single-word name that is a case-insensitive prefix of a
@@ -130,7 +137,8 @@ class HeuristicAttributor:
                     seg.speaker = canonical[seg.speaker]
         return [n for n in names if n not in canonical]
 
-    def _attribute_chapter(self, segments: list[Segment], discovered: dict[str, None]) -> None:
+    def _attribute_chapter(self, chapter: Chapter, discovered: dict[str, None]) -> None:
+        segments = chapter.segments
         # recent[-1] is the last speaker, recent[-2] the one before — enough to
         # alternate an untagged two-person exchange.
         recent: list[str] = []
@@ -147,7 +155,8 @@ class HeuristicAttributor:
                 recent.clear()  # a scene break resets conversational context
                 continue
 
-            speaker, tag_index = self._resolve_dialogue(segments, i, recent, consumed)
+            speaker, tag_index, tier = self._resolve_dialogue(segments, i, recent, consumed)
+            self.tiers[(chapter.index, i)] = tier
             if tag_index is not None:
                 consumed.add(tag_index)
             seg.speaker = speaker
@@ -158,8 +167,13 @@ class HeuristicAttributor:
 
     def _resolve_dialogue(
         self, segments: list[Segment], i: int, recent: list[str], consumed: set[int]
-    ) -> tuple[str, int | None]:
-        """Return ``(speaker, trailing_tag_index_to_consume_or_None)``."""
+    ) -> tuple[str, int | None, str]:
+        """Return ``(speaker, trailing_tag_index_to_consume_or_None, tier)``.
+
+        ``tier`` says how the speaker was found: ``named_trailing``,
+        ``named_leading``, ``pronoun``, ``alternation`` or ``fallback``. The
+        first two are explicit names in the text; the rest are guesses.
+        """
         after_idx, before_idx = i + 1, i - 1
         after = self._neighbor_narration(segments, after_idx)
         before = "" if before_idx in consumed else self._neighbor_narration(segments, before_idx)
@@ -167,22 +181,22 @@ class HeuristicAttributor:
         # 1. Trailing named tag wins ("..." said Sunny); consume it.
         name = self._extract_name(after)
         if name:
-            return name, after_idx
+            return name, after_idx, "named_trailing"
         # 2. Leading named tag (Sunny said, "...") — not a previous line's tag.
         name = self._extract_name(before)
         if name:
-            return name, None
+            return name, None, "named_leading"
 
         # 3. Pronoun-only tag -> most recent distinct named speaker.
         if (_PRONOUN_TAG.search(after) or _PRONOUN_TAG.search(before)) and recent:
-            return recent[-1], None
+            return recent[-1], None, "pronoun"
 
         # 4. Untagged: alternate between the last two speakers if we have them.
         if len(recent) >= 2:
-            return recent[-2], None
+            return recent[-2], None, "alternation"
         if recent:
-            return recent[-1], None
-        return NARRATOR, None  # unknown speaker falls back to the narrator voice
+            return recent[-1], None, "fallback"
+        return NARRATOR, None, "fallback"  # unknown speaker falls back to the narrator voice
 
     @staticmethod
     def _neighbor_narration(segments: list[Segment], j: int) -> str:

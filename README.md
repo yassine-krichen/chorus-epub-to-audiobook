@@ -140,9 +140,18 @@ book2audio generate <epub> [options]
       --dry-run           Parse, attribute and cast without synthesizing
       --thumbnails        Validates freellmapi credentials; thumbnail files are
                           produced by the hosted worker, not this CLI
+      --attributor MODE   heuristic (default, offline) | llm (ask the model about every
+                          line) | hybrid (ask only about lines the heuristic guessed)
+      --attribution-max-calls N
+                          Max LLM windows per book (default 150); later windows keep
+                          heuristic labels
 ```
 
 Run `--dry-run` first to see detected character names, then pin voices with `--voice NAME=VOICE`. Kokoro voice ids follow `<accent><gender>_<name>`, for example `am_michael` or `bf_emma`; the pool lives in `src/book2audio/tts/voices.py`.
+
+### LLM speaker attribution
+
+The heuristic attributor is the default and stays offline. `--attributor hybrid` keeps its labels wherever a name sits in the text and asks the model only about lines it had to guess (pronoun, alternation or fallback); `llm` asks about every line. Replies are validated per line, so a bad reply, an outage or an exhausted budget leaves the heuristic labels in place. The budget counts windows (one request each); a timeout, connect error, 429 or 5xx is retried once after a short backoff, so HTTP requests can exceed it by up to 2x. Auth and request errors (400, 401, 403) are not retried. The request timeout is 120 s. A name the model introduces must appear capitalized in the window and never in lowercase, but that does not prove it is a person (a capitalized place passes); nicknames that prefix a known name are folded into it. Windows are split at scene breaks, capped at about 25 lines, and cached in `<work-dir>/attribution-cache.json`, so a re-run costs nothing. `--dry-run` prints an estimate of the windows it would send and makes no request. Only the chapters being rendered are sent, and their text is sent to whatever gateway `FREELLMAPI_BASE_URL` points at, so do not enable this for books you cannot share with that provider. Cache entries are keyed on the instructions, model, sampling settings and passage, and empty or fully rejected replies are not cached. During attribution the hosted worker keeps the job's heartbeat fresh after every window, so a long pass is not mistaken for a crashed worker. The hosted API rejects `llm` and `hybrid` jobs unless `HOSTED_LLM_ATTRIBUTION=enabled` (see the table below); the CLI is not gated. The hosted worker does not round-trip the cache through R2 (its scratch dir is empty each run), so a resumed hosted job pays for attribution again. Whether `llm` or `hybrid` actually beats the heuristic is measured by `evals/attribution/`.
 
 ### Hosted mode
 
@@ -166,9 +175,11 @@ The CLI needs no environment variables. These names are read in `src/`.
 | `R2_BUCKET`, `R2_ACCOUNT_ID`, `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | storage | R2, or MinIO via endpoint URL |
 | `CLOUD_RUN_JOB_NAME` | job service | Job triggered per render |
 | `JOB_CONFIG`, `WORKER_MODE` | worker entrypoint | Job payload and mode |
+| `HOSTED_LLM_ATTRIBUTION` | API | Unset (default) rejects hosted jobs whose `attributor` is `llm` or `hybrid` with HTTP 403, because registration is open and each LLM job spends the operator's freellmapi key. Set it to exactly `enabled` to allow them. Any other value (a typo such as `Enabled` or `true`) makes the API refuse to start. The CLI and local runs ignore it |
 | `LOCAL_WORKER_POLL_INTERVAL_SECONDS` | local daemon | Poll interval |
 | `CLEANUP_GRACE_PERIOD_DAYS` | cleanup job | Artifact retention |
 | `FREELLMAPI_API_KEY`, `FREELLMAPI_BASE_URL`, `FREELLMAPI_IMAGE_MODEL` | thumbnails | Optional chapter images |
+| `FREELLMAPI_API_KEY`, `FREELLMAPI_BASE_URL` (includes `/v1`), `FREELLMAPI_MODEL` (default `auto`) | `--attributor llm\|hybrid`, job `attributor` | LLM speaker attribution; checked before any work starts |
 
 ## API
 
@@ -186,14 +197,14 @@ The CLI needs no environment variables. These names are read in `src/`.
 uv run pytest
 ```
 
-380 tests are collected (`pytest --collect-only -q`). They cover segmentation, attribution, voice casting, normalization, music, EPUB parsing, pipeline batching and callbacks, config, auth and rate limiting, job ownership and the worker entrypoints. Real synthesis is exercised through the `--limit` render path rather than mocked.
+575 tests are collected (`pytest --collect-only -q`). They cover segmentation, attribution, voice casting, normalization, music, EPUB parsing, pipeline batching and callbacks, config, auth and rate limiting, job ownership and the worker entrypoints. Real synthesis is exercised through the `--limit` render path rather than mocked.
 
 ## Roadmap
 
 | Status | Item |
 | --- | --- |
 | Done | CLI pipeline, multi-voice casting, resumable and batched `.m4b` output, music bed, hosted API and worker |
-| Planned | LLM attribution and casting by personality, age and role, behind the existing `Attributor` interface |
+| In progress | LLM attribution (`--attributor llm` or `hybrid`) is implemented; accuracy against hand-labelled gold is not yet measured. Casting by personality, age and role is still planned |
 | Planned | Word-level emphasis, which needs a TTS backend with SSML/prosody control; Kokoro takes plain text only |
 | Planned | Chapter images, pending a local-vs-cloud decision on GPU, latency and cost |
 | Planned | Library, player and voice-preview GUI |

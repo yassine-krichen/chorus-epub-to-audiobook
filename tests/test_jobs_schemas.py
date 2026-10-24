@@ -82,3 +82,20 @@ def test_job_config_accepts_a_known_music_preset():
 def test_job_config_rejects_an_unknown_music_preset():
     with pytest.raises(ValidationError, match="Unknown music_preset"):
         JobConfig(music_preset="not-a-real-preset")
+
+
+# --- attributor wiring ------------------------------------------------------
+
+
+def test_job_config_defaults_attributor_to_heuristic():
+    assert JobConfig().attributor == "heuristic"
+
+
+@pytest.mark.parametrize("mode", ["heuristic", "llm", "hybrid"])
+def test_job_config_accepts_every_known_attributor(mode):
+    assert JobConfig(attributor=mode).attributor == mode
+
+
+def test_job_config_rejects_an_unknown_attributor():
+    with pytest.raises(ValidationError, match="Unknown attributor"):
+        JobConfig(attributor="gpt")

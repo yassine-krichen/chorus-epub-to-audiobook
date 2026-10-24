@@ -16,6 +16,7 @@ import sys
 from rich.console import Console
 
 from book2audio.assemble.music import MUSIC_PRESETS
+from book2audio.attribution import ATTRIBUTOR_MODES, require_llm_attribution_configured
 from book2audio.config import Config
 from book2audio.images.freellmapi import require_freellmapi_configured
 from book2audio.pipeline import Pipeline
@@ -121,6 +122,26 @@ def _build_parser() -> argparse.ArgumentParser:
             "exists via the hosted worker's R2-backed job pipeline."
         ),
     )
+    gen.add_argument(
+        "--attributor",
+        choices=ATTRIBUTOR_MODES,
+        default="heuristic",
+        help=(
+            "Who speaks each line: heuristic (offline, default), llm (ask the model about "
+            "every line) or hybrid (ask only about lines the heuristic had to guess). "
+            "llm/hybrid need FREELLMAPI_BASE_URL and FREELLMAPI_API_KEY."
+        ),
+    )
+    gen.add_argument(
+        "--attribution-max-calls",
+        type=int,
+        default=150,
+        metavar="N",
+        help=(
+            "Max LLM windows (one request each) per book; later windows keep heuristic "
+            "labels. A transient failure may be retried once, outside this count (default: 150)"
+        ),
+    )
     return parser
 
 
@@ -151,11 +172,15 @@ def _run_generate(args: argparse.Namespace, console: Console) -> int:
         male_voice=args.male_voice,
         female_voice=args.female_voice,
         thumbnails=args.thumbnails,
+        attributor=args.attributor,
+        attribution_max_calls=args.attribution_max_calls,
     )
 
     try:
         if config.thumbnails:
             require_freellmapi_configured()
+        if config.attributor != "heuristic":
+            require_llm_attribution_configured()
         pipeline = Pipeline(config, console)
         if args.dry_run:
             _dry_run(pipeline, console)
@@ -169,7 +194,7 @@ def _run_generate(args: argparse.Namespace, console: Console) -> int:
 
 def _dry_run(pipeline: Pipeline, console: Console) -> None:
     pipeline.config.validate()
-    book = pipeline._load_and_prepare()
+    book = pipeline._load_and_prepare(estimate_only=True)
     cast = pipeline._cast_voices(book)
     selected = pipeline._select_chapters(book)
     pipeline._report_plan(book, selected, cast)

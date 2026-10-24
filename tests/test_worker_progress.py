@@ -307,3 +307,32 @@ def test_on_chapter_done_records_failed_status_and_does_not_raise_when_generatio
 
     db_session.refresh(job)
     assert job.chapters[0]["thumbnail_status"] == "failed"
+
+
+# --- build_heartbeat ----------------------------------------------------------
+
+
+def test_heartbeat_bumps_last_heartbeat_at(db_session):
+    stale = datetime.now(timezone.utc) - timedelta(hours=1)
+    job = _make_job(db_session, last_heartbeat_at=stale)
+
+    progress_module.build_heartbeat(job.id)()
+
+    db_session.refresh(job)
+    heartbeat = job.last_heartbeat_at
+    if heartbeat.tzinfo is None:
+        heartbeat = heartbeat.replace(tzinfo=timezone.utc)
+    assert datetime.now(timezone.utc) - heartbeat < timedelta(minutes=1)
+
+
+def test_heartbeat_does_not_raise_when_the_job_row_no_longer_exists():
+    progress_module.build_heartbeat(uuid.uuid4())()  # must not raise
+
+
+def test_heartbeat_swallows_database_errors_so_a_blip_cannot_abort_the_render(monkeypatch):
+    def broken_session():
+        raise RuntimeError("connection reset")
+
+    monkeypatch.setattr(progress_module, "SessionLocal", broken_session)
+
+    progress_module.build_heartbeat(uuid.uuid4())()  # must not raise

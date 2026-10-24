@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from book2audio.api.jobs.filenames import validate_filename_template
 from book2audio.assemble.music import MUSIC_PRESETS
+from book2audio.attribution.base import ATTRIBUTOR_MODES
 from book2audio.tts.voices import FEMALE_VOICES, MALE_VOICES
 
 
@@ -46,6 +47,16 @@ class JobConfig(BaseModel):
     expressive: bool = True
     filename_template: str | None = None
     thumbnails: bool = False
+    attributor: str = "heuristic"
+
+    @field_validator("attributor")
+    @classmethod
+    def _validate_attributor(cls, value: str) -> str:
+        if value not in ATTRIBUTOR_MODES:
+            raise ValueError(
+                f"Unknown attributor {value!r}. Known: {', '.join(ATTRIBUTOR_MODES)}"
+            )
+        return value
 
     @field_validator("filename_template")
     @classmethod

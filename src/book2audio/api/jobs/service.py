@@ -56,7 +56,31 @@ def worker_mode() -> str:
     return mode
 
 
+def hosted_llm_attribution_enabled() -> bool:
+    """Whether hosted jobs may use the LLM speaker attributor (default: no).
+
+    Registration is open and every LLM job spends the operator's freellmapi key
+    and sends book text to that gateway, so the API fails closed: only the exact
+    value ``HOSTED_LLM_ATTRIBUTION=enabled`` opens it. Any other non-empty value
+    is treated as a typo and raises, rather than silently staying closed (or
+    open) without the operator noticing. Validated at startup like WORKER_MODE.
+    """
+    value = os.environ.get("HOSTED_LLM_ATTRIBUTION", "")
+    if value == "":
+        return False
+    if value != "enabled":
+        raise RuntimeError(
+            f"HOSTED_LLM_ATTRIBUTION must be unset or exactly 'enabled', got {value!r}"
+        )
+    return True
+
+
 def create_job(db: Session, user_id: uuid.UUID, payload: CreateJobRequest) -> Job:
+    if payload.config.attributor != "heuristic" and not hosted_llm_attribution_enabled():
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "LLM speaker attribution is not enabled on this server; use the heuristic attributor",
+        )
     job = Job(
         user_id=user_id,
         title=payload.title,

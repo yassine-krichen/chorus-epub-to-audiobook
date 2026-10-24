@@ -27,7 +27,7 @@ from rich.progress import (
 from book2audio.assemble.audio import concat_with_gaps, normalize_rms, write_wav
 from book2audio.assemble.audiobook import ChapterAudio, build_m4b
 from book2audio.assemble.music import LOOP_SECONDS, generate_bed_for_preset, mix_music_bed
-from book2audio.attribution import HeuristicAttributor
+from book2audio.attribution import LLMAttributor, build_attributor
 from book2audio.config import Config
 from book2audio.epub import ParsedChapter, parse_epub
 from book2audio.models import Book, BookMetadata, Chapter, Segment, SegmentKind
@@ -63,12 +63,16 @@ class Pipeline:
         *,
         on_chapter_done: Callable[[Chapter], None] | None = None,
         on_part_ready: Callable[[int, str, list[Chapter]], None] | None = None,
+        on_attribution_progress: Callable[[], None] | None = None,
     ) -> None:
         self.config = config
         self.console = console or Console()
         self._music_bed: np.ndarray | None = None
         self._on_chapter_done = on_chapter_done
         self._on_part_ready = on_part_ready
+        # Attribution can run for many minutes before the first chapter
+        # finishes, so hosted workers need a liveness signal from it.
+        self._on_attribution_progress = on_attribution_progress
 
     def run(self) -> str:
         cfg = self.config
@@ -98,16 +102,47 @@ class Pipeline:
 
     # --- stages -----------------------------------------------------------
 
-    def _load_and_prepare(self) -> Book:
+    def _load_and_prepare(self, *, estimate_only: bool = False) -> Book:
+        """Parse and attribute the book.
+
+        ``estimate_only`` (dry runs) keeps an LLM attributor from making any
+        request: it labels with the heuristic and reports the windows it would send.
+        """
         metadata, parsed = parse_epub(self.config.epub_path, cover_dir=self.config.work_dir)
         chapters = [self._build_chapter(pc) for pc in parsed]
         book = Book(metadata=metadata, chapters=chapters)
 
-        attributor = HeuristicAttributor()
-        characters = attributor.attribute(book.chapters)
+        # LLM calls only cover the chapters being rendered, so a --limit or
+        # --start-chapter run does not spend the call budget on the rest.
+        start_pos, end_pos = self.config.selection_bounds(len(chapters))
+        selected = frozenset(c.index for c in chapters[start_pos:end_pos])
+        attributor = build_attributor(
+            self.config,
+            only_chapters=selected,
+            on_progress=None if estimate_only else self._on_attribution_progress,
+        )
+        if estimate_only and isinstance(attributor, LLMAttributor):
+            characters = attributor.estimate(book.chapters)
+        else:
+            characters = attributor.attribute(book.chapters)
         self._characters = self._order_by_frequency(characters, book)
         self._genders = attributor.genders
+        if isinstance(attributor, LLMAttributor):
+            self._report_attribution(attributor, estimate_only)
         return book
+
+    def _report_attribution(self, attributor: LLMAttributor, estimate_only: bool) -> None:
+        report = attributor.report
+        for warning in report.warnings:
+            self.console.print(f"[yellow]Warning:[/yellow] {warning}")
+        if estimate_only:
+            self.console.print(
+                f"[dim]LLM attribution ({report.mode}) estimate: {report.windows} window(s) "
+                f"to send, {report.lines_targeted} line(s) targeted, budget "
+                f"{self.config.attribution_max_calls} call(s); no request made[/dim]"
+            )
+        else:
+            self.console.print(f"[dim]{report.summary()}[/dim]")
 
     @staticmethod
     def _order_by_frequency(characters: list[str], book: Book) -> list[str]:

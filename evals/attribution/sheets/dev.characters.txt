@@ -1,0 +1,4 @@
+Characters per chapter (hand-written from the text, not from any model).
+Special speaker values: Narrator (quoted words no character says aloud), SKIP (cannot be decided; excluded from scoring).
+
+alice chapter 6 (CHAPTER VI. Pig and Pepper): Alice; Footman; Duchess; Cook; Cheshire Cat
