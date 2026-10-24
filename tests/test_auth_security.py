@@ -50,7 +50,13 @@ def test_decode_access_token_rejects_an_expired_token(monkeypatch):
 
 def test_decode_access_token_rejects_a_tampered_token():
     token, _ = create_access_token(uuid.uuid4())
-    tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+    # Flip a character in the middle of the payload segment. The last character
+    # of a segment carries base64url padding bits, so changing it is a no-op
+    # about 6% of the time and made this test flaky.
+    header, payload, signature = token.split(".")
+    mid = len(payload) // 2
+    flipped = "A" if payload[mid] != "A" else "B"
+    tampered = ".".join([header, payload[:mid] + flipped + payload[mid + 1 :], signature])
     with pytest.raises(jwt.PyJWTError):
         decode_access_token(tampered)
 
