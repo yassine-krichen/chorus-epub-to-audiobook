@@ -42,6 +42,7 @@ SEED_ALIASES: dict[str, dict[str, list[str]]] = {
         "Cheshire Cat": ["Cat", "The Cat", "Cheshire-Cat"],
         "Footman": ["The Footman", "Frog Footman", "Frog"],
         "Cook": ["The Cook"],
+        "King": ["The King", "King of Hearts"],
     },
     "penrod": {
         "Penrod": ["Penrod Schofield"],
@@ -58,6 +59,9 @@ SEED_ALIASES: dict[str, dict[str, list[str]]] = {
         "Robert Williams": ["Bob", "Mr. Robert Williams", "Robert"],
         "Marjorie": ["Marjorie Jones"],
         "Mitchy-Mitch": ["Mitchy", "Mitchell", "Mitch"],
+        "Mrs. Jones": ["Mrs. Marjorie Jones"],
+        "Watermelon Man": ["The Watermelon Man", "watermelon man"],
+        "Red-faced Man": ["The Red-faced Man", "Winnie Man"],
     },
 }
 

@@ -1,0 +1,5797 @@
+{
+ "meta": {
+  "split": "test",
+  "timestamp": "20261025T030521Z",
+  "model": "gemini-3.1-flash-lite-preview",
+  "prompt_sha256": "a82c729cf3c31b132eadb3406ac8ba22710d83f87b53f00a3ac21518b879da45",
+  "modes": [
+   "heuristic",
+   "hybrid"
+  ],
+  "runs_per_llm_mode": 2,
+  "max_calls_per_book": 150,
+  "bootstrap_seed": 0,
+  "bootstrap_iterations": 10000,
+  "epub_sha256": {
+   "alice": "08a2de3a58226311915bd87056e59ed4ee49a284dcb5e722fef415bca4032a4b",
+   "penrod": "6b0479be46490c7a0deeb877a6fb859f872e535218fc4d11d90470d49fe39251"
+  },
+  "aliases": {
+   "Alice": [],
+   "Mad Hatter": [
+    "Hatter",
+    "The Hatter",
+    "The Mad Hatter"
+   ],
+   "March Hare": [
+    "Hare",
+    "The March Hare"
+   ],
+   "Dormouse": [
+    "The Dormouse"
+   ],
+   "Caterpillar": [
+    "The Caterpillar"
+   ],
+   "Pigeon": [],
+   "Duchess": [
+    "The Duchess"
+   ],
+   "Queen": [
+    "Queen of Hearts",
+    "The Queen"
+   ],
+   "Gryphon": [
+    "The Gryphon",
+    "Griffin"
+   ],
+   "Mock Turtle": [
+    "The Mock Turtle",
+    "Turtle"
+   ],
+   "Cheshire Cat": [
+    "Cat",
+    "The Cat",
+    "Cheshire-Cat"
+   ],
+   "Footman": [
+    "The Footman",
+    "Frog Footman",
+    "Frog"
+   ],
+   "Cook": [
+    "The Cook"
+   ],
+   "King": [
+    "The King",
+    "King of Hearts"
+   ],
+   "Penrod": [
+    "Penrod Schofield"
+   ],
+   "Sam Williams": [
+    "Sam",
+    "Samuel Williams"
+   ],
+   "Herman": [],
+   "Verman": [],
+   "Roddy": [
+    "Roderick",
+    "Roderick Magsworth Bitts",
+    "Master Bitts"
+   ],
+   "Mrs. Bitts": [
+    "Mrs. Roderick Magsworth Bitts"
+   ],
+   "Mrs. Williams": [],
+   "Mr. Williams": [],
+   "Mrs. Schofield": [],
+   "Mr. Schofield": [],
+   "Margaret": [
+    "Margaret Schofield",
+    "Miss Margaret Schofield"
+   ],
+   "Robert Williams": [
+    "Bob",
+    "Mr. Robert Williams",
+    "Robert"
+   ],
+   "Marjorie": [
+    "Marjorie Jones"
+   ],
+   "Mitchy-Mitch": [
+    "Mitchy",
+    "Mitchell",
+    "Mitch"
+   ],
+   "Mrs. Jones": [
+    "Mrs. Marjorie Jones"
+   ],
+   "Watermelon Man": [
+    "The Watermelon Man",
+    "watermelon man"
+   ],
+   "Red-faced Man": [
+    "The Red-faced Man",
+    "Winnie Man"
+   ]
+  }
+ },
+ "summary": {
+  "n_scored": 500,
+  "skipped": 5,
+  "heuristic": {
+   "accuracy": 0.474,
+   "n": 500,
+   "wilson_lo": 0.430597326218342,
+   "wilson_hi": 0.5177991539452649,
+   "tiers": {
+    "alternation": {
+     "accuracy": 0.11818181818181818,
+     "n": 220
+    },
+    "fallback": {
+     "accuracy": 0.09090909090909091,
+     "n": 22
+    },
+    "named_leading": {
+     "accuracy": 1.0,
+     "n": 3
+    },
+    "named_trailing": {
+     "accuracy": 0.8947368421052632,
+     "n": 209
+    },
+    "pronoun": {
+     "accuracy": 0.41304347826086957,
+     "n": 46
+    }
+   }
+  },
+  "hybrid": {
+   "runs": [
+    {
+     "accuracy": 0.846,
+     "n": 500,
+     "wilson_lo": 0.8117339597150403,
+     "wilson_hi": 0.8749898042615746,
+     "diff_vs_heuristic": {
+      "line": {
+       "mean": 0.372,
+       "lo": 0.328,
+       "hi": 0.414
+      },
+      "clustered": {
+       "mean": 0.372,
+       "lo": 0.31666666666666665,
+       "hi": 0.4163424124513619
+      }
+     },
+     "fixed": 187,
+     "broken": 1,
+     "fraction_sent": 0.5782178217821782,
+     "lines_targeted": 292,
+     "calls": 24,
+     "cache_hits": 0,
+     "windows_failed": 0,
+     "breaker_tripped": false,
+     "budget_exhausted": false,
+     "seconds": 88.60802390000026,
+     "problems": [],
+     "reliable": true
+    },
+    {
+     "accuracy": 0.846,
+     "n": 500,
+     "wilson_lo": 0.8117339597150403,
+     "wilson_hi": 0.8749898042615746,
+     "diff_vs_heuristic": {
+      "line": {
+       "mean": 0.372,
+       "lo": 0.328,
+       "hi": 0.414
+      },
+      "clustered": {
+       "mean": 0.372,
+       "lo": 0.31666666666666665,
+       "hi": 0.4163424124513619
+      }
+     },
+     "fixed": 187,
+     "broken": 1,
+     "fraction_sent": 0.5782178217821782,
+     "lines_targeted": 292,
+     "calls": 24,
+     "cache_hits": 0,
+     "windows_failed": 0,
+     "breaker_tripped": false,
+     "budget_exhausted": false,
+     "seconds": 52.16501199999766,
+     "problems": [],
+     "reliable": true
+    }
+   ],
+   "reliable_runs": 2,
+   "mean_accuracy": 0.846,
+   "tiers": {
+    "alternation": {
+     "accuracy": 0.8136363636363636,
+     "n": 220
+    },
+    "fallback": {
+     "accuracy": 0.4090909090909091,
+     "n": 22
+    },
+    "named_leading": {
+     "accuracy": 1.0,
+     "n": 3
+    },
+    "named_trailing": {
+     "accuracy": 0.8947368421052632,
+     "n": 209
+    },
+    "pronoun": {
+     "accuracy": 0.9782608695652174,
+     "n": 46
+    }
+   }
+  }
+ },
+ "lines": [
+  {
+   "id": "5:1:80495816",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:2:3e9f4c00",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_leading",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:3:d8fbfa4b",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:4:0605782f",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:5:d21d2404",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:6:29e6f0e0",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:7:70bdf948",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:8:14785e30",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:9:b5c91e98",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:10:6639a9d6",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:11:e57e3430",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:12:032f62fd",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:13:718fa70f",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:14:029c5c5f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:15:d7cd606e",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:16:b1a636ab",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:17:80495816",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:18:e381fafa",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:19:5d8a995a",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:20:be4f7bca",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:21:c2641d73",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:22:31d84f8b",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:23:b41225d0",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:24:ce66c6da",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:25:e287259f",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:26:3b9d7f62",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:27:4656818f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:28:80180f46",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:29:bd8e52b2",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:30:f947fdc7",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:31:ec316354",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:32:9ce3b6c9",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:33:00a038fe",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Father William",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:34:db407956",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:35:995f2017",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Father William",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:36:067ca6fd",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:37:00a038fe",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Father William",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:38:fc6d39d7",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:39:995f2017",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Father William",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:40:1f951455",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:41:00a038fe",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Father William",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:42:d6af2e14",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:43:995f2017",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Father William",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:44:3ad721a2",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:45:b5bc94f7",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Father William",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:46:911a3e0b",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Father William",
+    "Father William"
+   ]
+  },
+  {
+   "id": "5:47:42023f1b",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:48:19cd4a4f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:49:ebfed0af",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:50:47a1dd73",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:51:fd32ba3f",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:52:96b2d9ac",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:53:794c3a58",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:54:1595e38c",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:55:3113bbf1",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:56:9657cfba",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:57:3bafc7a6",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:58:6da42880",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:59:9d154c01",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:60:8a6c7621",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:61:468d5da0",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:62:1629c2c1",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:63:b688bff1",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:64:79d5df20",
+   "book": "alice",
+   "gold": "Caterpillar",
+   "tier": "named_trailing",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Caterpillar",
+    "Caterpillar"
+   ]
+  },
+  {
+   "id": "5:65:b40cbdeb",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Caterpillar",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:66:a4f38039",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:67:2150740c",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:68:47e170b1",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:69:7a388ec6",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "named_trailing",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:70:faf5cbe6",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:71:0905e5fc",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:72:2082c602",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "named_trailing",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:73:373666d2",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:74:9392ebe3",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:75:17d3dcb0",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "alternation",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:76:59255d00",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:77:51fe1c37",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "named_trailing",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:78:9f9761d4",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:79:f25e1186",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:80:ac1db41b",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "named_trailing",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:81:67ee81f2",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:82:2ab3b13e",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:83:920d0391",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:84:373cf31d",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "named_trailing",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:85:5627cbd7",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:86:7cdf1c75",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:87:0ac9c962",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "named_trailing",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:88:bed84bb6",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:89:2f4629ed",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:90:b2121f1f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:91:06ad85db",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "named_trailing",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:92:8a77ee43",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:93:aaf26412",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "alternation",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:94:efb50f10",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:95:99183caf",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:96:009c6aba",
+   "book": "alice",
+   "gold": "Pigeon",
+   "tier": "named_trailing",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Pigeon",
+    "Pigeon"
+   ]
+  },
+  {
+   "id": "5:97:152f9b35",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:98:a1ac0263",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "5:99:d5ac622c",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Pigeon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:1:39476189",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "fallback",
+   "heuristic": "Narrator",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:2:31589574",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "fallback",
+   "heuristic": "Narrator",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:3:2e1f9478",
+   "book": "alice",
+   "gold": "SKIP",
+   "tier": "fallback",
+   "heuristic": "Narrator",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:4:f1449814",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:5:ab6f1e10",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:6:3c0b1150",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:7:ffc7997e",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:8:67dda700",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:9:67d1aabf",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:10:e5723457",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:11:cae27d02",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:12:df6c94c7",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:13:11c7f779",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:14:fd025748",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:15:2d0add1a",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:16:d879ea7c",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:17:11624098",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:18:2e82e581",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:19:dc05e774",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:20:d8447ff3",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:21:bb1e4489",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:22:f06605ec",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:23:81c7cd6e",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:24:955b36e6",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:25:6f84825f",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:26:b2cacac2",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:27:6f84825f",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "named_trailing",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:28:6d271b60",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:29:cf9919f2",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:30:0e0cd11b",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "pronoun",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:31:dd3d5246",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:32:b25d77dc",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:33:c4f1db99",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "pronoun",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:34:07ef143b",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:35:07c1e694",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:36:dacb6c6f",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:37:4765a347",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:38:a6c8fe99",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:39:30c4fad8",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:40:2bff2a07",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:41:a73b128f",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:42:d694dc26",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:43:70d21bc0",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:44:77c21fbf",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:45:3a4998aa",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:46:683b2a1a",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:47:25eec61f",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:48:a9a026e0",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:49:070040c4",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:50:008dd71f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:51:11409898",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:52:a0561bbf",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:53:8b2c4ac1",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_leading",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:54:edbc3300",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:55:3fb7861b",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:56:d0150906",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:57:1a980579",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:58:b3dfd136",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:59:7c7722ce",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:60:bf9c9da3",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:61:81ca88e4",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:62:f8716eeb",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:63:b3a2f83d",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:64:99ac1fcc",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:65:1c44a16b",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:66:3a0a1e93",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:67:aaf74124",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:68:f2d4c028",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:69:455cd3f2",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:70:1b72df58",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:71:80b2228c",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:72:c79440c1",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:73:1791ab40",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:74:a4422083",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:75:55bbfac1",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:76:a120b9a0",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:77:9198e8e9",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:78:b93733cd",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:79:8a833725",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:80:ff4a37fb",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:81:8f720c80",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:82:0613f5be",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:83:17593c99",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:84:dc05e774",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:85:584ccb2d",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:86:6b30eef7",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:87:fe7bca45",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:88:0a37cce8",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:89:dfa35d64",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:90:17baccd7",
+   "book": "alice",
+   "gold": "SKIP",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:91:da426eec",
+   "book": "alice",
+   "gold": "SKIP",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:92:49a3a404",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:93:353d2209",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:94:9d09a4c5",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:95:0edadd86",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:96:588d716f",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:97:456993ce",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:98:84271279",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "named_trailing",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:99:cc8d74b0",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:100:129cd0d5",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:101:e375d191",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "named_trailing",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:102:c6881abc",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:103:60530ffa",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:104:3b675cd4",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "named_trailing",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:105:afebb688",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:106:088e9718",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:107:13c7ceb2",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:108:ac6c29cb",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:109:9cf1035a",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:110:2addadc0",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:111:162f37a8",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:112:ed0035b5",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:113:70fbba37",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:114:7848b2dd",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:115:0870e257",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:116:7a100f3d",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:117:60a0d9fb",
+   "book": "alice",
+   "gold": "SKIP",
+   "tier": "named_trailing",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:118:c73e9555",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:119:ad60e6fb",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:120:5d4cfdd3",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:121:34686d61",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "named_trailing",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:122:6d8c9a93",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:123:a66be45f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:124:d5cd5649",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "named_trailing",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:125:96cb2ba2",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:126:853a4dc4",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "pronoun",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:127:fae31bb2",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:128:03f82424",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:129:2933ef16",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "alternation",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:130:4d274f5f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:131:7348fb99",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "named_trailing",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:132:dd33be97",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:133:4805f249",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Dormouse",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:134:467a974e",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:135:df379085",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:136:fae1cd1b",
+   "book": "alice",
+   "gold": "March Hare",
+   "tier": "named_trailing",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "March Hare",
+    "March Hare"
+   ]
+  },
+  {
+   "id": "7:137:ff44953b",
+   "book": "alice",
+   "gold": "Dormouse",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Dormouse",
+    "Dormouse"
+   ]
+  },
+  {
+   "id": "7:138:ae7c804f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:139:748c8fe1",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "March Hare",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:140:88c9753e",
+   "book": "alice",
+   "gold": "Mad Hatter",
+   "tier": "named_trailing",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Hatter",
+    "Hatter"
+   ]
+  },
+  {
+   "id": "7:141:bb2e1f50",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:142:e83e5fc9",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:143:228f203e",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:144:76dca4fb",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "7:145:0b482517",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Hatter",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:1:5c3c2d73",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:2:0d97dcfd",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:3:9255a841",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:4:0998597f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "fallback",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:5:ba658933",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "fallback",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:6:349fec21",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "fallback",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:7:f364a8ea",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:8:079e6242",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "pronoun",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:9:9d2efdb6",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:10:95da3921",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:11:8a63727a",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "fallback",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:12:c79fe52c",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:13:873db0f4",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:14:469f13f1",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:15:70b00795",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:16:96f35e31",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:17:edac6e0c",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:18:81b09ec0",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:19:f1523d05",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:20:763137b3",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:21:947c8263",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:22:e6a30779",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:23:52bfe4f1",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:24:8b066746",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:25:6f30ac4a",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:26:9ac2c7c0",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:27:a4e8f713",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:28:0ac7ea34",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:29:d0f70bd9",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:30:f4bd3a8a",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:31:d968fecf",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:32:e549a906",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:33:2ef984b4",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:34:9f6230f7",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:35:a7e869bc",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:36:478fea13",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:37:69eaf41b",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:38:b265f21f",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:39:e03ce495",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:40:2e1fc0d4",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:41:1e6d3b8d",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:42:f7cfe32a",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:43:7391c3cf",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:44:2c30cdee",
+   "book": "alice",
+   "gold": "Duchess",
+   "tier": "named_trailing",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Duchess",
+    "Duchess"
+   ]
+  },
+  {
+   "id": "9:45:5a8c6f89",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "named_trailing",
+   "heuristic": "Queen",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:46:8dcaeae8",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "alternation",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:47:663803f2",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "named_trailing",
+   "heuristic": "Queen",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:48:c527f80f",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "alternation",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:49:7a7f8c65",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "alternation",
+   "heuristic": "Queen",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:50:ac8efca0",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "alternation",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:51:ce66c6da",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:52:bda5b7a8",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Duchess",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:53:1a204cff",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "named_trailing",
+   "heuristic": "Queen",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:54:bca63c76",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:55:8cb2e3d6",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "named_trailing",
+   "heuristic": "Queen",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:56:0354b477",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:57:2a680776",
+   "book": "alice",
+   "gold": "King",
+   "tier": "alternation",
+   "heuristic": "Queen",
+   "hybrid": [
+    "King",
+    "King"
+   ]
+  },
+  {
+   "id": "9:58:0d4f48af",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "pronoun",
+   "heuristic": "Queen",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:59:2be011e1",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "named_trailing",
+   "heuristic": "Queen",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:60:34168795",
+   "book": "alice",
+   "gold": "Queen",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Queen",
+    "Queen"
+   ]
+  },
+  {
+   "id": "9:61:ffbacb87",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:62:32192e84",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:63:3ab34ec0",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:64:d0615d78",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:65:4b18996e",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:66:6ffb78ac",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:67:0e25fafd",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:68:7a1c8fc1",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:69:f2d9ffc1",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:70:485ff30d",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:71:3bd5ef6d",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:72:0238f1c7",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:73:d300b8c0",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:74:168a7145",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:75:12fed898",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:76:c86f6728",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:77:fc84382d",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:78:0c241d0c",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:79:36b2e938",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:80:7d93ac07",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:81:e1c4d87f",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:82:02004b51",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:83:7c5b773f",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:84:0585787a",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:85:87792136",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:86:1893ac37",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:87:5b4e4d06",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:88:d49405a4",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:89:d0f6fa9a",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:90:403f5a9a",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:91:1f1ca15d",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:92:9d3643c3",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:93:5d2ced81",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:94:0915012a",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:95:0519b47e",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:96:b463af36",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:97:064c3afe",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:98:c4c44436",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:99:98620c32",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:100:3af12dbd",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:101:50425278",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:102:feb13dcb",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:103:3f6e1482",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:104:524d84d4",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:105:0d85f1eb",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:106:a371c6b5",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:107:bbff7b98",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:108:b2a60793",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:109:f0bfa3d3",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:110:5d2ced81",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:111:577d608b",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:112:7295752c",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:113:afef5577",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:114:8aff1980",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:115:d83f5e19",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:116:8e71ec90",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:117:5532781c",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:118:9dec654a",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:119:d14bf16e",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:120:9934129b",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:121:281bb051",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:122:bc8a8b2f",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:123:9d9d2ca8",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:124:98c8e120",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:125:c6e0d2b4",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:126:229f0e07",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:127:7d4ef8c1",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:128:9f5127a3",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "named_trailing",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:129:dbd7e590",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:130:97daf8b3",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Alice",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:131:b7c3fed9",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:132:be37eac4",
+   "book": "alice",
+   "gold": "Mock Turtle",
+   "tier": "named_trailing",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Mock Turtle",
+    "Mock Turtle"
+   ]
+  },
+  {
+   "id": "9:133:d2a8800b",
+   "book": "alice",
+   "gold": "Alice",
+   "tier": "alternation",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Alice",
+    "Alice"
+   ]
+  },
+  {
+   "id": "9:134:371a99f3",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "named_trailing",
+   "heuristic": "Gryphon",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "9:135:44bc8046",
+   "book": "alice",
+   "gold": "Gryphon",
+   "tier": "alternation",
+   "heuristic": "Mock Turtle",
+   "hybrid": [
+    "Gryphon",
+    "Gryphon"
+   ]
+  },
+  {
+   "id": "5:1:07b6be9f",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "fallback",
+   "heuristic": "Narrator",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:2:c9280b49",
+   "book": "penrod",
+   "gold": "Mr. Williams",
+   "tier": "fallback",
+   "heuristic": "Narrator",
+   "hybrid": [
+    "Mr. Williams",
+    "Mr. Williams"
+   ]
+  },
+  {
+   "id": "5:3:cab3b0d1",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:4:e86c353d",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs. Williams",
+    "Mrs. Williams"
+   ]
+  },
+  {
+   "id": "5:5:49d5edfb",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:6:0192a3cf",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:7:3ed30ad1",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:8:8744db6a",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:9:9155a4a6",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:10:de112f0b",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:11:1064f31e",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:12:879f7c48",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:13:3e0bb680",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:14:12ddb1a1",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:15:a01a9959",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:16:5f22666d",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:17:8d00ad12",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:18:31be2871",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:19:d0290058",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:20:1cd3d03a",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:21:e6361db9",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:22:fca55858",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:23:a5649699",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:24:1cffa852",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:25:58c36918",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:26:7477a98e",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "named_trailing",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:27:a54bff7d",
+   "book": "penrod",
+   "gold": "Mrs. Williams",
+   "tier": "fallback",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:28:bc1b3b7c",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Schofield",
+    "Schofield"
+   ]
+  },
+  {
+   "id": "5:29:d3a36e6d",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Schofield",
+    "Schofield"
+   ]
+  },
+  {
+   "id": "5:30:487de8f3",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:31:4fdbc178",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Schofield",
+    "Schofield"
+   ]
+  },
+  {
+   "id": "5:32:94d55ba7",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:33:8a98ddb1",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mrs",
+   "hybrid": [
+    "Schofield",
+    "Schofield"
+   ]
+  },
+  {
+   "id": "5:34:89b5a18c",
+   "book": "penrod",
+   "gold": "Mrs. Schofield",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:35:aabcbc4a",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:36:220ca4a4",
+   "book": "penrod",
+   "gold": "Mr. Williams",
+   "tier": "named_trailing",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:37:d7559d3f",
+   "book": "penrod",
+   "gold": "Mr. Williams",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Sam Williams",
+    "Sam Williams"
+   ]
+  },
+  {
+   "id": "5:38:253b8f11",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:39:13abc6d7",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Schofield",
+    "Schofield"
+   ]
+  },
+  {
+   "id": "5:40:043e0344",
+   "book": "penrod",
+   "gold": "Sam Williams",
+   "tier": "named_trailing",
+   "heuristic": "Sam Williams",
+   "hybrid": [
+    "Sam Williams",
+    "Sam Williams"
+   ]
+  },
+  {
+   "id": "5:41:3e987f15",
+   "book": "penrod",
+   "gold": "Sam Williams",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Sam Williams",
+    "Sam Williams"
+   ]
+  },
+  {
+   "id": "5:42:43482edf",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "named_trailing",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:43:46f8fade",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:44:cb57f7fc",
+   "book": "penrod",
+   "gold": "SKIP",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:45:e845c708",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Narrator",
+    "Narrator"
+   ]
+  },
+  {
+   "id": "5:46:4808949f",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Narrator",
+    "Narrator"
+   ]
+  },
+  {
+   "id": "5:47:24f0712c",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Narrator",
+    "Narrator"
+   ]
+  },
+  {
+   "id": "5:48:39beb697",
+   "book": "penrod",
+   "gold": "Margaret",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Margaret",
+    "Margaret"
+   ]
+  },
+  {
+   "id": "5:49:aa5c4f8d",
+   "book": "penrod",
+   "gold": "Margaret",
+   "tier": "alternation",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Margaret",
+    "Margaret"
+   ]
+  },
+  {
+   "id": "5:50:74052169",
+   "book": "penrod",
+   "gold": "Robert Williams",
+   "tier": "pronoun",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Robert",
+    "Robert"
+   ]
+  },
+  {
+   "id": "5:51:bde22be4",
+   "book": "penrod",
+   "gold": "Robert Williams",
+   "tier": "pronoun",
+   "heuristic": "Schofield",
+   "hybrid": [
+    "Robert",
+    "Robert"
+   ]
+  },
+  {
+   "id": "5:52:90c87ac5",
+   "book": "penrod",
+   "gold": "Margaret",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Margaret",
+    "Margaret"
+   ]
+  },
+  {
+   "id": "5:53:18c33248",
+   "book": "penrod",
+   "gold": "Robert Williams",
+   "tier": "named_trailing",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:54:6a5895d3",
+   "book": "penrod",
+   "gold": "Robert Williams",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Robert",
+    "Robert"
+   ]
+  },
+  {
+   "id": "5:55:a121d4dc",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "named_leading",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:56:8da4ebe6",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:57:eb28f48c",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:58:8ddf93e7",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:59:23a4d909",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:60:3cef32ee",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:61:674092aa",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:62:e693c93f",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "pronoun",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:63:4d18bde0",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "pronoun",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:64:ddda245d",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "named_trailing",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:65:334d016f",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "named_trailing",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:66:300c14d6",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:67:cdc6140e",
+   "book": "penrod",
+   "gold": "Mitchy-Mitch",
+   "tier": "named_trailing",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Mitchy-Mitch",
+    "Mitchy-Mitch"
+   ]
+  },
+  {
+   "id": "5:68:9ec8e6b8",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "named_trailing",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:69:879cc232",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "pronoun",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:70:b2d56b44",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "pronoun",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:71:e661bb5f",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:72:2506b4d1",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:73:a5662b9d",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "pronoun",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:74:ca712480",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "pronoun",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:75:a9e43817",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:76:c8768bcf",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:77:c5ec7f9e",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:78:e4141dd1",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "alternation",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:79:832f4034",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "pronoun",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:80:093f6e90",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "named_trailing",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:81:b64eeeac",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:82:c1677b57",
+   "book": "penrod",
+   "gold": "Mitchy-Mitch",
+   "tier": "alternation",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Mitchy-Mitch",
+    "Mitchy-Mitch"
+   ]
+  },
+  {
+   "id": "5:83:5bd368cb",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "pronoun",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:84:0ee35fc8",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "pronoun",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:85:786060c4",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "pronoun",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:86:a0e2f5cf",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:87:054d07c1",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "alternation",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:88:ccc8473a",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:89:6b7b2e93",
+   "book": "penrod",
+   "gold": "Mrs. Jones",
+   "tier": "alternation",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:90:1fad209d",
+   "book": "penrod",
+   "gold": "Mrs. Jones",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Mrs",
+    "Mrs"
+   ]
+  },
+  {
+   "id": "5:91:9fc7a19a",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Marjorie",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:92:37b985b2",
+   "book": "penrod",
+   "gold": "Marjorie",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Marjorie",
+    "Marjorie"
+   ]
+  },
+  {
+   "id": "5:93:18f50ab4",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:94:6f28ca73",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:95:fdb6d64e",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "named_trailing",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:96:0a8cfbc2",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mitchy",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:97:2332e688",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "named_trailing",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:98:823f78fe",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:99:12ccb560",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:100:dc8d6ddf",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "pronoun",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:101:e17df771",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:102:a5963378",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:103:e8a577b7",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:104:09fa9d76",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:105:eb70adac",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:106:1e239eff",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:107:524299a2",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:108:b87dbb3a",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:109:f4a60b5a",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:110:aabcbc4a",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:111:e8a577b7",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:112:c99510bf",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:113:8f81876f",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:114:b509b751",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:115:51c7a1c9",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:116:85fe6d1f",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "named_trailing",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:117:b99e3e85",
+   "book": "penrod",
+   "gold": "Mr. Schofield",
+   "tier": "pronoun",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Mr",
+    "Mr"
+   ]
+  },
+  {
+   "id": "5:118:552fc5ed",
+   "book": "penrod",
+   "gold": "Watermelon Man",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Chosen",
+    "Chosen"
+   ]
+  },
+  {
+   "id": "5:119:14ebe56a",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Narrator",
+    "Narrator"
+   ]
+  },
+  {
+   "id": "5:120:6ac8d794",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Narrator",
+    "Narrator"
+   ]
+  },
+  {
+   "id": "5:121:04eefd62",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Narrator",
+    "Narrator"
+   ]
+  },
+  {
+   "id": "5:122:70672867",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Narrator",
+    "Narrator"
+   ]
+  },
+  {
+   "id": "5:123:2ea500a7",
+   "book": "penrod",
+   "gold": "Red-faced Man",
+   "tier": "alternation",
+   "heuristic": "Mr",
+   "hybrid": [
+    "Narrator",
+    "Narrator"
+   ]
+  },
+  {
+   "id": "5:124:af039ef9",
+   "book": "penrod",
+   "gold": "Narrator",
+   "tier": "alternation",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Narrator",
+    "Narrator"
+   ]
+  },
+  {
+   "id": "5:125:a301306c",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "pronoun",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  },
+  {
+   "id": "5:126:7c5211be",
+   "book": "penrod",
+   "gold": "Penrod",
+   "tier": "pronoun",
+   "heuristic": "Penrod",
+   "hybrid": [
+    "Penrod",
+    "Penrod"
+   ]
+  }
+ ]
+}

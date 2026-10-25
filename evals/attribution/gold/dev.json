@@ -1,0 +1,709 @@
+{
+ "split": "dev",
+ "books": {
+  "alice": {
+   "epub_sha256": "08a2de3a58226311915bd87056e59ed4ee49a284dcb5e722fef415bca4032a4b"
+  }
+ },
+ "aliases": {
+  "Alice": [],
+  "Mad Hatter": [
+   "Hatter",
+   "The Hatter",
+   "The Mad Hatter"
+  ],
+  "March Hare": [
+   "Hare",
+   "The March Hare"
+  ],
+  "Dormouse": [
+   "The Dormouse"
+  ],
+  "Caterpillar": [
+   "The Caterpillar"
+  ],
+  "Pigeon": [],
+  "Duchess": [
+   "The Duchess"
+  ],
+  "Queen": [
+   "Queen of Hearts",
+   "The Queen"
+  ],
+  "Gryphon": [
+   "The Gryphon",
+   "Griffin"
+  ],
+  "Mock Turtle": [
+   "The Mock Turtle",
+   "Turtle"
+  ],
+  "Cheshire Cat": [
+   "Cat",
+   "The Cat",
+   "Cheshire-Cat"
+  ],
+  "Footman": [
+   "The Footman",
+   "Frog Footman",
+   "Frog"
+  ],
+  "Cook": [
+   "The Cook"
+  ],
+  "King": [
+   "The King",
+   "King of Hearts"
+  ]
+ },
+ "lines": [
+  {
+   "id": "6:1:4c852dc4",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:2:c7c9b0fc",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": "Frog-Footman; mapped to Footman"
+  },
+  {
+   "id": "6:3:864dc4df",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:4:98c53c86",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:5:2e3b4153",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:6:2c8ffba1",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:7:cf01af95",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:8:badf1b41",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:9:74686d10",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:10:e4b6dce0",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:11:fa3da0d2",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:12:f8fbca10",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:13:537d2ff0",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:14:fee6f26f",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:15:f3411ccf",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:16:092d99bf",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:17:091f6d65",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:18:5761b3dc",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:19:fa3da0d2",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:20:edfd2076",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:21:7210d5f4",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:22:b98751f6",
+   "book": "alice",
+   "speaker": "Footman",
+   "note": ""
+  },
+  {
+   "id": "6:23:080f08a1",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:24:2e1b2943",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:25:b26c9974",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:26:666aa9d1",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:27:98d889e5",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:28:2671e3f4",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:29:89dcb944",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:30:6a883491",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:31:3bd2b8ab",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:32:a517d20e",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:33:858af9c2",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:34:1963cb06",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:35:1a9a51ac",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:36:2ec7b871",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:37:27d4c0ab",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": "low confidence: unattributed exclamation, continues Alice's cry in 36"
+  },
+  {
+   "id": "6:38:68057708",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:39:7837a766",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:40:6b9a0e07",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:41:5057eab7",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:42:3205417c",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:43:655195aa",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:44:f50a8b78",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:45:d5e95a62",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:46:890cc00e",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:47:544d368b",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": "song sung by the Duchess"
+  },
+  {
+   "id": "6:48:87787f20",
+   "book": "alice",
+   "speaker": "Cook",
+   "note": "low confidence: chorus of cook and baby, cast has no baby; labelled Cook"
+  },
+  {
+   "id": "6:49:ffbeac6e",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:50:87787f20",
+   "book": "alice",
+   "speaker": "Cook",
+   "note": "low confidence: chorus of cook and baby, cast has no baby; labelled Cook"
+  },
+  {
+   "id": "6:51:abca96b6",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:52:be8ec746",
+   "book": "alice",
+   "speaker": "Duchess",
+   "note": ""
+  },
+  {
+   "id": "6:53:21983853",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": "Alice's thought, labelled Alice"
+  },
+  {
+   "id": "6:54:78f334c9",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:55:fbd7d3cb",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:56:553fed6a",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:57:7fee4958",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:58:6a545a77",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:59:8003cdcd",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:60:2908dfb8",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:61:01473a8e",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:62:f20d4f78",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:63:841cee9f",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:64:91b4f63b",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:65:40f6c76a",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:66:d71bdb7b",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:67:9c675e04",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:68:c5271471",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:69:40265bc3",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:70:57367239",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:71:48656829",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:72:43a0cea7",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:73:03c127be",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:74:247a7538",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:75:9329575a",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:76:6a53196c",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:77:b3d3e408",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:78:2ab6ed42",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:79:8a76b889",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:80:0d952038",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:81:d8590237",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:82:20720089",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:83:02213211",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:84:57b0a888",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": "low confidence: untagged but Alice replying to the Cat's claim"
+  },
+  {
+   "id": "6:85:4bb7e3d6",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:86:2af1a3ad",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:87:fdc05d79",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:88:7295752c",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:89:cffe031d",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:90:cfe0db45",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:91:65a1920c",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:92:c75de246",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:93:2b935c6d",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:94:dea2e160",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:95:e0107cb0",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:96:226ad108",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:97:c3ba3e69",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:98:0f441ce4",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:99:909ce8b0",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:100:3fd99d9e",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:101:7e687b59",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:102:57256f88",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:103:e97de6ae",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:104:2795493b",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:105:60cac484",
+   "book": "alice",
+   "speaker": "Cheshire Cat",
+   "note": ""
+  },
+  {
+   "id": "6:106:a44b7e46",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:107:bbffd466",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  },
+  {
+   "id": "6:108:8146f147",
+   "book": "alice",
+   "speaker": "Alice",
+   "note": ""
+  }
+ ]
+}
