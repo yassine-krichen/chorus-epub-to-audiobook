@@ -239,7 +239,7 @@ The CLI needs no environment variables. These names are read in `src/`.
 uv run pytest
 ```
 
-1002 tests are collected (`pytest --collect-only -q`). They cover segmentation, attribution, gender resolution, voice casting, chapter numbering, output file naming, thumbnails, normalization, music, EPUB parsing, pipeline batching and callbacks, config, auth and rate limiting, job ownership and the worker entrypoints. Real synthesis is exercised through the `--limit` render path rather than mocked.
+1006 tests are collected (`pytest --collect-only -q`). They cover segmentation, attribution, gender resolution, voice casting, chapter numbering, output file naming, thumbnails, normalization, music, EPUB parsing, pipeline batching and callbacks, config, auth and rate limiting, job ownership and the worker entrypoints. Real synthesis is exercised through the `--limit` render path rather than mocked.
 
 ## Roadmap
 

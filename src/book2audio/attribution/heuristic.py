@@ -46,6 +46,15 @@ _NAME = _TITLE + r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?"
 _VERB_THEN_NAME = re.compile(rf"\b(?:{_SPEECH_VERBS})\b\s+(?:the\s+)?({_NAME})")
 # "Sunny said" / "Nephis whispered" (name precedes verb)
 _NAME_THEN_VERB = re.compile(rf"\b({_NAME})\s+(?:\w+\s+)?(?:{_SPEECH_VERBS})\b")
+# "called" also means "named". Passive ("was called Rain") and descriptive ("a
+# girl called Rain") naming introduce a character, not a speaker, so these
+# phrases are blanked out before any tag is matched. Real speech keeps its
+# shape: '"Hey," Sunny called.', 'Sunny called out', '"Come!" called the guard'.
+_NAMING_PHRASE = re.compile(
+    r"\b(?:(?:was|is|were|are|am|be|been|being)\s+(?:\w+\s+)?"
+    r"|(?:a|an|the|his|her|their|my|your|our|its)\s+(?:[A-Za-z'-]+,?\s+){0,3})"
+    r"called\b"
+)
 # A pronoun tag with no name: "he said", "she asked".
 _PRONOUN_TAG = re.compile(rf"\b(he|she|they)\b\s+(?:\w+\s+)?(?:{_SPEECH_VERBS})\b", re.I)
 
@@ -276,7 +285,7 @@ class HeuristicAttributor:
     @staticmethod
     def _neighbor_narration(segments: list[Segment], j: int) -> str:
         if 0 <= j < len(segments) and segments[j].kind == SegmentKind.NARRATION:
-            return segments[j].text
+            return _NAMING_PHRASE.sub(" ", segments[j].text)
         return ""
 
     @staticmethod

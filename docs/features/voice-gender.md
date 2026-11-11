@@ -154,12 +154,14 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
 - **The bigger problem is who speaks.** The gender numbers above judge each line by the
   character the app chose. In a hand-labelled sample of 80 lines (both slices) the offline
   speaker detection chose the right character for 33 lines, and the sample is not typical.
-  Weighted by how common each kind of guess is, the estimate is about 22% right on these
+  Weighted by how common each kind of guess is, the estimate is about 21% right on these
   chapters. Lines the app gives to the wrong character get that character's voice.
-  In the 73 labelled lines spoken by a man or a woman, 23 were read in a voice of the wrong
-  gender. For example, Sunny's sister Rain is picked as the speaker of 23 lines in chapters
-  1 to 10 because the sentence says she "was called Rain". AI speaker detection
-  (`--attributor hybrid`) is the lever for this, not the gender code.
+  In the 73 labelled lines spoken by a man or a woman, 18 were read in a voice of the wrong
+  gender. AI speaker detection (`--attributor hybrid`) is the lever for this, not the
+  gender code. One cause is fixed: naming phrases such as "was called Rain", "a girl
+  called Rain" no longer make the named person a speaker (Rain used to take 23 lines in
+  chapter 1; they now fall back to the narrator voice until the AI pass finds the real
+  speaker). "Called" as a speech verb ("Hey," Sunny called) still attributes.
 - **Spelling variants are merged by a simple rule, and the rule can be wrong.** Two names
   of the same length that differ by one vowel (Cassia and Cassie, which Shadow Slave's
   narration mixes) are folded into one character, but only if they never speak in the same

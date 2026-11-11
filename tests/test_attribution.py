@@ -93,3 +93,37 @@ def test_saint_and_doctor_titles_survive_in_speaker_names():
     ch = _chapter([_dlg("Hold still."), _nar("said Dr. Watson."), _dlg("No."), _nar("said St. Clair.")])
     HeuristicAttributor().attribute([ch])
     assert [ch.segments[0].speaker, ch.segments[2].speaker] == ["Dr. Watson", "St. Clair"]
+
+
+def test_passive_naming_does_not_create_a_speaker():
+    ch = _chapter([_nar("Sunny's little sister was called Rain."), _dlg("Come on.")])
+    names = HeuristicAttributor().attribute([ch])
+    assert "Rain" not in names
+    assert ch.segments[1].speaker == NARRATOR
+
+
+def test_possessive_naming_does_not_create_a_speaker():
+    ch = _chapter([_dlg("Come on."), _nar("his little sister, called Rain, waited.")])
+    names = HeuristicAttributor().attribute([ch])
+    assert "Rain" not in names
+
+
+def test_descriptive_naming_does_not_create_a_speaker():
+    for narration in ("a girl called Rain stood there.", "a girl named Rain stood there.",
+                      "a girl known as Rain stood there."):
+        ch = _chapter([_nar(narration), _dlg("Come on.")])
+        names = HeuristicAttributor().attribute([ch])
+        assert "Rain" not in names, narration
+
+
+def test_called_as_speech_verb_still_attributes():
+    cases = {
+        "Sunny called.": "Sunny",
+        "called Sunny.": "Sunny",
+        "Sunny called out.": "Sunny",
+        "called the guard.": NARRATOR,
+    }
+    for tag, expected in cases.items():
+        ch = _chapter([_dlg("Hey!"), _nar(tag)])
+        HeuristicAttributor().attribute([ch])
+        assert ch.segments[0].speaker == expected, tag
