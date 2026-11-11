@@ -129,8 +129,28 @@ def test_posting_a_job_with_an_llm_attributor_returns_403_by_default(client, mon
     )
 
     assert response.status_code == 403
-    assert "not enabled" in response.json()["detail"]
+    assert response.json()["detail"] == (
+        "AI speaker detection isn't available on this server yet. "
+        'Turn off "AI speaker detection" and try again.'
+    )
     assert client.get("/jobs", headers=headers).json()["total"] == 0
+
+
+def test_posting_a_narrator_only_job_with_an_llm_attributor_skips_the_gate(client, monkeypatch):
+    monkeypatch.delenv("HOSTED_LLM_ATTRIBUTION", raising=False)
+    headers = _signed_up_user(client, "llm-narrator@example.com")
+
+    response = client.post(
+        "/jobs",
+        json={
+            "epub_object_key": "uploads/book.epub",
+            "title": "My Book",
+            "config": {"attributor": "hybrid", "voice_mode": "narrator_only"},
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 201
 
 
 def test_posting_a_job_with_an_llm_attributor_succeeds_when_the_flag_is_enabled(

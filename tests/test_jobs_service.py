@@ -628,9 +628,29 @@ def test_create_job_rejects_llm_attribution_by_default_and_creates_nothing(
         service.create_job(db_session, user.id, _llm_payload(mode))
 
     assert exc_info.value.status_code == 403
-    assert "not enabled" in exc_info.value.detail
+    assert "isn't available on this server" in exc_info.value.detail
     run_job_execution.assert_not_called()
     assert db_session.scalar(service.select(Job).where(Job.user_id == user.id)) is None
+
+
+@pytest.mark.parametrize("mode", ["llm", "hybrid"])
+def test_create_job_skips_the_llm_gate_for_narrator_only(db_session, monkeypatch, mode):
+    monkeypatch.delenv("HOSTED_LLM_ATTRIBUTION", raising=False)
+    monkeypatch.setattr(
+        service.cloud_run,
+        "run_job_execution",
+        MagicMock(return_value={"metadata": {"name": "projects/p/locations/l/jobs/j/executions/e1"}}),
+    )
+    user = _make_user(db_session)
+    payload = CreateJobRequest(
+        epub_object_key="uploads/book.epub",
+        title="A Book",
+        config=JobConfig(attributor=mode, voice_mode="narrator_only"),
+    )
+
+    job = service.create_job(db_session, user.id, payload)
+
+    assert job.user_id == user.id
 
 
 def test_create_job_rejects_llm_attribution_when_the_flag_is_empty(db_session, monkeypatch):

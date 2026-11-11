@@ -6,8 +6,13 @@ export const ACTIVE_JOB_STATUSES: readonly JobStatus[] = ["queued", "running"];
  * is unclear are read by the narrator); "narrator_only" has the narrator read everything. */
 export type VoiceMode = "cast" | "narrator_only";
 
+/** "heuristic" finds speakers with offline rules; "hybrid" also asks an AI model about
+ * the lines the rules had to guess. Hosted servers may refuse "hybrid" (HTTP 403). */
+export type Attributor = "heuristic" | "hybrid";
+
 export interface JobConfig {
   voice_mode: VoiceMode;
+  attributor: Attributor;
   narrator_voice: string | null;
   voice_overrides: Record<string, string>;
   male_voice: string | null;
@@ -33,6 +38,7 @@ export interface JobConfig {
  * defaults — but the form always builds and sends a full JobConfig. */
 export const DEFAULT_JOB_CONFIG: JobConfig = {
   voice_mode: "cast",
+  attributor: "heuristic",
   narrator_voice: null,
   voice_overrides: {},
   male_voice: null,

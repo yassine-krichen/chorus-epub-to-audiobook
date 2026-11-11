@@ -83,10 +83,13 @@ def hosted_llm_attribution_enabled() -> bool:
 
 
 def create_job(db: Session, user_id: uuid.UUID, payload: CreateJobRequest) -> Job:
-    if payload.config.attributor != "heuristic" and not hosted_llm_attribution_enabled():
+    # narrator_only never attributes speakers, so it never spends the LLM key.
+    uses_llm = payload.config.attributor != "heuristic" and payload.config.voice_mode == "cast"
+    if uses_llm and not hosted_llm_attribution_enabled():
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            "LLM speaker attribution is not enabled on this server; use the heuristic attributor",
+            "AI speaker detection isn't available on this server yet. "
+            'Turn off "AI speaker detection" and try again.',
         )
     job = Job(
         user_id=user_id,

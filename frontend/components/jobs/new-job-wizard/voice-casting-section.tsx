@@ -10,6 +10,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { VoicePicker } from "@/components/voices/voice-picker";
 import { useVoices } from "@/hooks/use-voices";
+import {
+  attributorForSwitch,
+  isAiSpeakerDetection,
+  voiceModePatch,
+} from "@/lib/jobs/ai-speaker-detection";
 import type { JobConfig } from "@/types/job";
 
 interface VoiceCastingSectionProps {
@@ -66,9 +71,25 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
         <Switch
           id="narrator-only-switch"
           checked={narratorOnly}
-          onCheckedChange={(checked) => onChange({ voice_mode: checked ? "narrator_only" : "cast" })}
+          onCheckedChange={(checked) => onChange(voiceModePatch(checked))}
         />
       </div>
+      {!narratorOnly && (
+        <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="ai-speaker-detection-switch">AI speaker detection</Label>
+            <p className="text-xs text-muted-foreground">
+              Uses an AI model to work out who is speaking when the book doesn&apos;t say. Better
+              voices for each character, but slower.
+            </p>
+          </div>
+          <Switch
+            id="ai-speaker-detection-switch"
+            checked={isAiSpeakerDetection(config.attributor)}
+            onCheckedChange={(checked) => onChange({ attributor: attributorForSwitch(checked) })}
+          />
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">
         Narrator voice reads all narration. Male/female pickers bias (not force) character
         casting when a character&apos;s gender is worked out from the text. Defaults work fine if

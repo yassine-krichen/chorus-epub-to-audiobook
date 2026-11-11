@@ -5,6 +5,7 @@ import { jobConfigSchema, newJobFormSchema } from "@/lib/validation/job-config";
 function validConfig() {
   return {
     voice_mode: "cast" as "cast" | "narrator_only",
+    attributor: "heuristic" as "heuristic" | "hybrid",
     narrator_voice: null,
     voice_overrides: {},
     male_voice: null,
@@ -57,6 +58,25 @@ describe("jobConfigSchema", () => {
   it("rejects an unknown voice mode", () => {
     const result = jobConfigSchema.safeParse({ ...validConfig(), voice_mode: "choir" });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts both attributors", () => {
+    for (const attributor of ["heuristic", "hybrid"] as const) {
+      expect(jobConfigSchema.safeParse({ ...validConfig(), attributor }).success).toBe(true);
+    }
+  });
+
+  it("rejects an unknown attributor", () => {
+    const result = jobConfigSchema.safeParse({ ...validConfig(), attributor: "oracle" });
+    expect(result.success).toBe(false);
+  });
+
+  it("defaults the attributor to heuristic when it is missing", () => {
+    const config: Partial<ReturnType<typeof validConfig>> = validConfig();
+    delete config.attributor;
+    const result = jobConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.attributor).toBe("heuristic");
   });
 
   it("rejects a music_preset outside the known enum", () => {
