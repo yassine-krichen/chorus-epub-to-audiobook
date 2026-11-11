@@ -26,11 +26,13 @@ _SCENE_BREAK = re.compile(r"^[\s*·•∗＊]{3,}$")
 def segment_paragraphs(paragraphs: list[str]) -> list[Segment]:
     """Convert raw chapter paragraphs into ordered, un-attributed segments."""
     segments: list[Segment] = []
-    for para in paragraphs:
+    for number, para in enumerate(paragraphs):
         if _SCENE_BREAK.match(para.strip()):
-            segments.append(Segment(kind=SegmentKind.SCENE_BREAK, text=""))
+            segments.append(Segment(kind=SegmentKind.SCENE_BREAK, text="", paragraph=number))
             continue
-        segments.extend(_split_paragraph(para))
+        for segment in _split_paragraph(para):
+            segment.paragraph = number
+            segments.append(segment)
     return segments
 
 

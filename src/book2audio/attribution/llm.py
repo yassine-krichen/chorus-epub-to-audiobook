@@ -5,8 +5,9 @@ consecutive segments, the model is asked who speaks each target dialogue line:
 
 * ``llm`` mode targets every dialogue line.
 * ``hybrid`` mode targets only the lines the heuristic had to guess (pronoun,
-  alternation or fallback tiers); lines with an explicit name in the text keep
-  their heuristic label and cost no tokens.
+  alternation or fallback tiers); lines with explicit evidence in the text (a
+  name, an unnamed speaker, a scare quote, a continuation) keep their heuristic
+  label and cost no tokens.
 
 The model is never trusted blindly. Replies are validated line by line and
 anything missing or invalid keeps the heuristic label, so a bad reply, an
@@ -381,6 +382,8 @@ class LLMAttributor:
     def _status(self, window: _Window, position: int, heuristic_speakers: dict) -> str:
         """Annotation for a dialogue line the model is not asked to label."""
         tier = self._heuristic.tiers.get((window.chapter.index, position))
+        if self.mode == "hybrid" and tier == "unnamed":
+            return "spoken by a person the text does not name"
         if self.mode == "hybrid" and tier not in UNSURE_TIERS:
             # Only explicit, name-in-text labels are shown; guesses would
             # just feed the heuristic's mistakes back to the model.

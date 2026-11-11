@@ -90,6 +90,86 @@ stateDiagram-v2
     Render --> [*]
 ```
 
+## How the offline rules pick a speaker
+
+These rules run first in every mode (they are the whole job when AI detection is off). Each
+dialogue line goes through the checks in order and stops at the first one that answers. The
+name that is the *subject* of the speech verb is the speaker: in "Nephis asked Sunny" the
+second name is who was asked.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Trailing: a dialogue line
+
+    state "Tag right after the quote, in the SAME paragraph: Name said, said Name, Name asked Other. A sentence ending in a colon opens the NEXT quote, and narration in the next paragraph is never this quote's tag" as Trailing
+    state trailingFork <<choice>>
+    Trailing --> trailingFork
+    trailingFork --> NamedTrailing: the subject is a name
+    trailingFork --> Leading: no name
+
+    state "Speaker is that name (solid: named_trailing)" as NamedTrailing
+    NamedTrailing --> [*]
+
+    state "Tag right before the quote, last two sentences: Name said:, or a sentence ending in a colon whose subject is a known character" as Leading
+    state leadingFork <<choice>>
+    Leading --> leadingFork
+    leadingFork --> NamedLeading: the subject is a name
+    leadingFork --> Between: no name
+
+    state "Speaker is that name (solid: named_leading)" as NamedLeading
+    NamedLeading --> [*]
+
+    state "Quote in the same paragraph as the previous quote, with a tag between them: speaker is the previous quote's (continuation)" as Between
+    state betweenFork <<choice>>
+    Between --> betweenFork
+    betweenFork --> Continuation: yes
+    betweenFork --> Pronoun: no
+    state "Continuation" as Continuation
+    Continuation --> [*]
+
+    state "Tag with only a pronoun (he said, she asked)" as Pronoun
+    state pronounFork <<choice>>
+    Pronoun --> pronounFork
+    state "Most recent speaker the pronoun can refer to. Gender evidence from a first pass rules out the wrong gender; a line that names the listener (Sunny, wait) is not Sunny's (pronoun)" as PronounPick
+    state "No known character fits: narrator voice, left for the AI (fallback)" as PronounNobody
+    pronounFork --> PronounPick: a pronoun tag, someone fits
+    pronounFork --> PronounNobody: a pronoun tag, nobody fits
+    pronounFork --> Unnamed: no pronoun tag
+    PronounPick --> [*]
+    PronounNobody --> [*]
+
+    state "Tag whose subject is a described person (The old guard grunted): narrator voice, never the nearest named character (unnamed)" as Unnamed
+    state unnamedFork <<choice>>
+    Unnamed --> unnamedFork
+    unnamedFork --> UnnamedDone: yes
+    unnamedFork --> ScareQuote: no
+    state "Narrator voice" as UnnamedDone
+    UnnamedDone --> [*]
+
+    state "A short quote with no closing punctuation in the middle of a sentence (the word 'honor' again) is not speech: narrator voice (quoted_term)" as ScareQuote
+    state scareFork <<choice>>
+    ScareQuote --> scareFork
+    scareFork --> ScareDone: yes
+    scareFork --> Beat: no
+    state "Narrator voice" as ScareDone
+    ScareDone --> [*]
+
+    state "Short action by one known character just before the quote (Mara shrugged.): that character speaks (named_beat)" as Beat
+    state beatFork <<choice>>
+    Beat --> beatFork
+    beatFork --> BeatDone: yes
+    beatFork --> Guess: no
+    state "Speaker is that character" as BeatDone
+    BeatDone --> [*]
+
+    state "Two speakers so far: alternate. One: continue. None: narrator voice (alternation, fallback). These are the guesses the AI is asked about" as Guess
+    Guess --> [*]
+```
+
+Genders are read from the narration, not from who was assigned a line, so the rules run
+twice: the first pass finds the characters and their gender evidence, the second uses it
+to decide who "he" or "she" can be.
+
 ## What changes for you
 
 - The voice casting tab has a new switch, "AI speaker detection". It is off by default.

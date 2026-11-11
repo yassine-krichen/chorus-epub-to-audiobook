@@ -33,6 +33,11 @@ class Segment:
     kind: SegmentKind
     text: str
     speaker: str | None = None
+    # Position of the source paragraph in the chapter, set by the segmenter. Two
+    # segments with the same value came from one paragraph, which is how a
+    # trailing tag ('"...," Nephis said') is told apart from the next paragraph's
+    # narration. ``None`` means unknown (hand-built segments). Not part of equality.
+    paragraph: int | None = field(default=None, compare=False)
 
 
 @dataclass
