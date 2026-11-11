@@ -74,4 +74,6 @@ def build_attributor(
         only_chapters=only_chapters,
         on_progress=on_progress,
         gender_overrides=config.gender_overrides,
+        # Short, forgiving jobs: the light chain is cheaper than the attribution one.
+        judge_client=LLMClient(task="light"),
     )

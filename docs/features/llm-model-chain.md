@@ -152,10 +152,19 @@ The light chain is ordered by cost. One real scene-brief request per model on ch
 40: every candidate returned a usable brief, but llama-4-scout and ministral-3-8b put
 Nephis into chapter 3, where she does not appear, so they were left out.
 
-The numbers measure speaker lines, not the whole book. Fifteen of the 80 lines are in the
-"named trailing" group. The model is never asked about them (the offline rules keep their
-answer) and 10 of them are wrong for every model, which caps all scores at about the same
-level. One run of 80 lines is an estimate, not a benchmark.
+The numbers above were taken before the offline rules were fixed. They measure speaker
+lines, not the whole book. Fifteen of the 80 lines were then in the "named trailing"
+group: the model was never asked about them and 10 of them were wrong for every model,
+which capped all scores at about the same level. Those rules are fixed now (a tag must
+sit in the quote's paragraph and name the subject of the speech verb), and the same
+default chain gets 71 of 80 (it got 61; the offline rules alone get 59, they got 33).
+Five of the remaining misses are lines spoken by a person the text never names, which the
+narrator voice reads. One run of 80 lines is an estimate, not a benchmark.
+
+On the day of that run the gateway answered 404 for `gemini-2.5-flash-lite` ("removed
+upstream") although its catalog still listed it. The chain skipped it for the run and the
+next model answered, which is what the chain is for. If it stays dead, drop it from the
+defaults or from `FREELLMAPI_MODEL_ATTRIBUTION`.
 
 ## How to try it
 

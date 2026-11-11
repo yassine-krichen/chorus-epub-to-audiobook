@@ -24,7 +24,7 @@ stateDiagram-v2
     modeFork --> NarratorOnly: Narrator reads everything switch, or --narrator-only
     modeFork --> Attribution: character voices (the default)
 
-    state "Find who speaks each line: offline rules by default, optional AI speaker detection. Nicknames and spelling variants are merged, for example Cassia and Cassie" as Attribution
+    state "Find who speaks each line: offline rules by default, optional AI speaker detection. Nicknames, epithets and spelling variants are merged when the text ties them together, for example Cassia and Cassie, or Nephis, the Changing Star. With AI detection on, one AI check also looks for aliases and quotes the book as proof" as Attribution
     state "Keep the offline labels for those lines and carry on" as KeepLabels
     Attribution --> KeepLabels: AI is off, unreachable or out of budget
     Attribution --> Evidence
@@ -55,10 +55,25 @@ stateDiagram-v2
     scoreCheck --> Unresolved: score is below 0.6
     UserWins --> Resolved
 
+    state aiFork <<choice>>
+    Unresolved --> aiFork
+    state "AI gender check (AI speaker detection on only): one request per book for the characters still unresolved. The model must quote a sentence of the book that names the character and shows the gender" as AiJudge
+    state quoteFork <<choice>>
+    AiJudge --> quoteFork
+    state "Resolved with score 0.7, marked for review in the cast report. The quote is kept as evidence" as AiResolved
+    state "Answer dropped: quote not in the book, does not name the character, has no word of that gender or words of both, or the text's own pronouns clearly say the opposite. Stays unresolved" as AiDropped
+    aiFork --> AiJudge: AI detection is on and the AI is reachable
+    aiFork --> StillUnresolved: AI is off, or it failed
+    quoteFork --> AiResolved: quote checks out
+    quoteFork --> AiDropped: any check fails
+    state "Still unresolved: the narrator voice reads this character" as StillUnresolved
+    AiDropped --> StillUnresolved
+    AiResolved --> Resolved
+
     state "Male or female voice from the matching pool. The busiest characters get different voices" as GenderVoice
     state "The narrator voice reads this character" as NarratorVoice
     Resolved --> GenderVoice
-    Unresolved --> NarratorVoice
+    StillUnresolved --> NarratorVoice
 
     state voiceOverride <<choice>>
     GenderVoice --> voiceOverride
@@ -133,10 +148,12 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
 | | Chapters 1 to 10 | Chapters 36 to 43 |
 |---|---|---|
 | Old: characters with the right gender | 3 of 4 (Rain wrongly male) | 2 of 5 (Nephis and Changing Star wrongly male) |
-| New: characters with the right gender, among those it decided | 4 of 4 | 3 of 3 |
-| New: characters left to the narrator | 0 | 1 (Changing Star, 4 lines) |
+| New, offline: characters with the right gender, among those it decided | 3 of 3 | 3 of 3 |
+| New, offline: characters left to the narrator | 0 | 1 (Changing Star, 12 lines) |
+| New, AI speaker detection on: characters with the right gender | 4 of 4 | 4 of 4 (the AI gender check resolved Changing Star as female) |
+| New, offline, whole book as evidence: characters with the right gender | 3 of 3 | 3 of 3 (Changing Star is folded into Nephis) |
 | Old: lines in a wrong-gender voice, counting the speaker the app chose | 23 of 157 | 63 of 209 |
-| New: the same count | 0 of 157 | 0 of 209 |
+| New: the same count, any mode | 0 of 157 | 0 of 209 |
 
 ## Honest limits
 
@@ -153,12 +170,12 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
   the report.
 - **The bigger problem is who speaks.** The gender numbers above judge each line by the
   character the app chose. In a hand-labelled sample of 80 lines (both slices) the offline
-  speaker detection chose the right character for 33 lines, and the sample is not typical.
-  Weighted by how common each kind of guess is, the estimate is about 21% right on these
-  chapters. Lines the app gives to the wrong character get that character's voice.
-  In the 73 labelled lines spoken by a man or a woman, 18 were read in a voice of the wrong
-  gender. AI speaker detection (`--attributor hybrid`) is the lever for this, not the
-  gender code. One cause is fixed: naming phrases such as "was called Rain", "a girl
+  speaker detection now chooses the right character for 59 lines (it was 33) and the AI
+  mode for 71 (it was 61); the sample is not typical. Weighted by how common each kind of
+  guess is, the offline estimate went from about 21% to about 62% right on these
+  chapters. Lines the app gives to the wrong character get that character's voice. In the
+  73 labelled lines spoken by a man or a woman, 18 were read in a voice of the wrong
+  gender before; it is 2 offline and 1 with AI speaker detection. One cause is fixed: naming phrases such as "was called Rain", "a girl
   called Rain" no longer make the named person a speaker (Rain used to take 23 lines in
   chapter 1; they now fall back to the narrator voice until the AI pass finds the real
   speaker). "Called" as a speech verb ("Hey," Sunny called) still attributes.
@@ -167,18 +184,26 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
   narration mixes) are folded into one character, but only if they never speak in the same
   chapter. Two real characters usually share scenes, so Maria and Maris stay separate when
   they talk in one chapter. A swap of a final "a" for "o" (Maria and Mario, Julia and
-  Julio) is never merged. The rule still merges two different characters with names like
-  Julie and Julia when they never speak in the same chapter, and then they share one voice
-  and one gender. There is no flag to undo a merge yet. The cast report shows only the
-  merged name.
-- Alternate names such as Changing Star for Nephis are not merged.
+  Julio) is never merged. A pair that does speak in one chapter is also merged when no
+  sentence in the book names both (Shadow Slave spells Cassie both ways inside single
+  chapters). The rule still merges two different characters with names like Julie and
+  Julia when they are never named together, and then they share one voice and one gender.
+  There is no flag to undo a merge yet. The cast report shows only the merged name.
+- **Epithets are merged only when the text ties them to a name**: "Nephis, the Changing
+  Star", "Changing Star Nephis", "Nephis, known as the Changing Star". With only chapters
+  36 to 43 as evidence the text has none of these, so the offline rule leaves Changing
+  Star separate; the pipeline reads the whole book, where it does. With AI speaker
+  detection on, an AI alias check can also link them, but only with a quote that names
+  both, and small models often decline.
+- **The AI gender check is a second opinion, not proof.** It gives a score of 0.7 (below
+  the 0.8 review line, so the cast report marks the character with `?`), keeps its quote
+  as evidence, and is dropped when the quote is not in the book, does not name the
+  character, has words of both genders, or the text's own pronouns say the opposite.
 - **The hosted worker writes `cast_report.json` but does not upload it.** On the website
   the report is not visible yet. It is only in the worker's scratch folder.
 
 ## Next steps
 
-- An AI gender judge for the characters that stay unresolved (only when AI speaker
-  detection is on).
 - A cast review screen before rendering, where you see each character, gender, score,
   sample line and voice, and fix the unclear ones with a click.
 - Better speaker detection for books like this one.

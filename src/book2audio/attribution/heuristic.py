@@ -338,6 +338,35 @@ class HeuristicAttributor:
                     seg.speaker = canonical[seg.speaker]
         return [n for n in names if n not in canonical]
 
+    def fold_aliases(self, pairs: list[tuple[str, str]], chapters: list[Chapter]) -> None:
+        """Fold ``(alias, name)`` pairs found by another source (the AI alias judge).
+
+        Of each pair the one-word name wins ("Nephis" over "Changing Star"), else
+        the one with more dialogue. A name that already absorbed another is never
+        folded away, and each fold points at its final target in :attr:`aliases`.
+        """
+        lines, _ = _speaker_stats(chapters)
+        canonical = dict(self.aliases)
+        for first, second in pairs:
+            if first in canonical or second in canonical:
+                continue
+            single = [n for n in (first, second) if " " not in n]
+            if len(single) == 1:
+                winner = single[0]
+            else:
+                # On a tie the second of the pair (the model's "name") wins.
+                winner = first if lines.get(first, 0) > lines.get(second, 0) else second
+            loser = second if winner == first else first
+            if loser in canonical.values():
+                continue
+            canonical[loser] = winner
+        canonical = _resolve_targets(canonical)
+        self.aliases = canonical
+        for chapter in chapters:
+            for seg in chapter.segments:
+                if seg.speaker in canonical:
+                    seg.speaker = canonical[seg.speaker]
+
     def _attribute_chapter(self, chapter: Chapter, discovered: dict[str, None]) -> None:
         segments = chapter.segments
         # recent[-1] is the last speaker, recent[-2] the one before — enough to

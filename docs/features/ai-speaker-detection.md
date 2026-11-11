@@ -56,12 +56,12 @@ stateDiagram-v2
 
     state "AI pass over the guessed lines" as LlmPass {
         [*] --> Window
-        state "Group the guessed lines with nearby text into windows, with at most 25 lines each. Lines whose speaker is named in the text are shown as already attributed and are not asked about" as Window
+        state "Group the guessed lines with nearby text into windows, with at most 25 lines each. Lines whose speaker the text settles (a name, a continuation, a short action beat, an unnamed person, a quoted word) are shown as already attributed and are not asked about" as Window
         state windowCheck <<choice>>
         Window --> windowCheck
         state "Reuse the saved answer for this window. No request is made" as WindowCached
         state "Ask the AI model who speaks each line. Each answer is checked line by line" as WindowAsk
-        state "Valid answers replace the offline label. Missing or invalid answers keep the offline label" as WindowApply
+        state "Valid answers replace the offline label. Unnamed means a person the text only describes: the narrator reads it, never the nearest named character. Missing or invalid answers keep the offline label" as WindowApply
         state "Window keeps its offline labels. The failure is counted" as WindowFail
         state "No more requests this book. Remaining windows keep their offline labels. A warning is recorded" as Stopped
         windowCheck --> WindowCached: this exact window was answered before
@@ -80,8 +80,14 @@ stateDiagram-v2
 
     state "Answers saved in the job's working folder, so asking about the same text again costs nothing. Spelling variants and nicknames are merged, for example Neph and Nephis" as Cached
     LlmPass --> Cached
+
+    state "AI character checks, one request each per book, on the light model list. 1) Alias check: which names are one person, for example Changing Star and Nephis. 2) Gender check, after the gender resolver, for characters still unresolved. Both must quote the book word for word; a quote that is not in the text, does not name the character, or contradicts the text is dropped" as Judges
+    state judgeFork <<choice>>
+    Cached --> judgeFork
+    judgeFork --> Judges: the AI is reachable
+    judgeFork --> Gender: the AI failed or is stopped, nothing changes
+    Judges --> Gender
     state "Gender resolver reads the whole text for evidence about each character: pronouns, titles, your overrides. Unsure means the narrator reads that character. See voice-gender.md" as Gender
-    Cached --> Gender
     state "Voices assigned: male or female voice for resolved characters, narrator voice for the rest" as Voices
     Gender --> Voices
     NarratorOnly --> Voices: narrator voice for every line
@@ -193,6 +199,8 @@ to decide who "he" or "she" can be.
 - 3 failed requests in a row stop the AI for the rest of the book. "Failed" means every
   model in the list failed that window, not one model hitting its limit.
 - The AI only decides lines that were guesses. A name written in the text always wins.
+- Two extra AI requests per book (alias check and gender check), cached. They never
+  touch a character you set yourself with `--gender`.
 
 ## What happens when the AI fails
 
@@ -248,10 +256,23 @@ sending any. The command line ignores `HOSTED_LLM_ATTRIBUTION`.
 
 ## Honest limits
 
-- On the 80-line speaker spot check (Shadow Slave book 1) the offline rules get 33 right
-  and the AI mode with the default model list gets 61. That is one run of 80 lines, an
-  estimate. Details in [llm-model-chain.md](llm-model-chain.md).
+- On the 80-line speaker spot check (Shadow Slave book 1) the offline rules now get 59
+  right (they got 33) and the AI mode with the default model list gets 71 (it got 61).
+  Five of the 80 lines are spoken by a person the text never names ("the old policeman");
+  the narrator voice reads them, so they count as misses although nobody is wrongly
+  voiced. That is one run of 80 lines, an estimate. Details in
+  [llm-model-chain.md](llm-model-chain.md).
+- What the offline rules gained, by switching each rule off in turn: knowing that "he" is
+  not a character the text calls "she" (+10 lines), short action beats such as "Mara
+  shrugged." (+8), quoted words that are not speech (+5), and reading a tag only from the
+  paragraph of its quote (+2).
 - The AI can be wrong too. It only replaces guesses, never a name found in the text.
-- Book text for guessed lines is sent to the freellmapi gateway.
-- The AI step does not decide gender. Gender still comes from the text evidence, and an
-  unsure character is read by the narrator. An AI gender check is a possible next step.
+- Book text for guessed lines, and sentences about unresolved characters, are sent to the
+  freellmapi gateway.
+- The alias check is strict (it needs a quote naming both names) and small models often
+  answer "none". In the slice test it did not link Changing Star to Nephis; the offline
+  rule did when it could read the whole book, where the text says "Nephis, the Changing
+  Star".
+- Still wrong: a line whose speaker is only a pronoun for someone who has not spoken yet
+  ("the old policeman ... he added"), and untagged two-person exchanges where the speaker
+  swaps without a hint.

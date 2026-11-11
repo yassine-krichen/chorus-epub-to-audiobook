@@ -194,6 +194,11 @@ class Pipeline:
             )
         else:
             self.console.print(f"[dim]{report.summary()}[/dim]")
+            judges = attributor.judge_report
+            for warning in judges.warnings:
+                self.console.print(f"[yellow]Warning:[/yellow] {warning}")
+            if judges.calls or judges.cache_hits:
+                self.console.print(f"[dim]{judges.summary()}[/dim]")
 
     @staticmethod
     def _order_by_frequency(characters: list[str], book: Book) -> list[str]:

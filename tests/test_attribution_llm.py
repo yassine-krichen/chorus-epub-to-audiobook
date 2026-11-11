@@ -421,6 +421,27 @@ def test_a_pronoun_is_not_accepted_as_a_new_name(monkeypatch):
     assert chapter.segments[4].speaker == "Sunny"
 
 
+def test_the_unnamed_label_gives_the_line_to_the_narrator_not_a_character(monkeypatch):
+    _install(monkeypatch, _echo_post("Unnamed"))
+    chapter = _alternation_chapter()
+
+    _attributor("hybrid").attribute([chapter])
+
+    assert chapter.segments[4].speaker == NARRATOR
+
+
+def test_a_line_spoken_by_a_described_person_is_not_sent_to_the_model(monkeypatch):
+    post = _install(monkeypatch, _echo_post("Sunny"))
+    chapter = _chapter(
+        [_dlg("Hello."), _nar("said Tom."), _nar("The old guard grunted."), _dlg("Papers.")]
+    )
+
+    _attributor("hybrid").attribute([chapter])
+
+    post.assert_not_called()
+    assert chapter.segments[3].speaker == NARRATOR
+
+
 def test_out_of_window_ids_are_ignored(monkeypatch):
     _install(
         monkeypatch,

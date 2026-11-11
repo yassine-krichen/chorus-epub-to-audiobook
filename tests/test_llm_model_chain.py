@@ -142,6 +142,7 @@ def test_attribution_and_scene_briefs_ask_for_their_own_task(monkeypatch, tmp_pa
     enhanced = build_enhanced_thumbnails(str(tmp_path), "Book")
 
     assert attributor._client.models == ("strong",)
+    assert attributor._judge_client.models == ("cheap",)  # the alias and gender judges
     assert enhanced is not None and enhanced._client.models == ("cheap",)
 
 

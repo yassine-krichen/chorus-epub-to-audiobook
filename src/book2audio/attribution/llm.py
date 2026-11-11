@@ -26,8 +26,9 @@ import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
-from book2audio.attribution.gender import GenderVerdict
+from book2audio.attribution.gender import GenderVerdict, llm_verdict
 from book2audio.attribution.heuristic import _STOPWORDS, HeuristicAttributor
+from book2audio.attribution.judges import AliasJudge, GenderJudge, JudgeReport
 from book2audio.attribution.llm_client import LLMClient, LLMError
 from book2audio.models import NARRATOR, Chapter, SegmentKind
 
@@ -54,11 +55,16 @@ SYSTEM_PROMPT = (
     "- For a character not in the list, use a name that appears capitalized in "
     "the passage. Never invent names.\n"
     '- Use "Narrator" only if the quoted text is not actually spoken by a character.\n'
+    '- Use "Unnamed" when the speaker is a person the passage never names, only '
+    'describes (the old guard, a broad-shouldered man). Never give such a line to a '
+    "named character just because they are nearby.\n"
     "- If you cannot tell who speaks a line, leave its id out.\n"
     "- Only label ids from the 'Label dialogue ids' list.\n"
     'Reply with JSON only, no prose: {"labels":[{"id":3,"speaker":"Alice"}]}'
 )
 
+# The model's word for "a speaker the text never names"; the narrator voices the line.
+UNNAMED_LABEL = "unnamed"
 _NAME_PUNCTUATION = frozenset(" .'’-")
 MAX_NAME_LENGTH = 40
 
@@ -176,6 +182,7 @@ class LLMAttributor:
         only_chapters: frozenset[int] | None = None,
         on_progress: Callable[[], None] | None = None,
         gender_overrides: Mapping[str, str] | None = None,
+        judge_client: LLMClient | None = None,
     ) -> None:
         if mode not in ("llm", "hybrid"):
             raise ValueError(f"LLMAttributor mode must be 'llm' or 'hybrid', got {mode!r}")
@@ -191,6 +198,10 @@ class LLMAttributor:
         self._on_progress = on_progress
         self._heuristic = HeuristicAttributor(gender_overrides)
         self.report = AttributionReport(mode=mode)
+        # The alias and gender judges (see judges.py) run once per book when a
+        # client is given; without one the attributor behaves as before.
+        self._judge_client = judge_client
+        self.judge_report = JudgeReport()
 
     @property
     def genders(self) -> dict[str, str]:
@@ -275,7 +286,61 @@ class LLMAttributor:
 
         names = self._speaker_names(chapters)
         self._heuristic.infer_genders(names, chapters)
+        if self._judge_client is not None:
+            names = self._run_judges(names, chapters)
         return names
+
+    def _run_judges(self, names: list[str], chapters: list[Chapter]) -> list[str]:
+        """Merge aliases the model can prove, then ask about genders still unresolved."""
+        heuristic = self._heuristic
+        self.judge_report = report = JudgeReport()
+        try:
+            aliases = AliasJudge(self._judge_client, self._cache, report).find(
+                names, chapters, heuristic.verdicts
+            )
+            if aliases:
+                heuristic.fold_aliases([(f.alias, f.name) for f in aliases], chapters)
+                report.aliases_added = len(aliases)
+                names = self._speaker_names(chapters)
+                heuristic.infer_genders(names, chapters)
+            self._judge_genders(names, chapters)
+        except Exception as exc:  # noqa: BLE001 - a judge bug must never fail a render
+            report.warnings.append(f"AI character check stopped ({type(exc).__name__})")
+        return names
+
+    def _judge_genders(self, names: list[str], chapters: list[Chapter]) -> None:
+        heuristic = self._heuristic
+        report = self.judge_report
+        speaking = self._speaking_in_scope(chapters)
+        unresolved = [
+            n for n in names if n in speaking and heuristic.verdicts[n].gender is None
+        ]
+        spellings = {
+            name: [name, *(alias for alias, target in heuristic.aliases.items() if target == name)]
+            for name in unresolved
+        }
+        for finding in GenderJudge(self._judge_client, self._cache, report).find(
+            unresolved, chapters, spellings
+        ):
+            previous = heuristic.verdicts[finding.name]
+            if _contradicts_evidence(previous, finding.gender):
+                report.rejected += 1
+                continue
+            heuristic.verdicts[finding.name] = llm_verdict(
+                previous, finding.gender, finding.quote, finding.chapter_index
+            )
+            heuristic.genders[finding.name] = finding.gender
+            report.genders_added += 1
+
+    def _speaking_in_scope(self, chapters: list[Chapter]) -> set[str]:
+        """Characters with dialogue in the chapters being rendered (all, if unrestricted)."""
+        return {
+            seg.speaker
+            for c in chapters
+            if self._only_chapters is None or c.index in self._only_chapters
+            for seg in c.segments
+            if seg.kind == SegmentKind.DIALOGUE and seg.speaker and seg.speaker != NARRATOR
+        }
 
     def _client_counters(self) -> tuple[int, int]:
         # Duck-typed clients (test doubles, custom transports) may not count.
@@ -554,7 +619,7 @@ def _resolve_speaker(
     if not name:
         return None
     lowered = name.lower()
-    if lowered == NARRATOR.lower():
+    if lowered == NARRATOR.lower() or lowered == UNNAMED_LABEL:
         return NARRATOR
     if _lookup_key(name) in known_lookup:
         return known_lookup[_lookup_key(name)]
@@ -573,6 +638,19 @@ def _resolve_speaker(
         return None
     accepted_new[lowered] = name
     return name
+
+
+# Evidence that already leans this strongly the other way outweighs one sentence.
+_CONTRADICTION_MIN_WEIGHT = 4.0
+_CONTRADICTION_MIN_SHARE = 0.7
+
+
+def _contradicts_evidence(previous: GenderVerdict, gender: str) -> bool:
+    """True when the text's own pronouns clearly say the opposite of the model."""
+    own = previous.male_weight if gender == "m" else previous.female_weight
+    other = previous.female_weight if gender == "m" else previous.male_weight
+    total = own + other
+    return total >= _CONTRADICTION_MIN_WEIGHT and other / total >= _CONTRADICTION_MIN_SHARE
 
 
 def _lookup_key(name: str) -> str:
