@@ -133,6 +133,45 @@ def read_object(key: str, *, max_bytes: int) -> bytes | None:
     return body.read()
 
 
+_DOWNLOAD_CHUNK_BYTES = 1024 * 1024
+
+
+def download_capped(key: str, local_path: str, *, max_bytes: int) -> bool:
+    """Download ``key`` to ``local_path``, never writing more than ``max_bytes``.
+
+    Returns ``False`` when the object does not exist. The size check and the read are
+    two requests, so the read is pinned to the ETag seen by the first (an object
+    replaced in between is refused, not read) and the byte count is enforced while
+    streaming as well. Raises ``ValueError`` over the cap; the partial file is removed.
+    """
+    client = _client()
+    try:
+        head = client.head_object(Bucket=_bucket(), Key=key)
+    except ClientError as exc:
+        if exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+            return False
+        raise
+    if int(head["ContentLength"]) > max_bytes:
+        raise ValueError(f"{key!r} is larger than the {max_bytes} byte limit")
+
+    request = {"Bucket": _bucket(), "Key": key}
+    if head.get("ETag"):
+        request["IfMatch"] = head["ETag"]
+    body = client.get_object(**request)["Body"]
+    written = 0
+    try:
+        with open(local_path, "wb") as out:
+            for chunk in iter(lambda: body.read(_DOWNLOAD_CHUNK_BYTES), b""):
+                written += len(chunk)
+                if written > max_bytes:
+                    raise ValueError(f"{key!r} is larger than the {max_bytes} byte limit")
+                out.write(chunk)
+    except ValueError:
+        os.remove(local_path)
+        raise
+    return True
+
+
 def _content_disposition(filename: str) -> str:
     """RFC 6266 ``Content-Disposition``, with an ASCII fallback for clients
     that only understand the legacy ``filename=`` parameter.

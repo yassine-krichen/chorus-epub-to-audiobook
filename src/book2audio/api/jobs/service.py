@@ -36,6 +36,7 @@ from book2audio.assemble.filenames import (
     default_filename_template,
     render_part_filenames,
 )
+from book2audio.api.jobs.uploads import require_owned_upload
 from book2audio.cast_report import cast_report_object_key
 from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import Job
@@ -119,6 +120,8 @@ def hosted_llm_attribution_enabled() -> bool:
 
 
 def create_job(db: Session, user_id: uuid.UUID, payload: CreateJobRequest) -> Job:
+    # Before anything else: a worker would download whatever key it is given.
+    require_owned_upload(user_id, payload.epub_object_key)
     # narrator_only never attributes speakers, so it never spends the LLM key.
     uses_llm = payload.config.attributor != "heuristic" and payload.config.voice_mode == "cast"
     if uses_llm and not hosted_llm_attribution_enabled():

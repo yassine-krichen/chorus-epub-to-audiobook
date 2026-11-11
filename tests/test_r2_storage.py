@@ -414,3 +414,72 @@ def test_read_object_refuses_an_object_over_the_limit_without_downloading_it(fak
     with pytest.raises(ValueError, match="more than the 100 byte limit"):
         r2.read_object("jobs/1/cast_report.json", max_bytes=100)
     fake_client.get_object.assert_not_called()
+
+
+# --- download_capped: untrusted uploads, size enforced while streaming ---------------------
+
+
+class _Body:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+        self._pos = 0
+
+    def read(self, size: int) -> bytes:
+        chunk = self._data[self._pos : self._pos + size]
+        self._pos += len(chunk)
+        return chunk
+
+
+def test_download_capped_writes_the_object_and_pins_the_read_to_the_etag_it_measured(
+    fake_client, tmp_path
+):
+    fake_client.head_object.return_value = {"ContentLength": 5, "ETag": '"abc"'}
+    fake_client.get_object.return_value = {"Body": _Body(b"hello")}
+    target = tmp_path / "book.epub"
+
+    assert r2.download_capped("uploads/u/x.epub", str(target), max_bytes=100) is True
+
+    assert target.read_bytes() == b"hello"
+    fake_client.get_object.assert_called_once_with(
+        Bucket="test-bucket", Key="uploads/u/x.epub", IfMatch='"abc"'
+    )
+
+
+def test_download_capped_returns_false_for_a_missing_object(fake_client, tmp_path):
+    fake_client.head_object.side_effect = _not_found()
+
+    assert r2.download_capped("uploads/u/x.epub", str(tmp_path / "b"), max_bytes=100) is False
+    fake_client.get_object.assert_not_called()
+
+
+def test_download_capped_refuses_an_object_that_is_declared_too_large(fake_client, tmp_path):
+    fake_client.head_object.return_value = {"ContentLength": 101, "ETag": '"abc"'}
+
+    with pytest.raises(ValueError):
+        r2.download_capped("uploads/u/x.epub", str(tmp_path / "b"), max_bytes=100)
+    fake_client.get_object.assert_not_called()
+
+
+def test_download_capped_stops_and_removes_the_file_when_the_stream_exceeds_the_cap(
+    fake_client, tmp_path
+):
+    # The object grew after the size check: the declared size said 5, the stream has more.
+    fake_client.head_object.return_value = {"ContentLength": 5, "ETag": '"abc"'}
+    fake_client.get_object.return_value = {"Body": _Body(b"x" * 500)}
+    target = tmp_path / "book.epub"
+
+    with pytest.raises(ValueError):
+        r2.download_capped("uploads/u/x.epub", str(target), max_bytes=100)
+
+    assert not target.exists()
+
+
+def test_download_capped_does_not_hide_a_failed_etag_check(fake_client, tmp_path):
+    fake_client.head_object.return_value = {"ContentLength": 5, "ETag": '"abc"'}
+    fake_client.get_object.side_effect = ClientError(
+        {"Error": {"Code": "PreconditionFailed"}, "ResponseMetadata": {"HTTPStatusCode": 412}},
+        "GetObject",
+    )
+
+    with pytest.raises(ClientError):
+        r2.download_capped("uploads/u/x.epub", str(tmp_path / "b"), max_bytes=100)

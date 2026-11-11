@@ -14,7 +14,16 @@ from book2audio.assemble.filenames import (
 )
 from book2audio.assemble.music import MUSIC_PRESETS
 from book2audio.attribution.base import ATTRIBUTOR_MODES, VOICE_MODES
-from book2audio.attribution.gender import validate_gender_overrides
+from book2audio.attribution.gender import (
+    GENDER_OVERRIDE_MAX_ENTRIES,
+    GENDER_OVERRIDE_MAX_NAME_LENGTH,
+    validate_gender_overrides,
+)
+from book2audio.api.jobs.uploads import (
+    MAX_UPLOAD_FILENAME_LENGTH,
+    MAX_UPLOAD_KEY_LENGTH,
+    validate_upload_filename,
+)
 from book2audio.cast_review import validate_character_aliases
 from book2audio.tts.voices import (
     CHARACTER_VOICE_POOL,
@@ -28,7 +37,12 @@ _KNOWN_VOICES = frozenset(CHARACTER_VOICE_POOL) | {DEFAULT_NARRATOR_VOICE}
 
 
 class UploadUrlRequest(BaseModel):
-    filename: str = Field(min_length=1, max_length=255)
+    filename: str = Field(min_length=1, max_length=MAX_UPLOAD_FILENAME_LENGTH)
+
+    @field_validator("filename")
+    @classmethod
+    def _validate_filename(cls, value: str) -> str:
+        return validate_upload_filename(value)
 
 
 class UploadUrlResponse(BaseModel):
@@ -74,6 +88,20 @@ class JobConfig(BaseModel):
     # Pause after speakers and genders are worked out, so the user can fix the cast before
     # any audio is made. On by default; a narrator-only job has no cast, so it never pauses.
     cast_review: bool = True
+
+    @field_validator("voice_overrides")
+    @classmethod
+    def _validate_voice_overrides(cls, value: dict[str, str]) -> dict[str, str]:
+        if len(value) > GENDER_OVERRIDE_MAX_ENTRIES:
+            raise ValueError(f"at most {GENDER_OVERRIDE_MAX_ENTRIES} voice overrides are allowed")
+        for name, voice in value.items():
+            if not name.strip() or len(name) > GENDER_OVERRIDE_MAX_NAME_LENGTH:
+                raise ValueError(
+                    f"voice override names must be 1 to {GENDER_OVERRIDE_MAX_NAME_LENGTH} characters"
+                )
+            if voice not in _KNOWN_VOICES:
+                raise ValueError(f"Unknown voice {voice!r} for {name!r}")
+        return value
 
     @field_validator("character_aliases")
     @classmethod
@@ -163,9 +191,17 @@ class JobConfig(BaseModel):
 
 
 class CreateJobRequest(BaseModel):
-    epub_object_key: str
+    epub_object_key: str = Field(min_length=1, max_length=MAX_UPLOAD_KEY_LENGTH)
     title: str = Field(min_length=1, max_length=255)
     config: JobConfig = Field(default_factory=JobConfig)
+
+    @model_validator(mode="after")
+    def _merges_come_from_the_cast_review_only(self) -> "CreateJobRequest":
+        # character_aliases are the user's decisions about a detected cast. A new job has no
+        # cast yet, so a client that sends them is guessing at names or probing.
+        if self.config.character_aliases:
+            raise ValueError("character_aliases can only be set through the cast review")
+        return self
 
 
 class CreateJobResponse(BaseModel):
@@ -225,7 +261,7 @@ class JobListResponse(BaseModel):
 
 
 class InspectRequest(BaseModel):
-    epub_object_key: str = Field(min_length=1, max_length=600)
+    epub_object_key: str = Field(min_length=1, max_length=MAX_UPLOAD_KEY_LENGTH)
 
 
 class ChapterInfo(BaseModel):

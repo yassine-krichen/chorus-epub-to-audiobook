@@ -36,6 +36,9 @@ packages = ["src/book2audio"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "real_upload_guard: run with the real upload ownership guard instead of the test stub",
+]
 
 [dependency-groups]
 dev = ["pytest>=8.0"]

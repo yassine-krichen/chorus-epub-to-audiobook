@@ -26,6 +26,7 @@ from book2audio.api.jobs.schemas import (
     UploadUrlRequest,
     UploadUrlResponse,
 )
+from book2audio.api.jobs.uploads import upload_key
 from book2audio.db.models import User
 from book2audio.storage.r2 import presign_put
 
@@ -43,7 +44,7 @@ MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 def create_upload_url(
     payload: UploadUrlRequest, current_user: User = Depends(get_current_user)
 ) -> UploadUrlResponse:
-    object_key = f"uploads/{current_user.id}/{uuid.uuid4()}-{payload.filename}"
+    object_key = upload_key(current_user.id, payload.filename)
     return UploadUrlResponse(upload_url=presign_put(object_key), object_key=object_key)
 
 

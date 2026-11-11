@@ -102,6 +102,13 @@ API: `POST /jobs/inspect` with `{"epub_object_key": "uploads/<your id>/..."}` re
 
 ## Honest limits
 
+- The book is untrusted input read inside the API process. The download is capped at 50 MB
+  while streaming and pinned to one version of the file; the archive is refused before parsing
+  if it has too many entries, an entry over 16 MiB, more than 100 MB unpacked, or a forged
+  size; any other parser failure is a plain 422. The parser is not run in a separate process
+  with a memory limit (there is no portable way to do that on both Windows and Linux), so these
+  caps and the rate limit are the protection. Only the user's own uploads can be read, and the
+  same ownership check now guards job creation.
 - The server reads the book once to build the list, so a large book takes a few seconds.
   Reading is limited to 20 books per user every 10 minutes (`INSPECT_RATE_LIMIT_PER_USER`,
   `INSPECT_RATE_LIMIT_WINDOW_SECONDS`).

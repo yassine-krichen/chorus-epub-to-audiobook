@@ -101,6 +101,20 @@ def _reset_rate_limits():
     rate_limit_module.reset_all()
 
 
+@pytest.fixture(autouse=True)
+def _accept_any_upload_key(request, monkeypatch):
+    """Most tests create jobs with a made-up key such as ``uploads/book.epub``.
+
+    The ownership guard has its own tests (marked ``real_upload_guard``), which run
+    against the real thing; everywhere else it is switched off so that those tests keep
+    testing what they are about.
+    """
+    if request.node.get_closest_marker("real_upload_guard") is None:
+        import book2audio.api.jobs.service as jobs_service
+
+        monkeypatch.setattr(jobs_service, "require_owned_upload", lambda user_id, key: None)
+
+
 @pytest.fixture
 def db_session():
     with SessionLocal() as session:
