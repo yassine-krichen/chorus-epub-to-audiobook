@@ -2,7 +2,12 @@ export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancele
 
 export const ACTIVE_JOB_STATUSES: readonly JobStatus[] = ["queued", "running"];
 
+/** "cast" gives each character a voice of their own gender (characters whose gender
+ * is unclear are read by the narrator); "narrator_only" has the narrator read everything. */
+export type VoiceMode = "cast" | "narrator_only";
+
 export interface JobConfig {
+  voice_mode: VoiceMode;
   narrator_voice: string | null;
   voice_overrides: Record<string, string>;
   male_voice: string | null;
@@ -27,6 +32,7 @@ export interface JobConfig {
  * only needs to send the fields the user actually changed from those
  * defaults — but the form always builds and sends a full JobConfig. */
 export const DEFAULT_JOB_CONFIG: JobConfig = {
+  voice_mode: "cast",
   narrator_voice: null,
   voice_overrides: {},
   male_voice: null,

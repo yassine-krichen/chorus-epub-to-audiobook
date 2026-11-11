@@ -31,7 +31,7 @@ Input: chapter 1 of *Alice's Adventures in Wonderland* (Project Gutenberg, publi
 
 ## Features
 
-**Multi-voice casting** — gives each character a stable Kokoro voice, busiest speakers first so leads never share one, gender-matched when pronouns in dialogue tags reveal it (`tts/voices.py`).
+**Multi-voice casting** — gives each character a stable Kokoro voice, busiest speakers first so leads never share one, gender-matched when the text makes the gender clear (`attribution/gender.py`, `tts/voices.py`). A character whose gender is not clear is read by the narrator voice, never by a guessed one; `--narrator-only` skips character voices entirely. See [Voice casting and gender](#voice-casting-and-gender).
 
 **Speaker attribution** — heuristic `Attributor` using dialogue tags, pronoun resolution and two-speaker alternation; nicknames fold into full names (`attribution/heuristic.py`).
 
@@ -130,6 +130,8 @@ book2audio generate <epub> [options]
       --narrator VOICE    Narrator voice id (default: am_michael)
       --voice NAME=VOICE  Override a character's voice (repeatable)
       --male-voice VOICE / --female-voice VOICE
+      --gender NAME=m|f   Set a character's gender (repeatable); beats the automatic guess
+      --narrator-only     The narrator voice reads everything; no speaker detection
       --speed FLOAT       0.5-2.0 (default 1.0)
       --bitrate STR       AAC bitrate (default 64k)
       --start-chapter N   Book chapter to start at (default: the story's first chapter;
@@ -166,6 +168,28 @@ Chapters are counted the way the book counts them: `Chapter 7` is 7, whatever it
 - `--dry-run` prints a table of every section up to the end of the selection (number, title, words, front matter, selected). If no chapter matches, the error lists the numbers the book has.
 
 Internally each chapter keeps its position in the EPUB as its identity (resume state, audio files, storage keys); only the labels and the selection use book numbers. The hosted API takes the same `start_chapter` (omit it for automatic). See `docs/features/chapter-selection.md` for the full flow.
+
+### Voice casting and gender
+
+A wrong-gender voice confuses listeners, so a gender is only used when the evidence is strong. Evidence is gathered from the narration (never from inside a quote) and each character gets a verdict with a confidence (`attribution/gender.py`):
+
+- **Pronouns**: `he/his/himself` and `she/her/hers/herself` count for the nearest name before them in the same sentence, anywhere in the narration, not only next to dialogue. A pronoun opening a sentence counts at half weight for the previous sentence's character, only when that sentence names exactly one character. Object `him`, and `her` used as an object, do not count.
+- **Titles and roles**: `Mrs. X`, `Lady X`, `his sister X`, `X, the girl`. One such cue is enough. `Master` is not treated as gendered.
+- **Your word**: `--gender NAME=m|f` always wins (confidence 1.0).
+
+Confidence is the Wilson 95% lower bound of the winning side's share of the evidence, and a character is resolved at 0.6 or above. In practice pronoun evidence alone needs about six agreeing mentions. Pronouns are credited by where they stand next to a name, never by who a line was assigned to, so a wrongly attributed line cannot vote itself into a gender.
+
+Voice rules, in order:
+
+1. `--voice NAME=VOICE` always wins.
+2. A character with a resolved gender gets a voice from the matching pool (busiest first, distinct voices).
+3. A character whose gender is not resolved is read by the **narrator voice**. There is no "any gender" pool and no random fallback.
+
+`--narrator-only` (`voice_mode: "narrator_only"` in the API and the website's "Narrator reads everything" switch) skips speaker detection and reads every line in the narrator voice.
+
+Every run prints a cast report and writes it to `<work-dir>/cast_report.json`: each character's lines, gender, confidence, evidence counts and top evidence snippets, a sample line and the voice. Characters that need a look (unresolved or under 0.8) come first. `--dry-run` prints it without rendering. Set a character the report got wrong with `--gender`.
+
+Limits: gender inference from text cannot reach 100%. In close third-person books the narration says "he" about the viewpoint character even in sentences about someone else, so a female character gets a share of male votes (about 25% for Nephis and Cassie in Shadow Slave, measured in `evals/gender/`). A character with little text stays unresolved. The bigger risk is the speaker, not the gender: if the heuristic gives a line to the wrong character, that line gets the wrong character's voice. `evals/gender/` measures both on a Shadow Slave sample. Flow diagram and numbers: [docs/features/voice-gender.md](docs/features/voice-gender.md).
 
 ### LLM speaker attribution
 

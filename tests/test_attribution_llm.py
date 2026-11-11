@@ -657,18 +657,20 @@ def _pronoun_chapter():
             _dlg("Shall we?"),
             _nar("She said, quietly."),
         ]
+        + [_nar("Nephis tilted her head and raised her chin.") for _ in range(4)]
     )
 
 
-def test_genders_and_names_are_recomputed_from_the_final_speakers(monkeypatch):
-    # Baseline: the heuristic resolves the pronoun tag to the previous speaker,
-    # Nephis, so the "she" vote lands on her.
+def test_genders_follow_the_text_and_not_the_speaker_labels(monkeypatch):
+    # The heuristic resolves the pronoun tag to the previous speaker, Nephis.
     baseline = _pronoun_chapter()
     heuristic_only = LLMAttributor("hybrid", None)
     heuristic_only.attribute([baseline])
     assert baseline.segments[4].speaker == "Nephis"
     assert heuristic_only.genders == {"Nephis": "f"}
 
+    # Relabelling the line to Sunny must not hand Sunny the "she" in its tag:
+    # genders come from names in the narration, not from who a line was given to.
     chapter = _pronoun_chapter()
     _install(monkeypatch, MagicMock(return_value=_chat_body(_labels((5, "Sunny")))))
     attributor = _attributor("hybrid")
@@ -676,7 +678,8 @@ def test_genders_and_names_are_recomputed_from_the_final_speakers(monkeypatch):
 
     assert chapter.segments[4].speaker == "Sunny"
     assert names == ["Sunny", "Nephis"]
-    assert attributor.genders == {"Sunny": "f"}
+    assert attributor.genders == {"Nephis": "f"}
+    assert set(attributor.verdicts) == {"Sunny", "Nephis"}
 
 
 def test_a_name_with_no_remaining_lines_is_dropped_from_the_returned_names(monkeypatch):

@@ -8,13 +8,14 @@ import {
 
 /**
  * Client-side shape/UX validation for the new-job form. Only
- * male_voice/female_voice, music_preset, filename_template, batch_size (>= 0) and
+ * voice_mode, male_voice/female_voice, music_preset, filename_template, batch_size (>= 0) and
  * the {chapter_title}-needs-one-file-per-chapter rule are actually
  * enforced server-side (see book2audio.api.jobs.schemas.JobConfig) — the
  * numeric ranges below (speed, bitrate, chapter_gap) are a UX
  * convention only, not a real constraint the backend imposes.
  */
 export const jobConfigSchema = z.object({
+  voice_mode: z.enum(["cast", "narrator_only"]),
   narrator_voice: z.string().nullable(),
   voice_overrides: z.record(z.string(), z.string()),
   male_voice: z.string().nullable(),

@@ -1,0 +1,129 @@
+{
+  "slice": "ch36-43",
+  "book": "Shadow Slave 001-100 (first volume)",
+  "first_chapter": 36,
+  "last_chapter": 43,
+  "characters": [
+    {
+      "name": "Nephis",
+      "aliases": [
+        "Neph",
+        "Changing Star",
+        "the tall girl",
+        "the silver-haired girl",
+        "princess",
+        "the girls"
+      ],
+      "gender": "f",
+      "approx_dialogue_lines": 90,
+      "evidence": [
+        {
+          "chapter": 36,
+          "quote_sha256_12": "83fb78fa013e"
+        },
+        {
+          "chapter": 38,
+          "quote_sha256_12": "2e94124f0d11"
+        }
+      ]
+    },
+    {
+      "name": "Cassie",
+      "aliases": [
+        "Cassia",
+        "the blind girl",
+        "the girls"
+      ],
+      "gender": "f",
+      "approx_dialogue_lines": 27,
+      "evidence": [
+        {
+          "chapter": 36,
+          "quote_sha256_12": "78e0f5ca82d9"
+        },
+        {
+          "chapter": 43,
+          "quote_sha256_12": "80c7b789b7e8"
+        }
+      ]
+    },
+    {
+      "name": "Sunny",
+      "aliases": [
+        "Sunless"
+      ],
+      "gender": "m",
+      "approx_dialogue_lines": 76,
+      "evidence": [
+        {
+          "chapter": 36,
+          "quote_sha256_12": "66954dc49fb3"
+        }
+      ]
+    },
+    {
+      "name": "The Spell (voice)",
+      "aliases": [
+        "the Spell's voice"
+      ],
+      "gender": "unknown",
+      "approx_dialogue_lines": 5,
+      "evidence": [
+        {
+          "chapter": 40,
+          "quote_sha256_12": "ade72270b5ac"
+        }
+      ]
+    },
+    {
+      "name": "Caster",
+      "aliases": [],
+      "gender": "m",
+      "approx_dialogue_lines": 0,
+      "evidence": [
+        {
+          "chapter": 38,
+          "quote_sha256_12": "8d0a745dcd2e"
+        }
+      ]
+    },
+    {
+      "name": "Odysseus",
+      "aliases": [],
+      "gender": "m",
+      "approx_dialogue_lines": 0,
+      "evidence": [
+        {
+          "chapter": 38,
+          "quote_sha256_12": "7ceb0bf4e6bd"
+        }
+      ]
+    },
+    {
+      "name": "Calypso",
+      "aliases": [
+        "the beautiful fairy"
+      ],
+      "gender": "f",
+      "approx_dialogue_lines": 0,
+      "evidence": [
+        {
+          "chapter": 38,
+          "quote_sha256_12": "1ebacd0d8b7d"
+        }
+      ]
+    },
+    {
+      "name": "Master Jet",
+      "aliases": [],
+      "gender": "f",
+      "approx_dialogue_lines": 0,
+      "evidence": [
+        {
+          "chapter": 41,
+          "quote_sha256_12": "638cb3a89788"
+        }
+      ]
+    }
+  ]
+}

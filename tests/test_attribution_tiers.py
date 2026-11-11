@@ -72,14 +72,16 @@ def test_unsure_tiers_are_the_guessed_ones():
     assert UNSURE_TIERS == {"pronoun", "alternation", "fallback"}
 
 
-def test_infer_genders_is_public_and_returns_the_vote():
+def test_infer_genders_is_public_and_returns_the_resolved_genders():
     chapter = Chapter(
         index=1,
         title="Ch",
-        segments=[_dlg("Hello."), _nar("said Sunny, and he smiled.")],
+        segments=[_dlg("Hello."), _nar("said Sunny.")]
+        + [_nar("Sunny shook his head and rubbed his eyes.") for _ in range(4)],
     )
     attributor = HeuristicAttributor()
     attributor.attribute([chapter])
 
     assert attributor.infer_genders(["Sunny"], [chapter]) == {"Sunny": "m"}
     assert attributor.genders == {"Sunny": "m"}
+    assert attributor.verdicts["Sunny"].gender == "m"

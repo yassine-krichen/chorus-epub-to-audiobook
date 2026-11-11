@@ -29,10 +29,15 @@ from book2audio.assemble.audio import concat_with_gaps, normalize_rms, write_wav
 from book2audio.assemble.audiobook import ChapterAudio, build_m4b
 from book2audio.assemble.filenames import PartInfo, next_free_name, render_part_filenames
 from book2audio.assemble.music import LOOP_SECONDS, generate_bed_for_preset, mix_music_bed
-from book2audio.attribution import LLMAttributor, build_attributor
+from book2audio.attribution import GenderVerdict, LLMAttributor, build_attributor
+from book2audio.cast_report import (
+    build_cast_report,
+    print_cast_report,
+    write_cast_report,
+)
 from book2audio.config import Config
 from book2audio.epub import ParsedChapter, parse_epub
-from book2audio.models import Book, BookMetadata, Chapter, Segment, SegmentKind
+from book2audio.models import NARRATOR, Book, BookMetadata, Chapter, Segment, SegmentKind
 from book2audio.state import RenderState
 from book2audio.text import normalize_for_tts, segment_paragraphs, speech_params
 from book2audio.tts import KokoroEngine, VoiceCast
@@ -97,6 +102,10 @@ class Pipeline:
         # Attribution can run for many minutes before the first chapter
         # finishes, so hosted workers need a liveness signal from it.
         self._on_attribution_progress = on_attribution_progress
+        self._characters: list[str] = []
+        self._genders: dict[str, str] = {}
+        self._verdicts: dict[str, GenderVerdict] = {}
+        self._aliases: dict[str, str] = {}
 
     def run(self) -> str:
         cfg = self.config
@@ -111,6 +120,7 @@ class Pipeline:
 
         selected = self._select_chapters(book)
         self._report_plan(book, selected, cast)
+        self.report_cast(selected, cast)
 
         engine = self._load_engine(book.metadata)
         self._music_bed = generate_bed_for_preset(cfg.music_preset) if cfg.music else None
@@ -136,6 +146,14 @@ class Pipeline:
         chapters = [self._build_chapter(pc) for pc in parsed]
         book = Book(metadata=metadata, chapters=chapters)
 
+        if self.config.voice_mode == "narrator_only":
+            # One voice for everything: nothing to attribute, no characters to cast.
+            for chapter in chapters:
+                for seg in chapter.segments:
+                    seg.speaker = NARRATOR
+            self._characters, self._genders, self._verdicts = [], {}, {}
+            return book
+
         # LLM calls only cover the chapters being rendered, so a --limit or
         # --start-chapter run does not spend the call budget on the rest.
         start_pos, end_pos = self.config.selection_bounds(chapters)
@@ -151,6 +169,8 @@ class Pipeline:
             characters = attributor.attribute(book.chapters)
         self._characters = self._order_by_frequency(characters, book)
         self._genders = attributor.genders
+        self._verdicts = attributor.verdicts
+        self._aliases = attributor.aliases
         if isinstance(attributor, LLMAttributor):
             self._report_attribution(attributor, estimate_only)
         return book
@@ -195,8 +215,32 @@ class Pipeline:
             male_voice=self.config.male_voice,
             female_voice=self.config.female_voice,
         )
-        cast.cast(self._characters, getattr(self, "_genders", {}))
+        cast.cast(self._characters, self._genders)
         return cast
+
+    def report_cast(self, selected: list[Chapter], cast: VoiceCast) -> None:
+        """Print the cast report and save it as ``cast_report.json`` in the work dir."""
+        entries = build_cast_report(self._characters, self._verdicts, selected, cast)
+        mode, narrator = self.config.voice_mode, cast.narrator_voice
+        print_cast_report(self.console, entries, voice_mode=mode, narrator_voice=narrator)
+        path = write_cast_report(
+            self.config.work_dir, entries, voice_mode=mode, narrator_voice=narrator
+        )
+        self.console.print(f"[dim]Cast report saved to {escape(path)}[/dim]")
+        unmatched = self._unmatched_gender_overrides()
+        if unmatched:
+            self.console.print(
+                "[yellow]Warning:[/yellow] --gender names that match no character: "
+                f"{escape(', '.join(unmatched))}"
+            )
+
+    def _unmatched_gender_overrides(self) -> list[str]:
+        if self.config.voice_mode == "narrator_only":
+            return []  # no characters are detected, so every name would look unmatched
+        known = {name.lower() for name in self._characters}
+        # A merged spelling ("Cassia" for "Cassie") still names a character.
+        known |= {variant.lower() for variant in self._aliases}
+        return sorted(n for n in self.config.gender_overrides if n.strip().lower() not in known)
 
     def _init_state(self, book: Book, cast: VoiceCast) -> RenderState:
         state = RenderState.load_or_new(

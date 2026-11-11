@@ -24,3 +24,6 @@ evals/attribution/data/
 
 # Active working deploy notes, local-only
 DEPLOYMENT-HYBRID.md
+
+# Verbatim book text kept local: gender gold quotes and the speaker spot-check sheet
+evals/gender/local/

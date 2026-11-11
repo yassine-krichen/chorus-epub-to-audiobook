@@ -66,8 +66,11 @@ def test_prefix_nickname_merges_into_full_name():
     assert "Neph" not in names
 
 
-def test_gender_inferred_from_dialogue_tag_pronouns():
-    ch = _chapter([_dlg("Now."), _nar("said Sunny. He was already gone.")])
+def test_gender_is_inferred_from_pronouns_in_plain_narration():
+    ch = _chapter(
+        [_dlg("Now."), _nar("said Sunny.")]
+        + [_nar("Sunny shook his head and rubbed his eyes.") for _ in range(4)]
+    )
     attr = HeuristicAttributor()
     attr.attribute([ch])
     assert ch.segments[0].speaker == "Sunny"

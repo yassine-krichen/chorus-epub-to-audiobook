@@ -9,6 +9,9 @@ from book2audio.models import Chapter
 # Selectable attribution strategies (``Config.attributor``, ``--attributor``).
 ATTRIBUTOR_MODES = ("heuristic", "llm", "hybrid")
 
+# Who voices dialogue: a distinct voice per character, or the narrator for everything.
+VOICE_MODES = ("cast", "narrator_only")
+
 
 class Attributor(Protocol):
     """Assigns a ``speaker`` to every segment across a book's chapters.

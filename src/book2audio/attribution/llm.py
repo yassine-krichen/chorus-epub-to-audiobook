@@ -22,9 +22,10 @@ import json
 import os
 import re
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
+from book2audio.attribution.gender import GenderVerdict
 from book2audio.attribution.heuristic import _STOPWORDS, HeuristicAttributor
 from book2audio.attribution.llm_client import LLMClient, LLMError
 from book2audio.models import NARRATOR, Chapter, SegmentKind
@@ -168,6 +169,7 @@ class LLMAttributor:
         *,
         only_chapters: frozenset[int] | None = None,
         on_progress: Callable[[], None] | None = None,
+        gender_overrides: Mapping[str, str] | None = None,
     ) -> None:
         if mode not in ("llm", "hybrid"):
             raise ValueError(f"LLMAttributor mode must be 'llm' or 'hybrid', got {mode!r}")
@@ -181,9 +183,21 @@ class LLMAttributor:
         # Called after every window (even skipped or failed ones) so a caller
         # can prove liveness during a long attribution pass.
         self._on_progress = on_progress
-        self._heuristic = HeuristicAttributor()
-        self.genders: dict[str, str] = {}
+        self._heuristic = HeuristicAttributor(gender_overrides)
         self.report = AttributionReport(mode=mode)
+
+    @property
+    def genders(self) -> dict[str, str]:
+        """Confident ``name -> 'm' | 'f'`` entries, resolved from the final speakers."""
+        return self._heuristic.genders
+
+    @property
+    def aliases(self) -> dict[str, str]:
+        return self._heuristic.aliases
+
+    @property
+    def verdicts(self) -> dict[str, GenderVerdict]:
+        return self._heuristic.verdicts
 
     def estimate(self, chapters: list[Chapter]) -> list[str]:
         """Dry run: heuristic labels plus how many windows the LLM would see.
@@ -192,7 +206,6 @@ class LLMAttributor:
         bound on ``calls`` (cache hits can only lower it).
         """
         names = self._heuristic.attribute(chapters)
-        self.genders = self._heuristic.genders
         self.report = AttributionReport(mode=self.mode)
         self._count_windows(self._build_windows(chapters))
         return names
@@ -251,7 +264,7 @@ class LLMAttributor:
         self._finish_warnings(report)
 
         names = self._speaker_names(chapters)
-        self.genders = self._heuristic.infer_genders(names, chapters)
+        self._heuristic.infer_genders(names, chapters)
         return names
 
     def _attribute_window(self, window: _Window, before: dict, known: list[str]) -> str:

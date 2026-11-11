@@ -52,6 +52,25 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="NAME=VOICE",
         help="Override a character's voice (repeatable), e.g. --voice Sunny=am_adam",
     )
+    gen.add_argument(
+        "--gender",
+        action="append",
+        default=[],
+        metavar="NAME=m|f",
+        help=(
+            "Set a character's gender (repeatable), e.g. --gender Cassie=f. Your word beats "
+            "the automatic guess; characters left unclear are read by the narrator voice"
+        ),
+    )
+    gen.add_argument(
+        "--narrator-only",
+        action="store_true",
+        default=False,
+        help=(
+            "The narrator voice reads everything (no character voices); speaker detection "
+            "is skipped"
+        ),
+    )
     gen.add_argument("--speed", type=float, default=1.0, help="Speaking speed (0.5–2.0)")
     gen.add_argument("--bitrate", default="64k", help="AAC bitrate for the .m4b")
     gen.add_argument(
@@ -187,6 +206,8 @@ def _run_generate(args: argparse.Namespace, console: Console) -> int:
         work_dir=work_dir,
         narrator_voice=args.narrator or DEFAULT_NARRATOR_VOICE,
         voice_overrides=_parse_overrides(args.voice),
+        gender_overrides=_parse_gender_overrides(args.gender),
+        voice_mode="narrator_only" if args.narrator_only else "cast",
         speed=args.speed,
         bitrate=args.bitrate,
         chapter_limit=args.limit,
@@ -208,7 +229,7 @@ def _run_generate(args: argparse.Namespace, console: Console) -> int:
     try:
         if config.thumbnails:
             require_freellmapi_configured()
-        if config.attributor != "heuristic":
+        if config.attributor != "heuristic" and config.voice_mode == "cast":
             require_llm_attribution_configured()
         pipeline = Pipeline(config, console)
         if args.dry_run:
@@ -231,9 +252,7 @@ def _dry_run(pipeline: Pipeline, console: Console) -> None:
     selected = pipeline._select_chapters(book)
     pipeline._report_plan(book, selected, cast)
     _print_planned_files(pipeline.planned_file_names(selected, book.metadata), console)
-    console.print("\n[bold]Full cast:[/bold]")
-    for name, voice in cast.as_dict().items():
-        console.print(f"  {name:<24} {voice}")
+    pipeline.report_cast(selected, cast)
 
 
 def _print_planned_files(names: list[str], console: Console) -> None:
@@ -281,6 +300,16 @@ def _parse_overrides(raw: list[str]) -> dict[str, str]:
             raise SystemExit(f"Invalid --voice {item!r}; expected NAME=VOICE")
         name, voice = item.split("=", 1)
         overrides[name.strip()] = voice.strip()
+    return overrides
+
+
+def _parse_gender_overrides(raw: list[str]) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for item in raw:
+        if "=" not in item:
+            raise SystemExit(f"Invalid --gender {item!r}; expected NAME=m or NAME=f")
+        name, gender = item.split("=", 1)
+        overrides[name.strip()] = gender.strip().lower()
     return overrides
 
 

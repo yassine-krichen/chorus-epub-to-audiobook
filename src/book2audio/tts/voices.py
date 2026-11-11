@@ -1,14 +1,22 @@
 """Assign a stable Kokoro voice to the narrator and to every character.
 
 Consistency is a hard requirement (PRD): a given character must keep the same
-voice for the entire book. We get that for free by hashing the character name
-into a fixed pool of distinct voices — deterministic, order-independent, and
-survives resume. Users can override any assignment via ``overrides``.
+voice for the entire book. Characters are cast once, in order, from a fixed pool
+split by gender, so the assignment is deterministic and survives resume. Users
+can override any assignment via ``overrides``.
+
+Voice rules (wrong-gender voices confuse listeners, so a guess is never made):
+
+1. A user override always wins.
+2. A character with a *resolved* gender (``m`` or ``f``) gets a voice from the
+   matching pool.
+3. A character whose gender is unresolved, and any speaker that was never cast,
+   is read by the narrator's voice. There is no "any gender" pool and no
+   name-hash fallback.
 """
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
 
 from book2audio.models import NARRATOR
@@ -57,26 +65,28 @@ class VoiceCast:
 
         Callers pass characters most-frequent-speaker first; assigning
         sequentially guarantees the busiest characters get *distinct* voices (no
-        collisions between the two leads who trade lines every page). When a
-        ``genders`` guess is available, each character draws from the matching
-        gender pool first; otherwise from the full pool. Voices only repeat once
-        a pool is exhausted. When ``male_voice``/``female_voice`` are set, that
-        voice is tried first within its gender pool — a casting bias, not a
-        hard pin (it still yields to distinctness once already used).
+        collisions between the two leads who trade lines every page). Only a
+        character whose ``genders`` entry is ``m`` or ``f`` is cast, from the
+        matching pool; everyone else stays uncast and is read by the narrator
+        voice (see :meth:`voice_for`). Voices only repeat once a pool is
+        exhausted. When ``male_voice``/``female_voice`` are set, that voice is
+        tried first within its gender pool - a casting bias, not a hard pin (it
+        still yields to distinctness once already used).
         """
         genders = genders or {}
         used = set(self._assignments.values()) | set(self.overrides.values())
-        cursors = {"m": 0, "f": 0, "any": 0}
+        cursors = {"m": 0, "f": 0}
         pools = {
             "m": self._rotate(self._prioritized(MALE_VOICES, self.male_voice), used),
             "f": self._rotate(self._prioritized(FEMALE_VOICES, self.female_voice), used),
-            "any": self._rotate(CHARACTER_VOICE_POOL, used),
         }
         for name in characters:
             if name in self._assignments or name in self.overrides:
                 continue
-            key = genders.get(name, "any")
-            pool = pools[key] or pools["any"]
+            key = genders.get(name)
+            if key not in pools:
+                continue
+            pool = pools[key]
             self._assignments[name] = pool[cursors[key] % len(pool)]
             cursors[key] += 1
 
@@ -97,21 +107,17 @@ class VoiceCast:
         return (preferred,) + tuple(v for v in pool if v != preferred)
 
     def voice_for(self, speaker: str) -> str:
-        """Return the voice id for a speaker, casting on demand if needed."""
+        """Return the voice id for a speaker.
+
+        The narrator and any speaker that was not cast (unresolved gender, or
+        never seen) use the narrator voice; an override beats everything.
+        """
         if speaker == NARRATOR:
             return self.narrator_voice
         if speaker in self.overrides:
             return self.overrides[speaker]
-        if speaker not in self._assignments:
-            self._assignments[speaker] = self._pick_voice(speaker)
-        return self._assignments[speaker]
+        return self._assignments.get(speaker, self.narrator_voice)
 
     def as_dict(self) -> dict[str, str]:
         """Full narrator + character mapping, for display and the resume state."""
         return {NARRATOR: self.narrator_voice, **self._assignments, **self.overrides}
-
-    def _pick_voice(self, name: str) -> str:
-        if name in self.overrides:
-            return self.overrides[name]
-        digest = hashlib.sha1(name.encode("utf-8")).digest()
-        return CHARACTER_VOICE_POOL[digest[0] % len(CHARACTER_VOICE_POOL)]

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { VoicePicker } from "@/components/voices/voice-picker";
 import { useVoices } from "@/hooks/use-voices";
 import type { JobConfig } from "@/types/job";
@@ -34,6 +35,7 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
   const maleVoices = voices.voices.filter((v) => v.gender === "male" && !v.is_default_narrator);
   const femaleVoices = voices.voices.filter((v) => v.gender === "female" && !v.is_default_narrator);
   const overrides = Object.entries(config.voice_overrides);
+  const narratorOnly = config.voice_mode === "narrator_only";
 
   function addOverride() {
     if (!overrideName.trim() || !overrideVoice) return;
@@ -52,10 +54,25 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="narrator-only-switch">Narrator reads everything (no character voices)</Label>
+          <p className="text-xs text-muted-foreground">
+            One voice for the whole book, dialogue included. Turn it off to give each character a
+            voice that matches their gender. When we are not sure of a character&apos;s gender, the
+            narrator reads that character&apos;s lines.
+          </p>
+        </div>
+        <Switch
+          id="narrator-only-switch"
+          checked={narratorOnly}
+          onCheckedChange={(checked) => onChange({ voice_mode: checked ? "narrator_only" : "cast" })}
+        />
+      </div>
       <p className="text-xs text-muted-foreground">
         Narrator voice reads all narration. Male/female pickers bias (not force) character
-        casting when a character&apos;s gender is guessed from context. Defaults work fine if you
-        leave these alone.
+        casting when a character&apos;s gender is worked out from the text. Defaults work fine if
+        you leave these alone.
       </p>
       <div className="flex flex-col gap-2">
         <Label>Narrator voice</Label>
@@ -65,25 +82,30 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
           onChange={(value) => onChange({ narrator_voice: value })}
         />
       </div>
-      <div className="flex flex-col gap-2">
-        <Label>Male character voice</Label>
-        <VoicePicker
-          voices={maleVoices}
-          value={config.male_voice}
-          onChange={(value) => onChange({ male_voice: value })}
-          allowNoPreference
-        />
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label>Female character voice</Label>
-        <VoicePicker
-          voices={femaleVoices}
-          value={config.female_voice}
-          onChange={(value) => onChange({ female_voice: value })}
-          allowNoPreference
-        />
-      </div>
+      {!narratorOnly && (
+        <>
+          <div className="flex flex-col gap-2">
+            <Label>Male character voice</Label>
+            <VoicePicker
+              voices={maleVoices}
+              value={config.male_voice}
+              onChange={(value) => onChange({ male_voice: value })}
+              allowNoPreference
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Female character voice</Label>
+            <VoicePicker
+              voices={femaleVoices}
+              value={config.female_voice}
+              onChange={(value) => onChange({ female_voice: value })}
+              allowNoPreference
+            />
+          </div>
+        </>
+      )}
 
+      {!narratorOnly && (
       <Accordion>
         <AccordionItem value="advanced">
           <AccordionTrigger>Advanced: per-character voice overrides</AccordionTrigger>
@@ -124,6 +146,7 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+      )}
     </div>
   );
 }

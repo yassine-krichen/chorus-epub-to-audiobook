@@ -16,7 +16,13 @@ chapters clearly follow-able. An LLM attributor can replace it later.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 
+from book2audio.attribution.gender import (
+    GenderVerdict,
+    resolve_genders,
+    resolved_genders,
+)
 from book2audio.models import NARRATOR, Chapter, Segment, SegmentKind
 
 # Verbs that introduce speech. Kept broad; false positives are cheap here.
@@ -58,21 +64,68 @@ _STOPWORDS = {
 }
 
 
-# Gendered pronouns used to guess a character's voice gender from dialogue tags.
-_MALE_PRONOUNS = re.compile(r"\b(he|him|his)\b", re.I)
-_FEMALE_PRONOUNS = re.compile(r"\b(she|her|hers)\b", re.I)
+_VOWELS = frozenset("aeiouy")
+
+
+def _speaker_stats(chapters: list[Chapter]) -> tuple[dict[str, int], dict[str, set[int]]]:
+    """Dialogue lines per speaker, and the chapters (by index) each speaker talks in."""
+    counts: dict[str, int] = {}
+    chapters_of: dict[str, set[int]] = {}
+    for chapter in chapters:
+        for seg in chapter.segments:
+            if seg.kind == SegmentKind.DIALOGUE and seg.speaker:
+                counts[seg.speaker] = counts.get(seg.speaker, 0) + 1
+                chapters_of.setdefault(seg.speaker, set()).add(chapter.index)
+    return counts, chapters_of
+
+
+def _differ_by_one_vowel(a: str, b: str) -> bool:
+    """True for names like ``Cassia``/``Cassie``: same length, one vowel swapped.
+
+    A final ``a``/``o`` swap is never a spelling variant: Maria/Mario,
+    Julia/Julio and Antonia/Antonio are a woman and a man.
+    """
+    if len(a) != len(b) or len(a) < 5 or " " in a or " " in b:
+        return False
+    diffs = [
+        (i, x, y) for i, (x, y) in enumerate(zip(a.lower(), b.lower())) if x != y
+    ]
+    if len(diffs) != 1:
+        return False
+    index, x, y = diffs[0]
+    if x not in _VOWELS or y not in _VOWELS:
+        return False
+    return not (index == len(a) - 1 and {x, y} == {"a", "o"})
+
+
+def _resolve_targets(canonical: dict[str, str]) -> dict[str, str]:
+    """Point every folded name at its final target, so no label is left orphaned."""
+    resolved: dict[str, str] = {}
+    for name, target in canonical.items():
+        seen = {name}
+        while target in canonical and target not in seen:
+            seen.add(target)
+            target = canonical[target]
+        resolved[name] = target
+    return resolved
 
 
 class HeuristicAttributor:
     """See module docstring. Stateless between calls; state lives per-book.
 
-    After :meth:`attribute`, :attr:`genders` holds a best-effort ``name -> 'm'
-    | 'f'`` guess (characters with no clear signal are omitted), used to cast
-    gender-appropriate voices.
+    After :meth:`attribute`, :attr:`verdicts` holds a
+    :class:`~book2audio.attribution.gender.GenderVerdict` per character and
+    :attr:`genders` the ``name -> 'm' | 'f'`` map of the confident ones (the
+    rest are unresolved and get the narrator's voice).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, gender_overrides: Mapping[str, str] | None = None) -> None:
+        self._gender_overrides = dict(gender_overrides or {})
         self.genders: dict[str, str] = {}
+        self.verdicts: dict[str, GenderVerdict] = {}
+        # Spelling variants folded into a character ("Cassia" -> "Cassie"), kept so
+        # the gender resolver can still read narration that uses the variant.
+        self.aliases: dict[str, str] = {}
         # How each dialogue line was resolved, keyed by ``(chapter.index,
         # position in chapter.segments)``. Kept beside the segments (not on
         # Segment) so the shared model stays free of attribution internals.
@@ -80,6 +133,7 @@ class HeuristicAttributor:
 
     def attribute(self, chapters: list[Chapter]) -> list[str]:
         self.tiers = {}
+        self.aliases = {}
         discovered: dict[str, None] = {}  # insertion-ordered set of names
         for chapter in chapters:
             self._attribute_chapter(chapter, discovered)
@@ -88,41 +142,35 @@ class HeuristicAttributor:
         return names
 
     def infer_genders(self, names: list[str], chapters: list[Chapter]) -> dict[str, str]:
-        """Vote each character's gender from pronouns in their dialogue tags.
+        """Resolve each character's gender from the whole text (see ``gender.py``).
 
-        For every line a character speaks, the surrounding tag ("...he said")
-        usually carries a matching pronoun. Majority vote across the book is a
-        reliable signal for main characters, who speak most. Public so another
-        attributor can recompute genders after it changes speakers.
+        Public so another attributor can recompute genders after it changes
+        speakers. Returns only the confident ``name -> 'm' | 'f'`` entries and
+        keeps every verdict, with its evidence, in :attr:`verdicts`.
         """
-        known = set(names)
-        votes: dict[str, list[int]] = {n: [0, 0] for n in names}
-        for chapter in chapters:
-            segs = chapter.segments
-            for i, seg in enumerate(segs):
-                if seg.kind != SegmentKind.DIALOGUE or seg.speaker not in known:
-                    continue
-                tag = self._neighbor_narration(segs, i + 1) + " " + self._neighbor_narration(
-                    segs, i - 1
-                )
-                votes[seg.speaker][0] += len(_MALE_PRONOUNS.findall(tag))
-                votes[seg.speaker][1] += len(_FEMALE_PRONOUNS.findall(tag))
-
-        self.genders = {}
-        for name, (male, female) in votes.items():
-            if male > female:
-                self.genders[name] = "m"
-            elif female > male:
-                self.genders[name] = "f"
+        self.verdicts = resolve_genders(
+            names, chapters, overrides=self._gender_overrides, aliases=self.aliases
+        )
+        self.genders = resolved_genders(self.verdicts)
         return self.genders
 
-    @staticmethod
-    def merge_aliases(names: list[str], chapters: list[Chapter]) -> list[str]:
-        """Fold obvious nicknames into their full name (``Neph`` -> ``Nephis``).
+    def merge_aliases(self, names: list[str], chapters: list[Chapter]) -> list[str]:
+        """Fold obvious nicknames and spelling variants into one name.
 
-        Rule: a short single-word name that is a case-insensitive prefix of a
-        longer known name is treated as the same character. Cheap and safe; the
-        harder cases (unrelated nicknames) are left for an LLM attributor.
+        Two rules, both cheap and safe; unrelated nicknames are left for an LLM
+        attributor. A short single-word name that is a case-insensitive prefix
+        of a longer known name is the same character (``Neph`` -> ``Nephis``).
+        Two names of the same length (5+) that differ by one vowel are one
+        character spelled two ways (``Cassia`` / ``Cassie``: a book's narration
+        and dialogue tags can use both), but only when they never speak in the
+        same chapter, because two real characters do share scenes. A final
+        ``a``/``o`` swap (Maria/Mario) is never merged. The one speaking more
+        lines wins. Every fold is recorded in :attr:`aliases` and points at its
+        final target.
+
+        Known limit: two different characters with names like this who never
+        speak in the same chapter (a Julie in chapter 3 and a Julia in chapter
+        40) are still merged.
         """
         canonical: dict[str, str] = {}
         for short in names:
@@ -134,8 +182,30 @@ class HeuristicAttributor:
                         canonical[short] = full
                         break
 
+        lines, chapters_of = _speaker_stats(chapters)
+        for i, first in enumerate(names):
+            for second in names[i + 1 :]:
+                if first in canonical or second in canonical:
+                    continue
+                if not _differ_by_one_vowel(first, second):
+                    continue
+                if chapters_of.get(first, set()) & chapters_of.get(second, set()):
+                    continue
+                winner, loser = (
+                    (first, second) if lines.get(first, 0) >= lines.get(second, 0)
+                    else (second, first)
+                )
+                # A name that already absorbed another cannot itself be folded away.
+                if loser in canonical.values():
+                    winner, loser = loser, winner
+                    if loser in canonical.values():
+                        continue
+                canonical[loser] = winner
+
+        canonical = _resolve_targets(canonical)
         if not canonical:
             return names
+        self.aliases.update(canonical)
         for chapter in chapters:
             for seg in chapter.segments:
                 if seg.speaker in canonical:

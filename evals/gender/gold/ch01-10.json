@@ -1,0 +1,241 @@
+{
+  "slice": "ch01-10",
+  "book": "Shadow Slave 001-100 (first volume)",
+  "first_chapter": 1,
+  "last_chapter": 10,
+  "characters": [
+    {
+      "name": "Sunny",
+      "aliases": [
+        "Sunless",
+        "the boy",
+        "boy",
+        "kid",
+        "child",
+        "the young slave",
+        "the scrawny slave",
+        "weakling"
+      ],
+      "gender": "m",
+      "approx_dialogue_lines": 35,
+      "evidence": [
+        {
+          "chapter": 1,
+          "quote_sha256_12": "e05f9d92d1af"
+        },
+        {
+          "chapter": 1,
+          "quote_sha256_12": "b16af135106b"
+        }
+      ]
+    },
+    {
+      "name": "Old policeman",
+      "aliases": [
+        "gray-haired policeman",
+        "the old policeman",
+        "the policeman"
+      ],
+      "gender": "m",
+      "approx_dialogue_lines": 15,
+      "evidence": [
+        {
+          "chapter": 1,
+          "quote_sha256_12": "bbae66aa723a"
+        }
+      ]
+    },
+    {
+      "name": "Desk officer",
+      "aliases": [
+        "tired-looking officer",
+        "the officer"
+      ],
+      "gender": "m",
+      "approx_dialogue_lines": 5,
+      "evidence": [
+        {
+          "chapter": 1,
+          "quote_sha256_12": "ceb50d56d950"
+        }
+      ]
+    },
+    {
+      "name": "The Spell (voice)",
+      "aliases": [
+        "Nightmare Spell",
+        "the Spell's voice",
+        "a faintly familiar voice"
+      ],
+      "gender": "unknown",
+      "approx_dialogue_lines": 8,
+      "evidence": [
+        {
+          "chapter": 1,
+          "quote_sha256_12": "f60a4b7a1eb8"
+        },
+        {
+          "chapter": 8,
+          "quote_sha256_12": "2b3e246367f6"
+        }
+      ]
+    },
+    {
+      "name": "Shifty",
+      "aliases": [
+        "shifty-looking guy",
+        "the shifty slave",
+        "the roguish slave",
+        "His follower"
+      ],
+      "gender": "m",
+      "approx_dialogue_lines": 29,
+      "evidence": [
+        {
+          "chapter": 3,
+          "quote_sha256_12": "0383510c526d"
+        },
+        {
+          "chapter": 5,
+          "quote_sha256_12": "6db0166214fd"
+        }
+      ]
+    },
+    {
+      "name": "Scholar",
+      "aliases": [
+        "the gentle-voiced slave",
+        "the scholar",
+        "the scholarly slave",
+        "the older slave",
+        "old man"
+      ],
+      "gender": "m",
+      "approx_dialogue_lines": 22,
+      "evidence": [
+        {
+          "chapter": 3,
+          "quote_sha256_12": "129c995d2b0a"
+        }
+      ]
+    },
+    {
+      "name": "Hero",
+      "aliases": [
+        "the young soldier",
+        "the soldier",
+        "newbie",
+        "the young hero",
+        "the young warrior",
+        "your lordship",
+        "Sunny's heroic liberator"
+      ],
+      "gender": "m",
+      "approx_dialogue_lines": 25,
+      "evidence": [
+        {
+          "chapter": 2,
+          "quote_sha256_12": "88f8f6d1d97a"
+        },
+        {
+          "chapter": 6,
+          "quote_sha256_12": "5567b9f90144"
+        }
+      ]
+    },
+    {
+      "name": "Veteran soldier",
+      "aliases": [
+        "the older soldier",
+        "the veteran soldier",
+        "the old veteran",
+        "the dying soldier",
+        "the old man",
+        "an officer"
+      ],
+      "gender": "m",
+      "approx_dialogue_lines": 5,
+      "evidence": [
+        {
+          "chapter": 2,
+          "quote_sha256_12": "7d6995504107"
+        }
+      ]
+    },
+    {
+      "name": "Broad-shouldered slave",
+      "aliases": [
+        "the broad-shouldered man",
+        "the broad-shouldered slave"
+      ],
+      "gender": "m",
+      "approx_dialogue_lines": 4,
+      "evidence": [
+        {
+          "chapter": 2,
+          "quote_sha256_12": "9d09433e0158"
+        }
+      ]
+    },
+    {
+      "name": "Head soldier",
+      "aliases": [],
+      "gender": "unknown",
+      "approx_dialogue_lines": 1,
+      "evidence": [
+        {
+          "chapter": 3,
+          "quote_sha256_12": "1eaec7169993"
+        }
+      ]
+    },
+    {
+      "name": "Mountain King",
+      "aliases": [
+        "the tyrant",
+        "the creature",
+        "the monster",
+        "the beast",
+        "the abomination"
+      ],
+      "gender": "unknown",
+      "approx_dialogue_lines": 0,
+      "evidence": [
+        {
+          "chapter": 6,
+          "quote_sha256_12": "95af39636dfe"
+        },
+        {
+          "chapter": 7,
+          "quote_sha256_12": "42a5ede15af8"
+        }
+      ]
+    },
+    {
+      "name": "Rain",
+      "aliases": [
+        "his little sister"
+      ],
+      "gender": "f",
+      "approx_dialogue_lines": 0,
+      "evidence": [
+        {
+          "chapter": 1,
+          "quote_sha256_12": "39ed825cabd5"
+        }
+      ]
+    },
+    {
+      "name": "Shadow God",
+      "aliases": [],
+      "gender": "m",
+      "approx_dialogue_lines": 0,
+      "evidence": [
+        {
+          "chapter": 2,
+          "quote_sha256_12": "3bbb0ba87de9"
+        }
+      ]
+    }
+  ]
+}

@@ -42,7 +42,7 @@ def render_job(
     config = _build_config(epub_path, scratch_dir, job_config)
     if config.thumbnails:
         require_freellmapi_configured()
-    if config.attributor != "heuristic":
+    if config.attributor != "heuristic" and config.voice_mode == "cast":
         require_llm_attribution_configured()
     book_title = _set_total_chapters(job_id, config)
 

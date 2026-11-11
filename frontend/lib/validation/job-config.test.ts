@@ -4,6 +4,7 @@ import { jobConfigSchema, newJobFormSchema } from "@/lib/validation/job-config";
 
 function validConfig() {
   return {
+    voice_mode: "cast" as "cast" | "narrator_only",
     narrator_voice: null,
     voice_overrides: {},
     male_voice: null,
@@ -45,6 +46,17 @@ describe("jobConfigSchema", () => {
       narrator_voice: "en-US-voice-1",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts both voice modes", () => {
+    for (const voice_mode of ["cast", "narrator_only"] as const) {
+      expect(jobConfigSchema.safeParse({ ...validConfig(), voice_mode }).success).toBe(true);
+    }
+  });
+
+  it("rejects an unknown voice mode", () => {
+    const result = jobConfigSchema.safeParse({ ...validConfig(), voice_mode: "choir" });
+    expect(result.success).toBe(false);
   });
 
   it("rejects a music_preset outside the known enum", () => {

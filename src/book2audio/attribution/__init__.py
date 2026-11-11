@@ -12,7 +12,14 @@ import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from book2audio.attribution.base import ATTRIBUTOR_MODES, Attributor
+from book2audio.attribution.base import ATTRIBUTOR_MODES, VOICE_MODES, Attributor
+from book2audio.attribution.gender import (
+    GENDER_CONFIDENCE_THRESHOLD,
+    GenderEvidence,
+    GenderVerdict,
+    resolve_genders,
+    validate_gender_overrides,
+)
 from book2audio.attribution.heuristic import HeuristicAttributor
 from book2audio.attribution.llm import CACHE_FILENAME, AttributionCache, LLMAttributor
 from book2audio.attribution.llm_client import (
@@ -26,14 +33,20 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ATTRIBUTOR_MODES",
+    "GENDER_CONFIDENCE_THRESHOLD",
+    "VOICE_MODES",
     "Attributor",
     "AttributionCache",
+    "GenderEvidence",
+    "GenderVerdict",
     "HeuristicAttributor",
     "LLMAttributor",
     "LLMClient",
     "LLMError",
     "build_attributor",
     "require_llm_attribution_configured",
+    "resolve_genders",
+    "validate_gender_overrides",
 ]
 
 
@@ -50,7 +63,7 @@ def build_attributor(
     after every LLM window so a long pass can report that it is alive.
     """
     if config.attributor == "heuristic":
-        return HeuristicAttributor()
+        return HeuristicAttributor(config.gender_overrides)
     if config.attributor not in ATTRIBUTOR_MODES:
         raise ValueError(f"Unknown attributor {config.attributor!r}")
     return LLMAttributor(
@@ -60,4 +73,5 @@ def build_attributor(
         config.attribution_max_calls,
         only_chapters=only_chapters,
         on_progress=on_progress,
+        gender_overrides=config.gender_overrides,
     )

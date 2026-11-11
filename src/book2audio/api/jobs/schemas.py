@@ -13,7 +13,8 @@ from book2audio.assemble.filenames import (
     validate_filename_template,
 )
 from book2audio.assemble.music import MUSIC_PRESETS
-from book2audio.attribution.base import ATTRIBUTOR_MODES
+from book2audio.attribution.base import ATTRIBUTOR_MODES, VOICE_MODES
+from book2audio.attribution.gender import validate_gender_overrides
 from book2audio.tts.voices import FEMALE_VOICES, MALE_VOICES
 
 
@@ -53,6 +54,23 @@ class JobConfig(BaseModel):
     filename_template: str | None = Field(default=None, max_length=200)
     thumbnails: bool = False
     attributor: str = "heuristic"
+    # "cast" = a voice per character; "narrator_only" = the narrator reads everything.
+    voice_mode: str = "cast"
+    # Character name -> "m" or "f"; the user's word beats the gender inference.
+    gender_overrides: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("voice_mode")
+    @classmethod
+    def _validate_voice_mode(cls, value: str) -> str:
+        if value not in VOICE_MODES:
+            raise ValueError(f"Unknown voice_mode {value!r}. Known: {', '.join(VOICE_MODES)}")
+        return value
+
+    @field_validator("gender_overrides")
+    @classmethod
+    def _validate_gender_overrides(cls, value: dict[str, str]) -> dict[str, str]:
+        validate_gender_overrides(value)
+        return value
 
     @field_validator("attributor")
     @classmethod

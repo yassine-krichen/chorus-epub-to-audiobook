@@ -16,7 +16,8 @@ from book2audio.assemble.filenames import (
     validate_filename_template,
 )
 from book2audio.assemble.music import MUSIC_PRESETS
-from book2audio.attribution.base import ATTRIBUTOR_MODES
+from book2audio.attribution.base import ATTRIBUTOR_MODES, VOICE_MODES
+from book2audio.attribution.gender import validate_gender_overrides
 from book2audio.tts.voices import (
     CHARACTER_VOICE_POOL,
     DEFAULT_NARRATOR_VOICE,
@@ -102,6 +103,14 @@ class Config:
     attributor: str = "heuristic"
     attribution_max_calls: int = 150
 
+    # ``cast``: each character gets a voice of their own gender; characters whose
+    # gender is not clear enough are read by the narrator voice, never a guessed
+    # one. ``narrator_only``: the narrator voice reads everything and speaker
+    # attribution is skipped.
+    voice_mode: str = "cast"
+    # Character name -> "m" or "f". The user's word beats every inference.
+    gender_overrides: dict[str, str] = field(default_factory=dict)
+
     def validate(self) -> None:
         import os
 
@@ -135,6 +144,11 @@ class Config:
             )
         if self.attribution_max_calls < 0:
             raise ValueError("attribution_max_calls cannot be negative")
+        if self.voice_mode not in VOICE_MODES:
+            raise ValueError(
+                f"Unknown voice_mode {self.voice_mode!r}. Known: {', '.join(VOICE_MODES)}"
+            )
+        validate_gender_overrides(self.gender_overrides)
         if self.chapter_limit < 0:
             raise ValueError("chapter_limit cannot be negative")
         if self.start_chapter is not None and self.start_chapter < 0:
