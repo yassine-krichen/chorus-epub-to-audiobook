@@ -1,4 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { partChapterRange } from "@/lib/jobs/part-chapter-range";
 import type { PartProgress } from "@/types/job";
 
 export function PartRow({ part }: { part: PartProgress }) {
@@ -6,9 +7,7 @@ export function PartRow({ part }: { part: PartProgress }) {
     <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col gap-0.5">
         <span className="text-sm font-medium">Part {part.part_number}</span>
-        <span className="text-xs text-muted-foreground">
-          Chapters {part.first_index + 1}–{part.last_index + 1}
-        </span>
+        <span className="text-xs text-muted-foreground">{partChapterRange(part)}</span>
       </div>
       <div className="flex items-center gap-3">
         {part.download_url ? (

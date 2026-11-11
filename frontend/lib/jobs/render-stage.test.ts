@@ -264,8 +264,8 @@ describe("deriveRenderStage", () => {
     });
   });
 
-  describe("start_chapter offset (start_chapter > 1)", () => {
-    it("returns casting-voices when total_chapters is known but no chapters have started yet, offset from start_chapter", () => {
+  describe("start_chapter does not shift the position label", () => {
+    it("returns casting-voices when total_chapters is known but no chapters have started yet, with a start_chapter set", () => {
       const job = baseJob({
         status: "running",
         total_chapters: 5,
@@ -275,7 +275,7 @@ describe("deriveRenderStage", () => {
       expect(deriveRenderStage(job)).toEqual({ kind: "casting-voices" });
     });
 
-    it("reports absolute chapter 11 of 5 (selection starting at chapter 10) after the first selected chapter completes", () => {
+    it("reports chapter 2 of 5 (selection starting at book chapter 10) after the first selected chapter completes", () => {
       const job = baseJob({
         status: "running",
         total_chapters: 5,
@@ -284,12 +284,12 @@ describe("deriveRenderStage", () => {
       });
       expect(deriveRenderStage(job)).toEqual({
         kind: "synthesizing-chapter",
-        chapterNumber: 11,
+        chapterNumber: 2,
         totalChapters: 5,
       });
     });
 
-    it("reports absolute chapter 13 of 10 mid-render in single-batch mode starting at chapter 10", () => {
+    it("reports chapter 4 of 10 mid-render in single-batch mode starting at chapter 10", () => {
       const job = baseJob({
         status: "running",
         total_chapters: 10,
@@ -298,12 +298,12 @@ describe("deriveRenderStage", () => {
       });
       expect(deriveRenderStage(job)).toEqual({
         kind: "synthesizing-chapter",
-        chapterNumber: 13,
+        chapterNumber: 4,
         totalChapters: 10,
       });
     });
 
-    it("reports absolute chapter 12 of 5 when batch_size is 0 (single-file mode) starting at chapter 10", () => {
+    it("reports chapter 3 of 5 when batch_size is 0 (single-file mode) starting at chapter 10", () => {
       const job = baseJob({
         status: "running",
         total_chapters: 5,
@@ -312,15 +312,15 @@ describe("deriveRenderStage", () => {
       });
       expect(deriveRenderStage(job)).toEqual({
         kind: "synthesizing-chapter",
-        chapterNumber: 12,
+        chapterNumber: 3,
         totalChapters: 5,
       });
     });
 
-    it("moves straight into the next batch's first absolute chapter once a non-final batch completes, offset from start_chapter", () => {
-      // selection = absolute chapters 10-16 (total=7), batch_size=3 =>
-      // batches [10-12], [13-15], [16-16]. First batch is fully done (3
-      // chapters), so this should read as absolute chapter 13, not an
+    it("moves straight into the next batch's first chapter once a non-final batch completes, with a start_chapter set", () => {
+      // selection = 7 chapters, batch_size=3 =>
+      // batches [1-3], [4-6], [7-7]. First batch is fully done (3
+      // chapters), so this should read as chapter 4, not an
       // intermediate assembling stage.
       const job = baseJob({
         status: "running",
@@ -331,14 +331,14 @@ describe("deriveRenderStage", () => {
       });
       expect(deriveRenderStage(job)).toEqual({
         kind: "synthesizing-chapter",
-        chapterNumber: 13,
+        chapterNumber: 4,
         totalChapters: 7,
       });
     });
 
-    it("does not report assembling-part for an intermediate batch even when that batch's own chapters are all complete, offset from start_chapter", () => {
-      // Same total/batch_size as above, but only the first batch (absolute
-      // chapters 10-12) is done; the last batch (16-16) has zero chapters
+    it("does not report assembling-part for an intermediate batch even when that batch's own chapters are all complete, with a start_chapter set", () => {
+      // Same total/batch_size as above, but only the first batch (chapters
+      // 1-3) is done; the last batch (7-7) has zero chapters
       // done, so batchChaptersDone is false and this must not read as
       // assembling.
       const job = baseJob({
@@ -350,14 +350,14 @@ describe("deriveRenderStage", () => {
       });
       expect(deriveRenderStage(job)).toEqual({
         kind: "synthesizing-chapter",
-        chapterNumber: 13,
+        chapterNumber: 4,
         totalChapters: 7,
       });
     });
 
-    it("reports assembling part 2 of 2 once the final batch's chapters are all done but its part hasn't appeared yet, offset from start_chapter", () => {
-      // selection = absolute chapters 10-15 (total=6), batch_size=3 =>
-      // batches [10-12] part 1, [13-15] part 2.
+    it("reports assembling part 2 of 2 once the final batch's chapters are all done but its part hasn't appeared yet, with a start_chapter set", () => {
+      // selection = 6 chapters, batch_size=3 =>
+      // batches [1-3] part 1, [4-6] part 2.
       const job = baseJob({
         status: "running",
         total_chapters: 6,
@@ -372,7 +372,7 @@ describe("deriveRenderStage", () => {
       });
     });
 
-    it("falls back to synthesizing-chapter once the final batch's part has appeared in job.parts, offset from start_chapter", () => {
+    it("falls back to synthesizing-chapter once the final batch's part has appeared in job.parts, with a start_chapter set", () => {
       const job = baseJob({
         status: "running",
         total_chapters: 6,
@@ -382,12 +382,12 @@ describe("deriveRenderStage", () => {
       });
       expect(deriveRenderStage(job)).toEqual({
         kind: "synthesizing-chapter",
-        chapterNumber: 16,
+        chapterNumber: 7,
         totalChapters: 6,
       });
     });
 
-    it("reports assembling part 1 of 1 for a single-batch job (batch_size 0) offset from start_chapter once all chapters are done and no part exists yet", () => {
+    it("reports assembling part 1 of 1 for a single-batch job (batch_size 0) with a start_chapter set once all chapters are done and no part exists yet", () => {
       const job = baseJob({
         status: "running",
         total_chapters: 5,

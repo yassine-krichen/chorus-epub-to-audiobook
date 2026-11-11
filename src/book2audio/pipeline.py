@@ -14,6 +14,7 @@ from typing import Callable
 
 import numpy as np
 from rich.console import Console
+from rich.markup import escape
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -114,7 +115,7 @@ class Pipeline:
 
         # LLM calls only cover the chapters being rendered, so a --limit or
         # --start-chapter run does not spend the call budget on the rest.
-        start_pos, end_pos = self.config.selection_bounds(len(chapters))
+        start_pos, end_pos = self.config.selection_bounds(chapters)
         selected = frozenset(c.index for c in chapters[start_pos:end_pos])
         attributor = build_attributor(
             self.config,
@@ -156,7 +157,13 @@ class Pipeline:
 
     @staticmethod
     def _build_chapter(pc: ParsedChapter) -> Chapter:
-        return Chapter(index=pc.index, title=pc.title, segments=segment_paragraphs(pc.paragraphs))
+        return Chapter(
+            index=pc.index,
+            title=pc.title,
+            segments=segment_paragraphs(pc.paragraphs),
+            number=pc.number,
+            front_matter=pc.front_matter,
+        )
 
     def _cast_voices(self, book: Book) -> VoiceCast:
         cast = VoiceCast(
@@ -181,12 +188,14 @@ class Pipeline:
         return state
 
     def _select_chapters(self, book: Book) -> list[Chapter]:
-        start_pos, end_pos = self.config.selection_bounds(len(book.chapters))
+        start_pos, end_pos = self.config.selection_bounds(book.chapters)
         chapters = book.chapters[start_pos:end_pos]
         if not chapters:
+            numbers = [c.number for c in book.chapters]
             raise ValueError(
-                f"start_chapter={self.config.start_chapter} is beyond this book's "
-                f"{len(book.chapters)} chapter(s); nothing to render"
+                f"start_chapter={self.config.start_chapter} matches no chapter in this book "
+                f"(its chapters are numbered {min(numbers)} to {max(numbers)}); "
+                "nothing to render"
             )
         return chapters
 
@@ -223,7 +232,9 @@ class Pipeline:
                 for chapter in batch:
                     wav_path = os.path.join(chapters_dir, f"chapter_{chapter.index:04d}.wav")
                     text_hash = self._chapter_hash(chapter, cast)
-                    progress.update(task, description=f"Ch {chapter.index}: {chapter.title[:40]}")
+                    progress.update(
+                        task, description=f"Ch {chapter.number}: {escape(chapter.title[:40])}"
+                    )
                     if not state.is_done(chapter.index, wav_path, text_hash):
                         samples = self._render_chapter(chapter, engine, cast)
                         write_wav(wav_path, samples)
@@ -259,7 +270,7 @@ class Pipeline:
     ) -> BookMetadata:
         if single:
             return metadata
-        title = f"{metadata.title} — Part {part_no} (Ch {batch[0].index}-{batch[-1].index})"
+        title = f"{metadata.title} — Part {part_no} (Ch {batch[0].number}-{batch[-1].number})"
         return dataclasses.replace(metadata, title=title)
 
     def _chapter_hash(self, chapter: Chapter, cast: VoiceCast) -> str:
@@ -343,7 +354,9 @@ class Pipeline:
 
     def _report_plan(self, book: Book, selected: list[Chapter], cast: VoiceCast) -> None:
         c = self.console
-        c.print(f"\n[bold]{book.metadata.title}[/bold] by {book.metadata.author}")
+        c.print(
+            f"\n[bold]{escape(book.metadata.title)}[/bold] by {escape(book.metadata.author)}"
+        )
         words = sum(ch.word_count for ch in selected)
         c.print(
             f"Chapters: {len(selected)}/{len(book.chapters)}   "

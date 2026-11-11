@@ -210,3 +210,65 @@ def test_skips_spine_item_with_nav_property(tmp_path):
 
     assert len(chapters) == 1
     assert chapters[0].title == "Chapter 1: The Start"
+
+
+# --- book numbering ---------------------------------------------------------
+
+_PARAGRAPH = (
+    "A frail young man sat on a rusty bench across from the old police station, "
+    "cradling a cup of coffee in his hands and thinking hard about what was to come "
+    "next, and whether any single part of it had ever truly mattered at all."
+)
+
+
+def _spine_epub(path, documents):
+    """Build an EPUB whose spine lists ``documents`` ((heading, paragraph count)) in order."""
+    items = "".join(
+        f'<item id="d{i}" href="Text/d{i}.xhtml" media-type="application/xhtml+xml"/>'
+        for i in range(len(documents))
+    )
+    refs = "".join(f'<itemref idref="d{i}"/>' for i in range(len(documents)))
+    opf = (
+        '<?xml version="1.0"?><package version="2.0" unique-identifier="id" '
+        'xmlns="http://www.idpf.org/2007/opf"><metadata '
+        'xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Test Book</dc:title>'
+        "<dc:creator>Jane Author</dc:creator><dc:language>en</dc:language></metadata>"
+        f"<manifest>{items}</manifest><spine>{refs}</spine></package>"
+    )
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        zf.writestr("META-INF/container.xml", _CONTAINER)
+        zf.writestr("OEBPS/content.opf", opf)
+        for i, (heading, paragraphs) in enumerate(documents):
+            body = "".join(f"<p>{_PARAGRAPH}</p>" for _ in range(paragraphs))
+            zf.writestr(
+                f"OEBPS/Text/d{i}.xhtml",
+                '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+                f"<h1>{heading}</h1>{body}</body></html>",
+            )
+
+
+def test_parse_numbers_chapters_and_flags_a_synopsis_as_front_matter(tmp_path):
+    epub = tmp_path / "book.epub"
+    _spine_epub(epub, [("SYNOPSIS", 2), ("Chapter 1: A", 12), ("Chapter 2: B", 12)])
+
+    _, chapters = parse_epub(str(epub), cover_dir=str(tmp_path / "cover"))
+
+    assert [(c.index, c.number, c.front_matter) for c in chapters] == [
+        (1, 0, True),
+        (2, 1, False),
+        (3, 2, False),
+    ]
+
+
+def test_parse_of_a_book_with_no_numbered_titles_uses_position_numbers(tmp_path):
+    epub = tmp_path / "book.epub"
+    _spine_epub(epub, [("The Boy", 3), ("The Girl", 3), ("The Dog", 3)])
+
+    _, chapters = parse_epub(str(epub), cover_dir=str(tmp_path / "cover"))
+
+    assert [(c.index, c.number, c.front_matter) for c in chapters] == [
+        (1, 1, False),
+        (2, 2, False),
+        (3, 3, False),
+    ]

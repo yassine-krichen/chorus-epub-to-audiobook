@@ -15,7 +15,7 @@ export function ChapterCard({ index, chapter }: { index: number; chapter: Chapte
           // eslint-disable-next-line @next/next/no-img-element
           <img src={chapter.thumbnail_url ?? undefined} alt={chapter.title} className="h-full w-full object-cover" />
         ) : (
-          <span className="text-2xl text-muted-foreground">{index + 1}</span>
+          <span className="text-2xl text-muted-foreground">{chapter.number ?? index + 1}</span>
         )}
       </div>
       <p className="truncate text-xs text-muted-foreground" title={chapter.title}>

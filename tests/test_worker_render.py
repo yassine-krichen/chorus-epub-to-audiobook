@@ -17,6 +17,7 @@ from rich.console import Console
 
 from book2audio.config import Config
 from book2audio.db.models import Job, User
+from book2audio.epub import ParsedChapter
 from book2audio.models import BookMetadata, Chapter
 from book2audio.worker import render as render_module
 
@@ -107,6 +108,11 @@ def test_download_inputs_ignores_a_missing_resume_state_and_still_returns_the_ep
 # --- _set_total_chapters -------------------------------------------------
 
 
+def _parsed(count):
+    return [ParsedChapter(index=i, title=f"Chapter {i}") for i in range(1, count + 1)]
+
+
+
 def test_set_total_chapters_records_the_full_chapter_count_and_bumps_the_heartbeat(
     db_session, monkeypatch, tmp_path
 ):
@@ -114,7 +120,7 @@ def test_set_total_chapters_records_the_full_chapter_count_and_bumps_the_heartbe
     monkeypatch.setattr(
         render_module,
         "parse_epub",
-        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), [1, 2, 3])),
+        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), _parsed(3))),
     )
     config = Config(
         epub_path="book.epub", output_path=str(tmp_path / "book.m4b"), work_dir=str(tmp_path)
@@ -135,7 +141,7 @@ def test_set_total_chapters_caps_the_count_at_the_configured_chapter_limit(
     monkeypatch.setattr(
         render_module,
         "parse_epub",
-        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), [1, 2, 3, 4, 5])),
+        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), _parsed(5))),
     )
     config = Config(
         epub_path="book.epub",
@@ -157,7 +163,7 @@ def test_set_total_chapters_matches_selection_bounds_for_a_start_chapter_and_cha
     Config.selection_bounds rather than recomputing start_chapter/chapter_limit
     arithmetic itself -- these two have drifted apart once before."""
     job = _make_job(db_session)
-    parsed = list(range(20))  # a 20-chapter book; contents are irrelevant here
+    parsed = _parsed(20)  # a 20-chapter book; contents are irrelevant here
     monkeypatch.setattr(
         render_module,
         "parse_epub",
@@ -170,12 +176,37 @@ def test_set_total_chapters_matches_selection_bounds_for_a_start_chapter_and_cha
         start_chapter=10,
         chapter_limit=5,
     )
-    start_pos, end_pos = config.selection_bounds(len(parsed))
+    start_pos, end_pos = config.selection_bounds(parsed)
 
     render_module._set_total_chapters(job.id, config)
 
     db_session.refresh(job)
     assert job.total_chapters == end_pos - start_pos
+
+
+def test_set_total_chapters_does_not_count_a_skipped_synopsis_toward_the_chapter_limit(
+    db_session, monkeypatch, tmp_path
+):
+    job = _make_job(db_session)
+    parsed = [ParsedChapter(index=1, title="SYNOPSIS", number=0, front_matter=True)] + [
+        ParsedChapter(index=i + 1, title=f"Chapter {i}", number=i) for i in range(1, 21)
+    ]
+    monkeypatch.setattr(
+        render_module,
+        "parse_epub",
+        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), parsed)),
+    )
+    config = Config(
+        epub_path="book.epub",
+        output_path=str(tmp_path / "book.m4b"),
+        work_dir=str(tmp_path),
+        chapter_limit=10,
+    )
+
+    render_module._set_total_chapters(job.id, config)
+
+    db_session.refresh(job)
+    assert job.total_chapters == 10
 
 
 def test_set_total_chapters_does_not_raise_when_the_job_row_no_longer_exists(
@@ -184,7 +215,7 @@ def test_set_total_chapters_does_not_raise_when_the_job_row_no_longer_exists(
     monkeypatch.setattr(
         render_module,
         "parse_epub",
-        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), [1, 2])),
+        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), _parsed(2))),
     )
     config = Config(
         epub_path="book.epub", output_path=str(tmp_path / "book.m4b"), work_dir=str(tmp_path)
@@ -203,7 +234,7 @@ def _mock_common_deps(monkeypatch, base_on_chapter_done=None):
     monkeypatch.setattr(
         render_module,
         "parse_epub",
-        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), [1])),
+        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), _parsed(1))),
     )
     monkeypatch.setattr(
         render_module,
@@ -256,7 +287,7 @@ def test_render_job_requires_freellmapi_configured_when_thumbnails_are_enabled(
     monkeypatch.setattr(
         render_module,
         "parse_epub",
-        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), [1])),
+        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), _parsed(1))),
     )
     require_configured = MagicMock(side_effect=RuntimeError("FREELLMAPI_API_KEY not set"))
     monkeypatch.setattr(render_module, "require_freellmapi_configured", require_configured)
@@ -290,7 +321,7 @@ def test_render_job_requires_llm_attribution_configured_when_the_attributor_is_l
     monkeypatch.setattr(
         render_module,
         "parse_epub",
-        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), [1])),
+        MagicMock(return_value=(BookMetadata(title="My Book", author="A"), _parsed(1))),
     )
     require_configured = MagicMock(side_effect=RuntimeError("FREELLMAPI_API_KEY not set"))
     monkeypatch.setattr(render_module, "require_llm_attribution_configured", require_configured)

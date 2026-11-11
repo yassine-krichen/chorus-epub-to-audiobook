@@ -8,6 +8,7 @@ halfway through a 16-hour render.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Sequence
 
 from book2audio.assemble.music import MUSIC_PRESETS
 from book2audio.attribution.base import ATTRIBUTOR_MODES
@@ -17,6 +18,9 @@ from book2audio.tts.voices import (
     FEMALE_VOICES,
     MALE_VOICES,
 )
+
+if TYPE_CHECKING:
+    from book2audio.epub.numbering import Numbered
 
 # Every voice the engine can use, for validating overrides up front.
 _KNOWN_VOICES = frozenset(CHARACTER_VOICE_POOL) | {DEFAULT_NARRATOR_VOICE}
@@ -43,14 +47,19 @@ class Config:
     title_gap: float = 0.8
     chapter_gap: float = 1.8
 
-    # Optional cap on chapters, for quick previews (0 = whole book).
+    # Which chapters to render. Both settings use the book's own chapter
+    # numbers ("Chapter 7" is 7), not positions in the file; material before
+    # Chapter 1 (synopsis, info pages) is number 0.
+    #
+    # ``start_chapter``: None = automatic, start at the story's first chapter and
+    # skip front matter; 0 = include front matter; N = start at book chapter N.
+    # ``chapter_limit``: 0 = through the end of the book; otherwise render that
+    # many book numbers from the start, so ``start_chapter=1, chapter_limit=10``
+    # is Chapters 1 to 10. A kept prologue (number 0) is extra: it does not use
+    # up the limit. Books that do not number their chapters fall back to
+    # position numbering (1 = the first section).
     chapter_limit: int = 0
-
-    # 1-based chapter to start rendering from (matches ``Chapter.index``'s
-    # own 1-based convention), for resuming partway through a book or
-    # skipping front matter. ``chapter_limit`` counts from here, not from the
-    # book's beginning.
-    start_chapter: int = 1
+    start_chapter: int | None = None
 
     # Emit a playable .m4b every ``batch_size`` chapters so listening can start
     # long before the whole book finishes (0 = one file for the whole book).
@@ -112,8 +121,8 @@ class Config:
             raise ValueError("attribution_max_calls cannot be negative")
         if self.chapter_limit < 0:
             raise ValueError("chapter_limit cannot be negative")
-        if self.start_chapter < 1:
-            raise ValueError("start_chapter must be >= 1")
+        if self.start_chapter is not None and self.start_chapter < 0:
+            raise ValueError("start_chapter cannot be negative")
         if self.batch_size < 0:
             raise ValueError("batch_size cannot be negative")
         if self.chapter_gap < 0:
@@ -121,13 +130,35 @@ class Config:
         if not 0.0 <= self.music_volume <= 1.0:
             raise ValueError(f"music_volume must be between 0.0 and 1.0, got {self.music_volume}")
 
-    def selection_bounds(self, total: int) -> tuple[int, int]:
-        """0-based ``[start, end)`` slice bounds for a chapter list of length ``total``.
+    def selection_bounds(self, sections: Sequence[Numbered]) -> tuple[int, int]:
+        """0-based ``[start, end)`` slice bounds over ``sections`` (in reading order).
 
         Single source of truth for combining ``start_chapter`` and
         ``chapter_limit`` — both ``pipeline.py`` and ``worker/render.py`` must
         use this instead of recomputing the same arithmetic independently.
+        ``sections`` need ``number`` and ``front_matter`` (parsed or built
+        chapters). An empty slice means no chapter matches ``start_chapter``.
         """
-        start_pos = max(0, self.start_chapter - 1)
-        end_pos = start_pos + self.chapter_limit if self.chapter_limit > 0 else total
-        return start_pos, min(end_pos, total)
+        total = len(sections)
+        if self.start_chapter is None:
+            start_pos = next((i for i, s in enumerate(sections) if not s.front_matter), 0)
+        elif self.start_chapter == 0:
+            start_pos = 0
+        else:
+            start_pos = next(
+                (i for i, s in enumerate(sections) if s.number >= self.start_chapter), total
+            )
+        if start_pos >= total or self.chapter_limit == 0:
+            return start_pos, total
+
+        # Count from the first selected section's own number so a book with a
+        # gap at the requested start still yields chapter_limit chapters. A kept
+        # prologue (number 0, not front matter) does not use up the limit, so
+        # automatic start plus a limit of 10 is the prologue and Chapters 1 to 10.
+        first = sections[start_pos]
+        counted_from = first.number if first.front_matter else max(first.number, 1)
+        stop_number = counted_from + self.chapter_limit
+        end_pos = next(
+            (i for i in range(start_pos, total) if sections[i].number >= stop_number), total
+        )
+        return start_pos, end_pos

@@ -11,7 +11,7 @@ function validConfig() {
     speed: 1.0,
     bitrate: "128k",
     chapter_limit: 0,
-    start_chapter: 1,
+    start_chapter: null as number | null,
     batch_size: 1,
     chapter_gap: 0,
     music: false,
@@ -108,6 +108,31 @@ describe("jobConfigSchema", () => {
       ...validConfig(),
       chapter_limit: -1,
     });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a null start_chapter, meaning start automatically", () => {
+    const result = jobConfigSchema.safeParse({ ...validConfig(), start_chapter: null });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts start_chapter 0, meaning include front matter", () => {
+    const result = jobConfigSchema.safeParse({ ...validConfig(), start_chapter: 0 });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a positive start_chapter", () => {
+    const result = jobConfigSchema.safeParse({ ...validConfig(), start_chapter: 12 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a negative start_chapter", () => {
+    const result = jobConfigSchema.safeParse({ ...validConfig(), start_chapter: -1 });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a fractional start_chapter", () => {
+    const result = jobConfigSchema.safeParse({ ...validConfig(), start_chapter: 1.5 });
     expect(result.success).toBe(false);
   });
 

@@ -37,9 +37,20 @@ class Segment:
 
 @dataclass
 class Chapter:
-    index: int  # 1-based position in reading order
+    # 1-based position in reading order. This is the identity key for state.json,
+    # chapter wavs, storage keys and eval ids, so it never follows book numbering.
+    index: int
     title: str
     segments: list[Segment] = field(default_factory=list)
+    # The chapter number the book itself uses ("Chapter 7" -> 7, material before
+    # Chapter 1 -> 0). Negative means "unset": it then defaults to ``index``.
+    number: int = -1
+    # Synopsis, info pages and similar: skipped by default selection.
+    front_matter: bool = False
+
+    def __post_init__(self) -> None:
+        if self.number < 0:
+            self.number = self.index
 
     @property
     def word_count(self) -> int:

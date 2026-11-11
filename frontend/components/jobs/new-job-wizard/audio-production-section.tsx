@@ -101,15 +101,18 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
       <div className="flex flex-col gap-2">
         <Label htmlFor="start-chapter">Start at chapter</Label>
         <p className="text-xs text-muted-foreground">
-          Skip chapters before this one — e.g. resume partway through, or skip front matter your
-          EPUB didn&apos;t mark properly.
+          Leave empty and we start at the story&apos;s first chapter (synopsis and info pages are
+          skipped). Enter 0 to include them.
         </p>
         <Input
           id="start-chapter"
           type="number"
-          min={1}
-          value={config.start_chapter}
-          onChange={(event) => onChange({ start_chapter: Number(event.target.value) })}
+          min={0}
+          placeholder="Automatic"
+          value={config.start_chapter ?? ""}
+          onChange={(event) =>
+            onChange({ start_chapter: event.target.value === "" ? null : Number(event.target.value) })
+          }
         />
       </div>
 

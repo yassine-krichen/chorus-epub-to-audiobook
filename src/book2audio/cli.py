@@ -14,11 +14,14 @@ import re
 import sys
 
 from rich.console import Console
+from rich.markup import escape
+from rich.table import Table
 
 from book2audio.assemble.music import MUSIC_PRESETS
 from book2audio.attribution import ATTRIBUTOR_MODES, require_llm_attribution_configured
 from book2audio.config import Config
 from book2audio.images.freellmapi import require_freellmapi_configured
+from book2audio.models import Book
 from book2audio.pipeline import Pipeline
 
 
@@ -52,14 +55,25 @@ def _build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--speed", type=float, default=1.0, help="Speaking speed (0.5–2.0)")
     gen.add_argument("--bitrate", default="64k", help="AAC bitrate for the .m4b")
     gen.add_argument(
-        "--limit", type=int, default=0, metavar="N", help="Only render the first N chapters"
+        "--limit",
+        type=int,
+        default=0,
+        metavar="N",
+        help=(
+            "Only render N chapters, counted in the book's chapter numbers from the start "
+            "(--limit 10 renders Chapters 1 to 10; a prologue before Chapter 1 comes extra)"
+        ),
     )
     gen.add_argument(
         "--start-chapter",
         type=int,
-        default=1,
+        default=None,
         metavar="N",
-        help="1-based chapter to start rendering from (default: 1)",
+        help=(
+            "Book chapter number to start from. Default: automatic, the story's first chapter "
+            "(synopsis and info pages are skipped). 0 includes them. Use --dry-run to see the "
+            "numbers"
+        ),
     )
     gen.add_argument(
         "--batch",
@@ -196,11 +210,41 @@ def _dry_run(pipeline: Pipeline, console: Console) -> None:
     pipeline.config.validate()
     book = pipeline._load_and_prepare(estimate_only=True)
     cast = pipeline._cast_voices(book)
+    # Printed before selecting so a start_chapter that matches nothing still
+    # shows the numbers the book does have.
+    _print_chapter_table(book, pipeline.config, console)
     selected = pipeline._select_chapters(book)
     pipeline._report_plan(book, selected, cast)
     console.print("\n[bold]Full cast:[/bold]")
     for name, voice in cast.as_dict().items():
         console.print(f"  {name:<24} {voice}")
+
+
+def _print_chapter_table(book: Book, config: Config, console: Console) -> None:
+    """Show how the book was numbered and which chapters this run would render."""
+    start_pos, end_pos = config.selection_bounds(book.chapters)
+    table = Table(title="Chapters")
+    table.add_column("Number", justify="right")
+    table.add_column("Title")
+    table.add_column("Words", justify="right")
+    table.add_column("Front matter")
+    table.add_column("Selected")
+    # Rows after the selection are summarised below the table: a 100-chapter
+    # book would otherwise bury the part the user is checking.
+    shown = book.chapters[: max(end_pos, start_pos)]
+    for position, chapter in enumerate(shown):
+        selected = start_pos <= position < end_pos
+        table.add_row(
+            str(chapter.number),
+            escape(chapter.title),
+            f"{chapter.word_count:,}",
+            "yes" if chapter.front_matter else "",
+            "yes" if selected else "",
+        )
+    console.print(table)
+    remaining = len(book.chapters) - len(shown)
+    if remaining:
+        console.print(f"[dim]... and {remaining} more section(s) after the selection[/dim]")
 
 
 def _parse_overrides(raw: list[str]) -> dict[str, str]:

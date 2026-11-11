@@ -73,10 +73,36 @@ def _pipeline_with_start_chapter(tmp_path, start_chapter):
 def test_select_chapters_selects_from_start_chapter_to_the_books_end(tmp_path):
     p = _pipeline_with_start_chapter(tmp_path, start_chapter=3)
     selected = p._select_chapters(_book(5))
-    assert [c.index for c in selected] == [3, 4, 5]
+    assert [c.number for c in selected] == [3, 4, 5]
 
 
-def test_select_chapters_raises_when_start_chapter_is_beyond_the_books_chapter_count(tmp_path):
+def test_select_chapters_raises_naming_the_available_numbers_when_nothing_matches(tmp_path):
     p = _pipeline_with_start_chapter(tmp_path, start_chapter=10)
-    with pytest.raises(ValueError, match=r"start_chapter=10 is beyond this book's 5 chapter"):
+    with pytest.raises(ValueError, match=r"start_chapter=10 matches no chapter.*numbered 1 to 5"):
         p._select_chapters(_book(5))
+
+
+def _book_with_synopsis(n):
+    synopsis = Chapter(index=1, title="SYNOPSIS", number=0, front_matter=True)
+    chapters = [Chapter(index=i + 1, title=f"Chapter {i}", number=i) for i in range(1, n + 1)]
+    return Book(metadata=BookMetadata(title="Book", author="Author"), chapters=[synopsis, *chapters])
+
+
+def test_select_chapters_skips_the_synopsis_by_default_and_keeps_index_as_identity(tmp_path):
+    p = _pipeline_with_start_chapter(tmp_path, start_chapter=None)
+    p.config.chapter_limit = 3
+    selected = p._select_chapters(_book_with_synopsis(10))
+    assert [(c.number, c.index) for c in selected] == [(1, 2), (2, 3), (3, 4)]
+
+
+def test_select_chapters_includes_the_synopsis_when_start_chapter_is_zero(tmp_path):
+    p = _pipeline_with_start_chapter(tmp_path, start_chapter=0)
+    selected = p._select_chapters(_book_with_synopsis(3))
+    assert [c.title for c in selected] == ["SYNOPSIS", "Chapter 1", "Chapter 2", "Chapter 3"]
+
+
+def test_part_metadata_labels_chapters_with_book_numbers(tmp_path):
+    book = _book_with_synopsis(10)
+    batch = book.chapters[1:4]
+    meta = Pipeline._part_metadata(book.metadata, single=False, part_no=1, batch=batch)
+    assert meta.title.endswith("Part 1 (Ch 1-3)")

@@ -1076,8 +1076,12 @@ def _patch_parsed_book(monkeypatch):
     from book2audio.models import BookMetadata
 
     parsed = [
-        ParsedChapter(index=1, title="One", paragraphs=["Rain fell.", '"Hello there."']),
-        ParsedChapter(index=2, title="Two", paragraphs=["Wind blew.", '"Anyone home?"']),
+        ParsedChapter(
+            index=1, title="One", number=1, paragraphs=["Rain fell.", '"Hello there."']
+        ),
+        ParsedChapter(
+            index=2, title="Two", number=2, paragraphs=["Wind blew.", '"Anyone home?"']
+        ),
     ]
     monkeypatch.setattr(
         pipeline_module, "parse_epub", lambda *a, **kw: (BookMetadata("T", "A"), parsed)

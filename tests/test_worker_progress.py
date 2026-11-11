@@ -50,8 +50,19 @@ def test_on_chapter_done_records_the_chapter_as_done_and_bumps_the_heartbeat(db_
     on_chapter_done(_chapter(index=1, title="Chapter One"))
 
     db_session.refresh(job)
-    assert job.chapters == [{"index": 1, "title": "Chapter One", "status": "done"}]
+    assert job.chapters == [{"index": 1, "number": 1, "title": "Chapter One", "status": "done"}]
     assert job.last_heartbeat_at is not None
+
+
+def test_on_chapter_done_records_the_book_number_separately_from_the_index(db_session):
+    job = _make_job(db_session)
+    on_chapter_done, _ = build_progress_hooks(job.id, "/tmp/work", "jobs/1")
+
+    # Index 2 because a synopsis precedes it; the book calls it chapter 1.
+    on_chapter_done(Chapter(index=2, title="Chapter 1: Start", number=1))
+
+    db_session.refresh(job)
+    assert (job.chapters[0]["index"], job.chapters[0]["number"]) == (2, 1)
 
 
 def test_on_chapter_done_upserts_by_index_and_keeps_the_list_sorted(db_session):
@@ -71,7 +82,7 @@ def test_on_chapter_done_replaces_a_re_rendered_chapters_entry_instead_of_duplic
     on_chapter_done(_chapter(index=1, title="New Title"))
 
     db_session.refresh(job)
-    assert job.chapters == [{"index": 1, "title": "New Title", "status": "done"}]
+    assert job.chapters == [{"index": 1, "number": 1, "title": "New Title", "status": "done"}]
 
 
 def test_on_chapter_done_is_a_no_op_when_the_job_row_no_longer_exists(db_session):
@@ -95,6 +106,9 @@ def test_on_part_ready_uploads_the_part_and_records_it_on_the_job(db_session, mo
             "part_number": 1,
             "first_index": 1,
             "last_index": 2,
+            "first_number": 1,
+            "last_number": 2,
+            "first_title": "One",
             "r2_key": "jobs/1/part-01.m4b",
             "status": "done",
         }
@@ -174,8 +188,8 @@ def test_on_chapter_done_with_thumbnails_disabled_by_default_omits_all_thumbnail
     on_chapter_done(_chapter(index=1, title="One"))
 
     db_session.refresh(job)
-    assert job.chapters == [{"index": 1, "title": "One", "status": "done"}]
-    assert set(job.chapters[0].keys()) == {"index", "title", "status"}
+    assert job.chapters == [{"index": 1, "number": 1, "title": "One", "status": "done"}]
+    assert set(job.chapters[0].keys()) == {"index", "number", "title", "status"}
 
 
 def test_on_chapter_done_with_thumbnails_enabled_generates_and_uploads_a_new_thumbnail(

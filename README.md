@@ -132,7 +132,9 @@ book2audio generate <epub> [options]
       --male-voice VOICE / --female-voice VOICE
       --speed FLOAT       0.5-2.0 (default 1.0)
       --bitrate STR       AAC bitrate (default 64k)
-      --limit N           Only render the first N chapters
+      --start-chapter N   Book chapter to start at (default: the story's first chapter;
+                          0 = include synopsis/info pages)
+      --limit N           Render N chapters, counted in book chapter numbers
       --batch N           Playable .m4b every N chapters (default 10; 0 = one file)
       --chapter-gap SEC   Pause between chapters (default 1.8)
       --no-music / --music-volume 0-1 / --music-preset ambient|drone|rain
@@ -148,6 +150,18 @@ book2audio generate <epub> [options]
 ```
 
 Run `--dry-run` first to see detected character names, then pin voices with `--voice NAME=VOICE`. Kokoro voice ids follow `<accent><gender>_<name>`, for example `am_michael` or `bf_emma`; the pool lives in `src/book2audio/tts/voices.py`.
+
+### Choosing chapters
+
+Chapters are counted the way the book counts them: `Chapter 7` is 7, whatever its position in the EPUB. Pages before Chapter 1 (a synopsis, description, introduction, foreword, preface, note or info page) are number 0 and flagged as front matter; a real prologue also gets 0 but is kept.
+
+- By default rendering starts at the story's first chapter and skips front matter.
+- `--start-chapter 0` includes front matter, `--start-chapter N` starts at book chapter N.
+- `--limit N` renders N chapters from the start, so the defaults plus `--limit 10` give Chapters 1 to 10. A prologue before Chapter 1 is rendered too and does not use up the limit.
+- A book whose titles are not "Chapter N" (or that numbers them oddly) falls back to counting sections by position, with nothing skipped.
+- `--dry-run` prints a table of every section up to the end of the selection (number, title, words, front matter, selected). If no chapter matches, the error lists the numbers the book has.
+
+Internally each chapter keeps its position in the EPUB as its identity (resume state, audio files, storage keys); only the labels and the selection use book numbers. The hosted API takes the same `start_chapter` (omit it for automatic). See `docs/features/chapter-selection.md` for the full flow.
 
 ### LLM speaker attribution
 

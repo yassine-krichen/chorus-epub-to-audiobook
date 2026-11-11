@@ -283,6 +283,7 @@ def _to_chapter_progress(chapter: dict, job: Job) -> ChapterProgress:
         thumbnail_url = presign_get(chapter["thumbnail_r2_key"])
     return ChapterProgress(
         index=chapter["index"],
+        number=chapter.get("number"),
         title=chapter["title"],
         status=chapter["status"],
         thumbnail_status=chapter.get("thumbnail_status"),

@@ -18,18 +18,18 @@ interface Batch {
 }
 
 /** Mirrors ``pipeline.py::_plan_batches``: the ``totalChapters`` selected
- * chapters (which start at absolute chapter number ``startChapter``, per
- * ``config.start_chapter``) grouped into batches of ``batchSize`` (1-indexed
- * batch boundaries expressed as absolute numbers, matching ``chapters[].index``).
- * ``batchSize <= 0`` (or a size covering everything) yields a single batch. */
-function planBatches(totalChapters: number, batchSize: number, startChapter: number): Batch[] {
+ * chapters grouped into batches of ``batchSize``, expressed as 1-based
+ * positions within the selection (not book chapter numbers, which depend on
+ * where the book starts). ``batchSize <= 0`` (or a size covering everything)
+ * yields a single batch. */
+function planBatches(totalChapters: number, batchSize: number): Batch[] {
   if (batchSize <= 0 || batchSize >= totalChapters) {
-    return [{ partNumber: 1, firstIndex: startChapter, lastIndex: startChapter + totalChapters - 1 }];
+    return [{ partNumber: 1, firstIndex: 1, lastIndex: totalChapters }];
   }
   const batches: Batch[] = [];
   for (let start = 0; start < totalChapters; start += batchSize) {
-    const lastIndex = startChapter + Math.min(start + batchSize, totalChapters) - 1;
-    batches.push({ partNumber: batches.length + 1, firstIndex: startChapter + start, lastIndex });
+    const lastIndex = Math.min(start + batchSize, totalChapters);
+    batches.push({ partNumber: batches.length + 1, firstIndex: start + 1, lastIndex });
   }
   return batches;
 }
@@ -47,10 +47,11 @@ export function deriveRenderStage(job: JobDetail): RenderStage {
     return { kind: "casting-voices" };
   }
 
-  const startChapter = job.config.start_chapter ?? 1;
   const totalChapters = job.total_chapters;
-  const nextChapterNumber = startChapter + job.chapters.length;
-  const batches = planBatches(totalChapters, job.config.batch_size, startChapter);
+  // Position within the selection, so "chapter 3 of 10" holds whatever the
+  // start_chapter setting is.
+  const nextChapterNumber = job.chapters.length + 1;
+  const batches = planBatches(totalChapters, job.config.batch_size);
   const currentBatch =
     batches.find((batch) => nextChapterNumber <= batch.lastIndex) ?? batches[batches.length - 1];
 

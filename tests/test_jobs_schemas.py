@@ -99,3 +99,30 @@ def test_job_config_accepts_every_known_attributor(mode):
 def test_job_config_rejects_an_unknown_attributor():
     with pytest.raises(ValidationError, match="Unknown attributor"):
         JobConfig(attributor="gpt")
+
+
+# --- start_chapter ----------------------------------------------------------
+
+
+def test_job_config_defaults_start_chapter_to_automatic():
+    assert JobConfig().start_chapter is None
+
+
+@pytest.mark.parametrize("value", [0, 1, 250])
+def test_job_config_accepts_zero_and_positive_start_chapters(value):
+    assert JobConfig(start_chapter=value).start_chapter == value
+
+
+def test_job_config_rejects_a_negative_start_chapter():
+    with pytest.raises(ValidationError, match="start_chapter must be >= 0"):
+        JobConfig(start_chapter=-1)
+
+
+def test_chapter_and_part_progress_load_from_jobs_stored_before_numbering_existed():
+    from book2audio.api.jobs.schemas import ChapterProgress, PartProgress
+
+    chapter = ChapterProgress(index=1, title="One", status="done")
+    part = PartProgress(part_number=1, first_index=1, last_index=2, r2_key="k", status="done")
+
+    assert chapter.number is None
+    assert (part.first_number, part.last_number, part.first_title) == (None, None, None)

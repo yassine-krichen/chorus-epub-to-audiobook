@@ -356,3 +356,54 @@ def test_a_present_api_key_is_never_echoed_when_another_variable_is_missing(
     assert exit_code == 1
     assert "FREELLMAPI_BASE_URL" in captured.out
     assert fake_key not in captured.out + captured.err
+
+
+# --- chapter selection ---------------------------------------------------------
+
+
+def test_parser_defaults_start_chapter_to_automatic():
+    args = _build_parser().parse_args(["generate", "book.epub"])
+    assert args.start_chapter is None
+
+
+def test_parser_accepts_start_chapter_zero_to_include_front_matter():
+    args = _build_parser().parse_args(["generate", "book.epub", "--start-chapter", "0"])
+    assert args.start_chapter == 0
+
+
+def test_dry_run_prints_the_chapter_table_with_numbers_and_selection(epub, tmp_path, capsys):
+    exit_code = main(_generate_argv(epub, tmp_path, "--limit", "1"))
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Number" in out and "Front matter" in out and "Selected" in out
+    assert "Chapter 1: The Start" in out
+
+
+def test_dry_run_with_a_start_chapter_that_matches_nothing_names_the_available_numbers(
+    epub, tmp_path, capsys
+):
+    exit_code = main(_generate_argv(epub, tmp_path, "--start-chapter", "50"))
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "start_chapter=50 matches no chapter" in out
+    assert "numbered 1 to 1" in out
+
+
+def test_dry_run_table_prints_titles_with_square_brackets_literally(tmp_path, capsys):
+    path = tmp_path / "brackets.epub"
+    # Same book as the fixture, but the chapter title reads as rich markup.
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+        zf.writestr("META-INF/container.xml", _CONTAINER)
+        zf.writestr("OEBPS/content.opf", _OPF)
+        zf.writestr(
+            "OEBPS/Text/ch1.xhtml", _CH1.replace("Chapter 1: The Start", "Chapter 1: [/] [red]Odd[/]")
+        )
+        zf.writestr("OEBPS/Text/cover.xhtml", _COVER)
+
+    exit_code = main(_generate_argv(str(path), tmp_path))
+
+    assert exit_code == 0
+    assert "[/] [red]Odd[/]" in capsys.readouterr().out

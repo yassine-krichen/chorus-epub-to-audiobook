@@ -83,7 +83,13 @@ def build_heartbeat(job_id: uuid.UUID) -> Callable[[], None]:
 
 
 def _upsert_chapter(chapters: list[dict], chapter: Chapter, thumbnail_fields: dict) -> list[dict]:
-    entry = {"index": chapter.index, "title": chapter.title, "status": "done", **thumbnail_fields}
+    entry = {
+        "index": chapter.index,
+        "number": chapter.number,
+        "title": chapter.title,
+        "status": "done",
+        **thumbnail_fields,
+    }
     updated = [c for c in chapters if c.get("index") != chapter.index]
     updated.append(entry)
     updated.sort(key=lambda c: c["index"])
@@ -131,6 +137,9 @@ def _upsert_part(
         "part_number": part_no,
         "first_index": batch[0].index,
         "last_index": batch[-1].index,
+        "first_number": batch[0].number,
+        "last_number": batch[-1].number,
+        "first_title": batch[0].title,
         "r2_key": r2_key,
         "status": "done",
     }

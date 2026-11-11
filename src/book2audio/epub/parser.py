@@ -17,6 +17,7 @@ from xml.etree import ElementTree as ET
 
 from bs4 import BeautifulSoup
 
+from book2audio.epub.numbering import assign_book_numbers
 from book2audio.models import BookMetadata
 
 logger = logging.getLogger(__name__)
@@ -47,11 +48,19 @@ class ParsedChapter:
     """A chapter as it comes out of the EPUB: a title and raw paragraphs.
 
     Segmentation into narration/dialogue happens later, in the text stage.
+    ``index`` is the 1-based position in reading order; ``number`` is the
+    chapter number the book uses (negative = unset, defaults to ``index``).
     """
 
     index: int
     title: str
     paragraphs: list[str] = field(default_factory=list)
+    number: int = -1
+    front_matter: bool = False
+
+    def __post_init__(self) -> None:
+        if self.number < 0:
+            self.number = self.index
 
 
 @dataclass
@@ -109,6 +118,13 @@ def parse_epub(epub_path: str, cover_dir: str) -> tuple[BookMetadata, list[Parse
 
     if not chapters:
         raise ValueError(f"No narratable chapters found in {epub_path!r}")
+
+    numbering = assign_book_numbers(
+        [c.title for c in chapters], [sum(len(p.split()) for p in c.paragraphs) for c in chapters]
+    )
+    for chapter, (number, front_matter) in zip(chapters, numbering):
+        chapter.number = number
+        chapter.front_matter = front_matter
     return metadata, chapters
 
 

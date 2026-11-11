@@ -38,7 +38,8 @@ class JobConfig(BaseModel):
     speed: float = 1.0
     bitrate: str = "64k"
     chapter_limit: int = 0
-    start_chapter: int = 1
+    # None = automatic (skip front matter), 0 = include front matter, N = book chapter N.
+    start_chapter: int | None = None
     batch_size: int = 10
     chapter_gap: float = 1.8
     music: bool = True
@@ -67,9 +68,9 @@ class JobConfig(BaseModel):
 
     @field_validator("start_chapter")
     @classmethod
-    def _validate_start_chapter(cls, value: int) -> int:
-        if value < 1:
-            raise ValueError(f"start_chapter must be >= 1, got {value}")
+    def _validate_start_chapter(cls, value: int | None) -> int | None:
+        if value is not None and value < 0:
+            raise ValueError(f"start_chapter must be >= 0, got {value}")
         return value
 
     @field_validator("male_voice")
@@ -113,6 +114,8 @@ class CreateJobResponse(BaseModel):
 
 class ChapterProgress(BaseModel):
     index: int
+    # The book's own chapter number; absent on jobs rendered before numbering existed.
+    number: int | None = None
     title: str
     status: str
     thumbnail_status: str | None = None
@@ -123,6 +126,9 @@ class PartProgress(BaseModel):
     part_number: int
     first_index: int
     last_index: int
+    first_number: int | None = None
+    last_number: int | None = None
+    first_title: str | None = None
     r2_key: str
     status: str
     download_url: str | None = None

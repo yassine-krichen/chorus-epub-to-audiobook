@@ -10,7 +10,9 @@ export interface JobConfig {
   speed: number;
   bitrate: string;
   chapter_limit: number;
-  start_chapter: number;
+  /** null = automatic (start at the story's first chapter), 0 = include front matter,
+   * N = start at the book's chapter N. */
+  start_chapter: number | null;
   batch_size: number;
   chapter_gap: number;
   music: boolean;
@@ -32,7 +34,7 @@ export const DEFAULT_JOB_CONFIG: JobConfig = {
   speed: 1.0,
   bitrate: "64k",
   chapter_limit: 0,
-  start_chapter: 1,
+  start_chapter: null,
   batch_size: 10,
   chapter_gap: 1.8,
   music: true,
@@ -48,6 +50,8 @@ export const DEFAULT_JOB_CONFIG: JobConfig = {
 
 export interface ChapterProgress {
   index: number;
+  /** The book's own chapter number; absent on jobs rendered before numbering existed. */
+  number?: number | null;
   title: string;
   status: string;
   thumbnail_status: "ready" | "failed" | null;
@@ -58,6 +62,9 @@ export interface PartProgress {
   part_number: number;
   first_index: number;
   last_index: number;
+  first_number?: number | null;
+  last_number?: number | null;
+  first_title?: string | null;
   r2_key: string;
   status: string;
   download_url: string | null;
