@@ -6,6 +6,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { VoicePicker } from "@/components/voices/voice-picker";
@@ -15,6 +16,12 @@ import {
   isAiSpeakerDetection,
   voiceModePatch,
 } from "@/lib/jobs/ai-speaker-detection";
+import {
+  listCharacterOverrides,
+  removeCharacterOverride,
+  setCharacterOverride,
+  type OverrideGender,
+} from "@/lib/jobs/character-overrides";
 import type { JobConfig } from "@/types/job";
 
 interface VoiceCastingSectionProps {
@@ -22,10 +29,23 @@ interface VoiceCastingSectionProps {
   onChange: (patch: Partial<JobConfig>) => void;
 }
 
+const GENDER_NOT_SET = "not-set";
+const GENDER_CHOICES: Record<string, string> = {
+  [GENDER_NOT_SET]: "Work it out from the text",
+  m: "Male",
+  f: "Female",
+};
+
+function genderChoice(value: string | null): OverrideGender | null {
+  return value === "m" || value === "f" ? value : null;
+}
+
 export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionProps) {
   const { data: voices, isLoading } = useVoices();
   const [overrideName, setOverrideName] = useState("");
+  const [overrideGender, setOverrideGender] = useState<string>(GENDER_NOT_SET);
   const [overrideVoice, setOverrideVoice] = useState<string | null>(null);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
 
   if (isLoading || !voices) {
     return (
@@ -39,22 +59,23 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
 
   const maleVoices = voices.voices.filter((v) => v.gender === "male" && !v.is_default_narrator);
   const femaleVoices = voices.voices.filter((v) => v.gender === "female" && !v.is_default_narrator);
-  const overrides = Object.entries(config.voice_overrides);
+  const overrides = listCharacterOverrides(config);
   const narratorOnly = config.voice_mode === "narrator_only";
 
   function addOverride() {
-    if (!overrideName.trim() || !overrideVoice) return;
-    onChange({
-      voice_overrides: { ...config.voice_overrides, [overrideName.trim()]: overrideVoice },
+    const result = setCharacterOverride(config, overrideName, {
+      gender: genderChoice(overrideGender),
+      voice: overrideVoice,
     });
+    if (!result.ok) {
+      setOverrideError(result.error);
+      return;
+    }
+    onChange(result.patch);
     setOverrideName("");
+    setOverrideGender(GENDER_NOT_SET);
     setOverrideVoice(null);
-  }
-
-  function removeOverride(name: string) {
-    const next = { ...config.voice_overrides };
-    delete next[name];
-    onChange({ voice_overrides: next });
+    setOverrideError(null);
   }
 
   return (
@@ -129,24 +150,39 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
       {!narratorOnly && (
       <Accordion>
         <AccordionItem value="advanced">
-          <AccordionTrigger>Advanced: per-character voice overrides</AccordionTrigger>
+          <AccordionTrigger>Advanced: fix a character&apos;s gender or voice</AccordionTrigger>
           <AccordionContent>
             <div className="flex flex-col gap-3">
+              <p className="text-xs text-muted-foreground">
+                Know a character the app might get wrong? Say their gender and we will give them a
+                matching voice, or pick one voice for them. Use the name as the book spells it.
+              </p>
               {overrides.length > 0 && (
                 <ul className="flex flex-col gap-2">
-                  {overrides.map(([name, voiceId]) => (
-                    <li key={name} className="flex items-center justify-between gap-2 text-sm">
+                  {overrides.map((row) => (
+                    <li key={row.name} className="flex items-center justify-between gap-2 text-sm">
                       <span>
-                        {name} → <span className="font-mono">{voiceId}</span>
+                        {row.name}
+                        {row.gender && <> · {row.gender === "f" ? "female" : "male"}</>}
+                        {row.voice && (
+                          <>
+                            {" "}
+                            → <span className="font-mono">{row.voice}</span>
+                          </>
+                        )}
                       </span>
-                      <Button variant="ghost" size="sm" onClick={() => removeOverride(name)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onChange(removeCharacterOverride(config, row.name))}
+                      >
                         Remove
                       </Button>
                     </li>
                   ))}
                 </ul>
               )}
-              <div className="flex items-end gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                 <div className="flex flex-1 flex-col gap-1.5">
                   <Label htmlFor="override-name">Character name</Label>
                   <Input
@@ -156,13 +192,38 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
                   />
                 </div>
                 <div className="flex flex-1 flex-col gap-1.5">
+                  <Label>Gender</Label>
+                  <Select
+                    value={overrideGender}
+                    onValueChange={(value) => setOverrideGender(value ?? GENDER_NOT_SET)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(GENDER_CHOICES).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-1 flex-col gap-1.5">
                   <Label>Voice</Label>
-                  <VoicePicker voices={voices.voices} value={overrideVoice} onChange={setOverrideVoice} />
+                  <VoicePicker
+                    voices={voices.voices}
+                    value={overrideVoice}
+                    onChange={setOverrideVoice}
+                    allowNoPreference
+                    placeholder="Pick one for me"
+                  />
                 </div>
                 <Button type="button" variant="outline" onClick={addOverride}>
                   Add
                 </Button>
               </div>
+              {overrideError && <p className="text-xs text-destructive">{overrideError}</p>}
             </div>
           </AccordionContent>
         </AccordionItem>

@@ -255,4 +255,39 @@ describe("jobConfigSchema smarter thumbnails", () => {
     const result = jobConfigSchema.safeParse(validConfig());
     expect(result.success && result.data.thumbnails_enhanced).toBe(false);
   });
+
+  it("defaults gender overrides to none when the field is missing", () => {
+    const result = jobConfigSchema.safeParse(validConfig());
+    expect(result.success && result.data.gender_overrides).toEqual({});
+  });
+
+  it("accepts gender overrides of m and f", () => {
+    const result = jobConfigSchema.safeParse({
+      ...validConfig(),
+      gender_overrides: { Cassie: "f", Kai: "m" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a gender override that is not m or f", () => {
+    const result = jobConfigSchema.safeParse({
+      ...validConfig(),
+      gender_overrides: { Cassie: "x" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a gender override with an over-long name", () => {
+    const result = jobConfigSchema.safeParse({
+      ...validConfig(),
+      gender_overrides: { ["x".repeat(81)]: "f" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects more than 100 gender overrides", () => {
+    const many = Object.fromEntries(Array.from({ length: 101 }, (_, i) => [`Name ${i}`, "m"]));
+    const result = jobConfigSchema.safeParse({ ...validConfig(), gender_overrides: many });
+    expect(result.success).toBe(false);
+  });
 });

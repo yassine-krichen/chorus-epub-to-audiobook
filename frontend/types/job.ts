@@ -15,6 +15,8 @@ export interface JobConfig {
   attributor: Attributor;
   narrator_voice: string | null;
   voice_overrides: Record<string, string>;
+  /** Character name -> "m" or "f". The user's word beats what the app works out from the text. */
+  gender_overrides: Record<string, "m" | "f">;
   male_voice: string | null;
   female_voice: string | null;
   speed: number;
@@ -43,6 +45,7 @@ export const DEFAULT_JOB_CONFIG: JobConfig = {
   attributor: "heuristic",
   narrator_voice: null,
   voice_overrides: {},
+  gender_overrides: {},
   male_voice: null,
   female_voice: null,
   speed: 1.0,

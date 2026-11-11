@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { MUSIC_PRESETS } from "@/lib/constants/music-presets";
+import { MAX_CHARACTER_NAME_LENGTH, MAX_CHARACTER_OVERRIDES } from "@/lib/jobs/character-overrides";
 import {
   MAX_FILENAME_TEMPLATE_LENGTH,
   validateFilenameTemplate,
@@ -8,7 +9,7 @@ import {
 
 /**
  * Client-side shape/UX validation for the new-job form. Only
- * voice_mode, attributor, male_voice/female_voice, music_preset, filename_template, batch_size (>= 0),
+ * voice_mode, attributor, gender_overrides, male_voice/female_voice, music_preset, filename_template, batch_size (>= 0),
  * thumbnails_enhanced-needs-thumbnails and
  * the {chapter_title}-needs-one-file-per-chapter rule are actually
  * enforced server-side (see book2audio.api.jobs.schemas.JobConfig) — the
@@ -20,6 +21,12 @@ export const jobConfigSchema = z.object({
   attributor: z.enum(["heuristic", "hybrid"]).default("heuristic"),
   narrator_voice: z.string().nullable(),
   voice_overrides: z.record(z.string(), z.string()),
+  gender_overrides: z
+    .record(z.string().min(1).max(MAX_CHARACTER_NAME_LENGTH), z.enum(["m", "f"]))
+    .refine((overrides) => Object.keys(overrides).length <= MAX_CHARACTER_OVERRIDES, {
+      message: `At most ${MAX_CHARACTER_OVERRIDES} characters can be set`,
+    })
+    .default({}),
   male_voice: z.string().nullable(),
   female_voice: z.string().nullable(),
   speed: z.number().min(0.5).max(2.0),

@@ -23,3 +23,11 @@ def test_build_config_propagates_thumbnails_true_from_the_persisted_job_config()
     config = _build_config("book.epub", "/tmp/scratch", {"thumbnails": True})
 
     assert config.thumbnails is True
+
+
+def test_build_config_propagates_gender_overrides_from_the_wizard():
+    config = _build_config(
+        "book.epub", "/tmp/scratch", {"gender_overrides": {"Cassie": "f"}, "voice_overrides": {}}
+    )
+
+    assert config.gender_overrides == {"Cassie": "f"}
