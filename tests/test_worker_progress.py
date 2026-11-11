@@ -221,7 +221,7 @@ def test_on_chapter_done_reuses_the_cached_thumbnail_when_content_hash_is_unchan
     db_session, monkeypatch
 ):
     chapter = _chapter(index=1, title="One")
-    stable_hash = chapter_content_hash(chapter)
+    stable_hash = chapter_content_hash(chapter, "Book")
     job = _make_job(
         db_session,
         chapters=[
@@ -284,6 +284,56 @@ def test_on_chapter_done_regenerates_the_thumbnail_when_content_hash_changed(
     entry = job.chapters[0]
     assert entry["thumbnail_status"] == "ready"
     assert entry["thumbnail_hash"] != "stale-hash"
+
+
+def test_on_chapter_done_regenerates_the_thumbnail_when_only_the_book_title_changed(
+    db_session, monkeypatch
+):
+    chapter = _chapter(index=1, title="One")
+    job = _make_job(
+        db_session,
+        chapters=[
+            {
+                "index": 1,
+                "title": "One",
+                "status": "done",
+                "thumbnail_r2_key": "jobs/1/thumbnails/chapter-0001.png",
+                "thumbnail_hash": chapter_content_hash(chapter, "Old Book"),
+                "thumbnail_status": "ready",
+            }
+        ],
+    )
+    generate_thumbnail = MagicMock(return_value=b"new-bytes")
+    monkeypatch.setattr(progress_module, "try_generate_thumbnail", generate_thumbnail)
+    monkeypatch.setattr(progress_module, "upload_bytes", MagicMock())
+    on_chapter_done, _ = build_progress_hooks(
+        job.id, "/tmp/work", "jobs/1", thumbnails_enabled=True, book_title="New Book"
+    )
+
+    on_chapter_done(chapter)
+
+    generate_thumbnail.assert_called_once()
+
+
+def test_on_chapter_done_uploads_a_jpeg_thumbnail_with_a_jpg_key_and_jpeg_content_type(
+    db_session, monkeypatch
+):
+    jpeg = bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"jpeg-body"
+    upload_bytes = MagicMock()
+    monkeypatch.setattr(progress_module, "upload_bytes", upload_bytes)
+    monkeypatch.setattr(progress_module, "try_generate_thumbnail", MagicMock(return_value=jpeg))
+    job = _make_job(db_session)
+    on_chapter_done, _ = build_progress_hooks(
+        job.id, "/tmp/work", "jobs/1", thumbnails_enabled=True, book_title="Book"
+    )
+
+    on_chapter_done(_chapter(index=1, title="One"))
+
+    db_session.refresh(job)
+    assert job.chapters[0]["thumbnail_r2_key"] == "jobs/1/thumbnails/chapter-0001.jpg"
+    upload_bytes.assert_called_once_with(
+        jpeg, "jobs/1/thumbnails/chapter-0001.jpg", content_type="image/jpeg"
+    )
 
 
 def test_on_chapter_done_records_failed_status_and_does_not_raise_when_generation_returns_none(

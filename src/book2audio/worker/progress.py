@@ -15,7 +15,11 @@ from typing import Callable
 
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
-from book2audio.images.thumbnails import chapter_content_hash, try_generate_thumbnail
+from book2audio.images.thumbnails import (
+    chapter_content_hash,
+    image_file_type,
+    try_generate_thumbnail,
+)
 from book2audio.models import Chapter
 from book2audio.storage.r2 import upload_bytes, upload_file
 
@@ -105,7 +109,7 @@ def _thumbnail_fields(
     ``thumbnail_status="failed"`` and the chapter still ends up "done".
     """
     try:
-        content_hash = chapter_content_hash(chapter)
+        content_hash = chapter_content_hash(chapter, book_title)
         existing = next((c for c in chapters if c.get("index") == chapter.index), None)
         if existing is not None and existing.get("thumbnail_hash") == content_hash:
             return {
@@ -118,8 +122,9 @@ def _thumbnail_fields(
         if image_bytes is None:
             return {"thumbnail_hash": content_hash, "thumbnail_status": "failed"}
 
-        r2_key = f"{epub_object_prefix}/thumbnails/chapter-{chapter.index:04d}.png"
-        upload_bytes(image_bytes, r2_key, content_type="image/png")
+        extension, content_type = image_file_type(image_bytes)
+        r2_key = f"{epub_object_prefix}/thumbnails/chapter-{chapter.index:04d}.{extension}"
+        upload_bytes(image_bytes, r2_key, content_type=content_type)
         return {
             "thumbnail_r2_key": r2_key,
             "thumbnail_hash": content_hash,
