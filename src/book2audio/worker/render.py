@@ -86,12 +86,24 @@ def _download_inputs(epub_object_key: str, object_prefix: str, scratch_dir: str)
 
 def _build_config(epub_path: str, scratch_dir: str, job_config: dict) -> Config:
     output_path = os.path.join(scratch_dir, "book.m4b")
+    # filename_template only names hosted downloads (the API applies it). The
+    # worker keeps the legacy scratch names, so chapter titles from the EPUB
+    # never reach its file names, and a template stored by an older version
+    # cannot fail Config validation and block a resumed render.
     kwargs = {
         k: v
         for k, v in job_config.items()
-        if k in Config.__dataclass_fields__ and v is not None
+        if k in Config.__dataclass_fields__
+        and k not in {"filename_template", "legacy_file_names"}
+        and v is not None
     }
-    return Config(epub_path=epub_path, output_path=output_path, work_dir=scratch_dir, **kwargs)
+    return Config(
+        epub_path=epub_path,
+        output_path=output_path,
+        work_dir=scratch_dir,
+        legacy_file_names=True,
+        **kwargs,
+    )
 
 
 def _set_total_chapters(job_id: uuid.UUID, config: Config) -> str:

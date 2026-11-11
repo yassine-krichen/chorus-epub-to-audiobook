@@ -126,3 +126,23 @@ def test_chapter_and_part_progress_load_from_jobs_stored_before_numbering_existe
 
     assert chapter.number is None
     assert (part.first_number, part.last_number, part.first_title) == (None, None, None)
+
+
+def test_job_config_accepts_chapter_title_when_one_file_per_chapter():
+    config = JobConfig(filename_template="{chapter:03d} - {chapter_title}", batch_size=1)
+    assert config.batch_size == 1
+
+
+@pytest.mark.parametrize("batch_size", [0, 2, 10])
+def test_job_config_rejects_chapter_title_unless_one_file_per_chapter(batch_size):
+    with pytest.raises(ValidationError, match="one file per chapter"):
+        JobConfig(filename_template="{chapter_title}", batch_size=batch_size)
+
+
+def test_job_config_rejects_a_negative_batch_size():
+    with pytest.raises(ValidationError):
+        JobConfig(batch_size=-1)
+
+
+def test_job_config_accepts_zero_batch_size_meaning_one_file_for_the_book():
+    assert JobConfig(batch_size=0).batch_size == 0

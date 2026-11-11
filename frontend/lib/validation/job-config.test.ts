@@ -87,12 +87,40 @@ describe("jobConfigSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects a batch_size below 1", () => {
+  it("rejects a negative batch_size", () => {
+    const result = jobConfigSchema.safeParse({
+      ...validConfig(),
+      batch_size: -1,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts batch_size 0, which the backend treats as one file for the whole book", () => {
     const result = jobConfigSchema.safeParse({
       ...validConfig(),
       batch_size: 0,
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts {chapter_title} when batch_size is 1 (one file per chapter)", () => {
+    const result = jobConfigSchema.safeParse({
+      ...validConfig(),
+      batch_size: 1,
+      filename_template: "{chapter:03d} - {chapter_title}",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects {chapter_title} when batch_size is not 1", () => {
+    for (const batch_size of [0, 2, 10]) {
+      const result = jobConfigSchema.safeParse({
+        ...validConfig(),
+        batch_size,
+        filename_template: "{chapter_title}",
+      });
+      expect(result.success).toBe(false);
+    }
   });
 
   it("rejects a non-integer batch_size", () => {

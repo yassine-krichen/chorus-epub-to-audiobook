@@ -39,7 +39,7 @@ Input: chapter 1 of *Alice's Adventures in Wonderland* (Project Gutenberg, publi
 
 **Resumable renders** — per-chapter state lives in the work directory; re-running the same command skips finished chapters and repeats only the interrupted one.
 
-**Progressive output** — writes a playable `<name>-part-NN.m4b` every 10 chapters (`--batch`, `0` for one file), so listening starts before the book finishes.
+**Progressive output** — writes a playable `<name>-part-NN.m4b` every 10 chapters (`--batch`, `0` for one file), so listening starts before the book finishes. `--batch 1` writes one file per chapter, named like `001 - Nightmare Begins.m4b` (see [docs/features/per-chapter-files.md](docs/features/per-chapter-files.md)).
 
 **Audio production** — per-line loudness normalization, punctuation-driven pacing ("!" faster and louder, "..." slower and softer), a procedurally synthesized ambient music bed mixed relative to speech RMS, and a 1.8 s gap between chapters.
 
@@ -136,6 +136,10 @@ book2audio generate <epub> [options]
                           0 = include synopsis/info pages)
       --limit N           Render N chapters, counted in book chapter numbers
       --batch N           Playable .m4b every N chapters (default 10; 0 = one file)
+                          1 = one file per chapter, named by chapter title
+      --filename-template T
+                          Output file names: {title} {part} {part:0Nd} {chapter}
+                          {chapter:0Nd} {chapter_title} ({chapter_title}: --batch 1 only)
       --chapter-gap SEC   Pause between chapters (default 1.8)
       --no-music / --music-volume 0-1 / --music-preset ambient|drone|rain
       --no-expressive     Disable punctuation-driven pacing

@@ -6,9 +6,12 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from book2audio.api.jobs.filenames import validate_filename_template
+from book2audio.assemble.filenames import (
+    validate_chapter_title_placeholder,
+    validate_filename_template,
+)
 from book2audio.assemble.music import MUSIC_PRESETS
 from book2audio.attribution.base import ATTRIBUTOR_MODES
 from book2audio.tts.voices import FEMALE_VOICES, MALE_VOICES
@@ -40,7 +43,8 @@ class JobConfig(BaseModel):
     chapter_limit: int = 0
     # None = automatic (skip front matter), 0 = include front matter, N = book chapter N.
     start_chapter: int | None = None
-    batch_size: int = 10
+    # Chapters per output file: 1 = one file per chapter, 0 = one file for the whole book.
+    batch_size: int = Field(default=10, ge=0)
     chapter_gap: float = 1.8
     music: bool = True
     music_volume: float = 0.22
@@ -65,6 +69,11 @@ class JobConfig(BaseModel):
         if value is not None:
             validate_filename_template(value)
         return value
+
+    @model_validator(mode="after")
+    def _validate_chapter_title_needs_one_file_per_chapter(self) -> "JobConfig":
+        validate_chapter_title_placeholder(self.filename_template, self.batch_size)
+        return self
 
     @field_validator("start_chapter")
     @classmethod

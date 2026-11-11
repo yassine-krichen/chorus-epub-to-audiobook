@@ -123,3 +123,58 @@ describe("validateFilenameTemplate hardening", () => {
     expect(validateFilenameTemplate("{part:0\u0661\u0660d}")).not.toBeNull();
   });
 });
+
+describe("chapter placeholders", () => {
+  it("accepts {chapter}, {chapter:0Nd} and {chapter_title}", () => {
+    expect(validateFilenameTemplate("{chapter}")).toBeNull();
+    expect(validateFilenameTemplate("{chapter:03d}")).toBeNull();
+    expect(validateFilenameTemplate("{chapter:03d} - {chapter_title}", 1)).toBeNull();
+  });
+
+  it("rejects malformed chapter placeholders", () => {
+    expect(validateFilenameTemplate("{chapter:3d}")).not.toBeNull();
+    expect(validateFilenameTemplate("{chapter_title:>20}")).not.toBeNull();
+    expect(validateFilenameTemplate("{chapter_number}")).not.toBeNull();
+  });
+
+  it("caps the {chapter:0Nd} width like {part:0Nd}", () => {
+    expect(validateFilenameTemplate("{chapter:011d}")).not.toBeNull();
+    expect(validateFilenameTemplate("{chapter:010d}")).toBeNull();
+  });
+
+  it("rejects {chapter_title} unless the batch size is 1 (one file per chapter)", () => {
+    for (const batchSize of [0, 2, 10]) {
+      expect(validateFilenameTemplate("{chapter_title}", batchSize)).toMatch(
+        /one file per chapter/
+      );
+    }
+    expect(validateFilenameTemplate("{chapter_title}", 1)).toBeNull();
+  });
+
+  it("does not check the batch size for templates without {chapter_title}", () => {
+    expect(validateFilenameTemplate("{title} {chapter}", 10)).toBeNull();
+  });
+});
+
+describe("previewFilenameTemplate with chapters", () => {
+  it("previews the per-chapter default as a numbered, titled file", () => {
+    expect(
+      previewFilenameTemplate("{chapter:03d} - {chapter_title}", "Shadow Slave")
+    ).toBe("001 - Nightmare Begins");
+  });
+
+  it("uses the chapter it is given for {chapter} and {chapter_title}", () => {
+    expect(
+      previewFilenameTemplate("{chapter:03d} - {chapter_title}", "Book", 1, {
+        number: 42,
+        title: "Storm",
+      })
+    ).toBe("042 - Storm");
+  });
+
+  it("keeps {part} and {chapter} independent", () => {
+    expect(
+      previewFilenameTemplate("p{part}-c{chapter}", "Book", 3, { number: 21, title: "x" })
+    ).toBe("p3-c21");
+  });
+});

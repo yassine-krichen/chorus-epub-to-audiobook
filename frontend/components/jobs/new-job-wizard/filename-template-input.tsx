@@ -8,10 +8,11 @@ interface FilenameTemplateInputProps {
   value: string;
   onChange: (value: string) => void;
   title: string;
+  batchSize: number;
 }
 
-export function FilenameTemplateInput({ value, onChange, title }: FilenameTemplateInputProps) {
-  const error = value ? validateFilenameTemplate(value) : "Filename template is required";
+export function FilenameTemplateInput({ value, onChange, title, batchSize }: FilenameTemplateInputProps) {
+  const error = value ? validateFilenameTemplate(value, batchSize) : "Filename template is required";
   const preview = error ? null : previewFilenameTemplate(value, title, 1);
 
   return (
@@ -25,7 +26,9 @@ export function FilenameTemplateInput({ value, onChange, title }: FilenameTempla
       />
       <p className="text-xs text-muted-foreground">
         Placeholders: <code>{"{title}"}</code>, <code>{"{part}"}</code>,{" "}
-        <code>{"{part:02d}"}</code> (zero-padded).
+        <code>{"{part:02d}"}</code> (zero-padded), <code>{"{chapter}"}</code> and{" "}
+        <code>{"{chapter:03d}"}</code> (the book&apos;s chapter number, or the first chapter of
+        a part), and <code>{"{chapter_title}"}</code> (only with one file per chapter).
       </p>
       {error ? (
         <p className="text-xs text-destructive">{error}</p>

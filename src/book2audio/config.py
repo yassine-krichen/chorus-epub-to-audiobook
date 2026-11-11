@@ -10,6 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Sequence
 
+from book2audio.assemble.filenames import (
+    default_filename_template,
+    validate_chapter_title_placeholder,
+    validate_filename_template,
+)
 from book2audio.assemble.music import MUSIC_PRESETS
 from book2audio.attribution.base import ATTRIBUTOR_MODES
 from book2audio.tts.voices import (
@@ -64,6 +69,17 @@ class Config:
     # Emit a playable .m4b every ``batch_size`` chapters so listening can start
     # long before the whole book finishes (0 = one file for the whole book).
     batch_size: int = 10
+
+    # Output file names: placeholders {title} {part} {part:0Nd} {chapter}
+    # {chapter:0Nd} {chapter_title}; see ``assemble.filenames``. None keeps the
+    # legacy naming (``<output>.m4b``, ``<output>-part-NN.m4b``) except for one
+    # file per chapter (``batch_size == 1``), which is named
+    # "<chapter number> - <chapter title>" by default.
+    filename_template: str | None = None
+    # Force the legacy output names (<output>.m4b, <output>-part-NN.m4b) and ignore
+    # both the template and the one-file-per-chapter default. The hosted worker
+    # uses this: its files are internal, and downloads are named by the API.
+    legacy_file_names: bool = False
 
     # Procedural ambient music bed, mixed under the narration.
     music: bool = True
@@ -125,10 +141,19 @@ class Config:
             raise ValueError("start_chapter cannot be negative")
         if self.batch_size < 0:
             raise ValueError("batch_size cannot be negative")
+        if self.filename_template is not None:
+            validate_filename_template(self.filename_template)
+        validate_chapter_title_placeholder(self.filename_template, self.batch_size)
         if self.chapter_gap < 0:
             raise ValueError("chapter_gap cannot be negative")
         if not 0.0 <= self.music_volume <= 1.0:
             raise ValueError(f"music_volume must be between 0.0 and 1.0, got {self.music_volume}")
+
+    def resolved_filename_template(self) -> str | None:
+        """The template that names output files, or None for legacy naming."""
+        if self.legacy_file_names:
+            return None
+        return self.filename_template or default_filename_template(self.batch_size)
 
     def selection_bounds(self, sections: Sequence[Numbered]) -> tuple[int, int]:
         """0-based ``[start, end)`` slice bounds over ``sections`` (in reading order).

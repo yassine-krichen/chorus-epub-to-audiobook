@@ -685,3 +685,91 @@ def test_hosted_llm_attribution_enabled_only_for_the_exact_value(monkeypatch):
     assert service.hosted_llm_attribution_enabled() is False
     monkeypatch.setenv("HOSTED_LLM_ATTRIBUTION", "enabled")
     assert service.hosted_llm_attribution_enabled() is True
+
+
+def _done_part(number, **extra):
+    return {
+        "part_number": number,
+        "first_index": number + 1,
+        "last_index": number + 1,
+        "r2_key": f"jobs/1/part-{number:02d}.m4b",
+        "status": "done",
+        **extra,
+    }
+
+
+def _per_chapter_job(parts, **config):
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        title="Shadow Slave",
+        config={"batch_size": 1, **config},
+        parts=parts,
+        artifacts_swept_at=None,
+    )
+
+
+def test_download_filenames_use_book_chapter_numbers_and_cleaned_titles():
+    job = _per_chapter_job(
+        [
+            _done_part(1, first_number=1, first_title="Chapter 1: Nightmare Begins"),
+            _done_part(2, first_number=2, first_title="Chapter 2: Hidden Spring"),
+        ],
+        filename_template="{chapter:03d} - {chapter_title}",
+    )
+
+    names = service._render_download_filenames(job, job.parts)
+
+    assert names == {1: "001 - Nightmare Begins.m4b", 2: "002 - Hidden Spring.m4b"}
+
+
+def test_download_filenames_fall_back_to_first_index_for_parts_without_book_numbers():
+    job = _per_chapter_job(
+        [_done_part(1, first_title="Chapter 1: Old Job"), _done_part(2)],
+        filename_template="{chapter:03d} - {chapter_title}",
+    )
+
+    names = service._render_download_filenames(job, job.parts)
+
+    assert names == {1: "002 - Old Job.m4b", 2: "003 - Chapter 3.m4b"}
+
+
+def test_download_filenames_are_deduplicated_across_all_parts_of_the_job():
+    job = _per_chapter_job(
+        [
+            _done_part(1, first_number=1, first_title="Dawn"),
+            _done_part(2, first_number=1, first_title="dawn"),
+        ],
+        filename_template="{chapter_title}",
+    )
+
+    names = service._render_download_filenames(job, job.parts)
+
+    assert names == {1: "Dawn.m4b", 2: "dawn (2).m4b"}
+
+
+def test_one_file_per_chapter_job_without_a_template_gets_the_per_chapter_default():
+    job = _per_chapter_job([_done_part(1, first_number=4, first_title="Chapter 4: Storm")])
+
+    assert service._render_download_filenames(job, job.parts) == {1: "004 - Storm.m4b"}
+
+
+def test_download_keeps_the_r2_key_while_naming_the_file_after_the_chapter(monkeypatch):
+    presign_get = MagicMock(return_value="https://signed-url")
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    job = _per_chapter_job([_done_part(2, first_number=2, first_title="Chapter 2: Hidden Spring")])
+    names = service._render_download_filenames(job, job.parts)
+
+    service._to_part_progress(job.parts[0], job, names)
+
+    presign_get.assert_called_once_with(
+        "jobs/1/part-02.m4b", download_filename="002 - Hidden Spring.m4b"
+    )
+
+
+def test_legacy_invalid_template_yields_no_custom_names_for_any_part():
+    job = _per_chapter_job(
+        [_done_part(1, first_number=1, first_title="A"), _done_part(2, first_number=2)],
+        filename_template="{part:0999999999d}",
+    )
+
+    assert service._render_download_filenames(job, job.parts) == {}

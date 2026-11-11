@@ -19,7 +19,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from book2audio.api.jobs import cloud_run
-from book2audio.api.jobs.filenames import render_filename
 from book2audio.api.jobs.schemas import (
     ChapterProgress,
     CreateJobRequest,
@@ -27,6 +26,11 @@ from book2audio.api.jobs.schemas import (
     JobListResponse,
     JobSummary,
     PartProgress,
+)
+from book2audio.assemble.filenames import (
+    PartInfo,
+    default_filename_template,
+    render_part_filenames,
 )
 from book2audio.db.models import Job
 from book2audio.storage.r2 import presign_get
@@ -240,7 +244,8 @@ def _to_summary(job: Job) -> JobSummary:
 
 
 def to_detail(job: Job) -> JobDetail:
-    parts = [_to_part_progress(p, job) for p in job.parts]
+    download_filenames = _render_download_filenames(job, job.parts)
+    parts = [_to_part_progress(p, job, download_filenames) for p in job.parts]
     return JobDetail(
         **_to_summary(job).model_dump(),
         epub_object_key=job.epub_object_key,
@@ -251,25 +256,52 @@ def to_detail(job: Job) -> JobDetail:
     )
 
 
-def _render_download_filename(job: Job, part_number: int) -> str | None:
-    template = job.config.get("filename_template")
-    if not template:
-        return None
+def _render_download_filenames(job: Job, parts: list[dict]) -> dict[int, str]:
+    """Download name per part number, rendered together so names stay unique.
+
+    Empty when the job has no template (and is not one file per chapter) or
+    its stored template no longer renders.
+    """
+    template = job.config.get("filename_template") or default_filename_template(
+        job.config.get("batch_size", 10)
+    )
+    if not template or not parts:
+        return {}
+    part_infos = [
+        PartInfo(
+            part_number=part["part_number"],
+            # Parts stored before book numbering only know the parser position.
+            chapter_number=_first_chapter_number(part),
+            chapter_title=part.get("first_title") or "",
+        )
+        for part in parts
+    ]
     try:
-        return render_filename(template, title=job.title, part=part_number)
+        names = render_part_filenames(template, title=job.title, parts=part_infos)
     except ValueError:
         # Jobs stored before the width cap / bidi checks can hold a template
         # that no longer renders; serve the download under its storage name
         # rather than failing the whole job detail response.
         logger.warning("job.filename_template_invalid", extra={"job_id": str(job.id)})
-        return None
+        return {}
+    return {info.part_number: name for info, name in zip(part_infos, names)}
 
 
-def _to_part_progress(part: dict, job: Job) -> PartProgress:
+def _first_chapter_number(part: dict) -> int:
+    number = part.get("first_number")
+    return number if number is not None else part["first_index"]
+
+
+def _to_part_progress(
+    part: dict, job: Job, download_filenames: dict[int, str] | None = None
+) -> PartProgress:
     download_url = None
     if part.get("status") == "done" and job.artifacts_swept_at is None:
-        download_filename = _render_download_filename(job, part["part_number"])
-        download_url = presign_get(part["r2_key"], download_filename=download_filename)
+        if download_filenames is None:
+            download_filenames = _render_download_filenames(job, [part])
+        download_url = presign_get(
+            part["r2_key"], download_filename=download_filenames.get(part["part_number"])
+        )
     return PartProgress(**part, download_url=download_url)
 
 

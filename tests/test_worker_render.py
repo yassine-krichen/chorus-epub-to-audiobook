@@ -382,3 +382,32 @@ def test_render_job_wires_a_heartbeat_into_the_pipeline_for_slow_attribution(
     if refreshed.tzinfo is None:
         refreshed = refreshed.replace(tzinfo=timezone.utc)
     assert datetime.now(timezone.utc) - refreshed < timedelta(minutes=1)
+
+
+def test_build_config_does_not_pass_the_hosted_download_template_to_the_pipeline(tmp_path):
+    """A template stored by an older version must not fail Config validation and
+    block a resumed render; the API applies it to download names itself."""
+    from book2audio.worker.render import _build_config
+
+    config = _build_config(
+        str(tmp_path / "book.epub"),
+        str(tmp_path),
+        {"filename_template": "{part:0999999999d}", "batch_size": 1},
+    )
+
+    assert config.filename_template is None
+    assert config.batch_size == 1
+
+
+def test_hosted_worker_uses_legacy_scratch_names_even_for_one_file_per_chapter(tmp_path):
+    """Chapter titles from the EPUB must never become file names on the worker."""
+    from book2audio.worker.render import _build_config
+
+    config = _build_config(
+        str(tmp_path / "book.epub"),
+        str(tmp_path),
+        {"batch_size": 1, "filename_template": "{chapter_title}", "legacy_file_names": False},
+    )
+
+    assert config.legacy_file_names is True
+    assert config.resolved_filename_template() is None

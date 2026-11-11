@@ -27,6 +27,7 @@ from rich.progress import (
 
 from book2audio.assemble.audio import concat_with_gaps, normalize_rms, write_wav
 from book2audio.assemble.audiobook import ChapterAudio, build_m4b
+from book2audio.assemble.filenames import PartInfo, next_free_name, render_part_filenames
 from book2audio.assemble.music import LOOP_SECONDS, generate_bed_for_preset, mix_music_bed
 from book2audio.attribution import LLMAttributor, build_attributor
 from book2audio.config import Config
@@ -54,6 +55,28 @@ def _plan_batches(
     for i in range(0, len(chapters), batch_size):
         batches.append((len(batches) + 1, chapters[i : i + batch_size]))
     return batches
+
+
+def _unused_file_name(directory: str, name: str, claimed: set[str]) -> str:
+    stem, extension = os.path.splitext(name)
+    return next_free_name(
+        stem,
+        extension,
+        lambda candidate: candidate.lower() in claimed
+        or os.path.exists(os.path.join(directory, candidate)),
+    )
+
+
+def _recorded_file_name(name: str) -> str:
+    """A file name read back from state.json, which is a plain file on disk.
+
+    It is joined onto the output directory, so anything but a bare file name
+    (a path, or "." / "..") is refused rather than followed.
+    """
+    is_bare = name == os.path.basename(name) and "/" not in name and "\\" not in name
+    if not name or not is_bare or name in (".", ".."):
+        raise ValueError(f"state.json records an unsafe output file name: {name!r}")
+    return name
 
 
 class Pipeline:
@@ -222,6 +245,9 @@ class Pipeline:
         """
         batches = _plan_batches(chapters, self.config.batch_size)
         single = len(batches) == 1
+        # Named up front, before anything is written, so duplicates are resolved
+        # across all parts. None means the legacy <output>-part-NN naming.
+        named_outputs = self._plan_named_outputs(batches, metadata, state)
         outputs: list[str] = []
 
         with self._progress() as progress:
@@ -245,7 +271,10 @@ class Pipeline:
                     batch_audio.append(ChapterAudio(title=chapter.title, wav_path=wav_path))
                     progress.advance(task)
 
-                out_path = self._part_output(single, part_no, batch[0].index, batch[-1].index)
+                if named_outputs is not None:
+                    out_path = named_outputs[part_no]
+                else:
+                    out_path = self._part_output(single, part_no, batch[0].index, batch[-1].index)
                 if dirty or not os.path.exists(out_path):
                     part_meta = self._part_metadata(metadata, single, part_no, batch)
                     build_m4b(
@@ -256,6 +285,75 @@ class Pipeline:
                     self.console.print(f"[green]Part ready:[/green] {out_path}")
                 outputs.append(out_path)
         return outputs
+
+    def _planned_file_names(
+        self, batches: list[tuple[int, list[Chapter]]], metadata: BookMetadata
+    ) -> list[str] | None:
+        """Template-based file name per batch, or None for legacy naming."""
+        template = self.config.resolved_filename_template()
+        if template is None:
+            return None
+        extension = os.path.splitext(self.config.output_path)[1].lstrip(".") or "m4b"
+        return render_part_filenames(
+            template,
+            title=metadata.title,
+            parts=[PartInfo(no, batch[0].number, batch[0].title) for no, batch in batches],
+            extension=extension,
+        )
+
+    def planned_file_names(self, chapters: list[Chapter], metadata: BookMetadata) -> list[str]:
+        """File names a run over ``chapters`` would create (for dry runs).
+
+        Empty with legacy naming, where the names are just the output path and
+        ``-part-NN`` variants of it. Does not check for files already on disk.
+        """
+        batches = _plan_batches(chapters, self.config.batch_size)
+        return self._planned_file_names(batches, metadata) or []
+
+    def _plan_named_outputs(
+        self,
+        batches: list[tuple[int, list[Chapter]]],
+        metadata: BookMetadata,
+        state: RenderState,
+    ) -> dict[int, str] | None:
+        """Template-based file path per part number, or None for legacy naming.
+
+        A part keeps the name recorded for it in ``state`` (same work dir resumed),
+        even when a changed chapter makes it rebuild: it is rebuilt into its own
+        file. A new part never takes a path that already exists (that file belongs
+        to another run) or a name recorded for another part, so it gets " (2)",
+        " (3)"...
+        """
+        names = self._planned_file_names(batches, metadata)
+        if names is None:
+            return None
+        out_dir = os.path.dirname(self.config.output_path)
+
+        # The planned name is part of the key: a changed template or title is a
+        # new file, not a rename of the earlier one.
+        keys = [
+            f"{batch[0].index}-{batch[-1].index}:{name}"
+            for (_, batch), name in zip(batches, names)
+        ]
+        # Recorded names are claimed first, so a fresh part cannot take the name
+        # a later part already owns.
+        recorded = {
+            key: _recorded_file_name(state.part_files[key])
+            for key in keys
+            if key in state.part_files
+        }
+        claimed = {name.lower() for name in recorded.values()}
+
+        paths: dict[int, str] = {}
+        for (part_no, _), planned, key in zip(batches, names, keys):
+            name = recorded.get(key)
+            if name is None:
+                name = _unused_file_name(out_dir, planned, claimed)
+                claimed.add(name.lower())
+                state.part_files[key] = name
+            paths[part_no] = os.path.join(out_dir, name)
+        state.save()
+        return paths
 
     def _part_output(self, single: bool, part_no: int, first: int, last: int) -> str:
         """Where a batch's .m4b goes. Single batch -> the plain output path."""

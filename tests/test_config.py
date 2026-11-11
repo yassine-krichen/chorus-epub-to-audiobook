@@ -275,3 +275,40 @@ def test_selection_bounds_kept_prologue_does_not_consume_the_limit(tmp_path):
 
     # The prologue plus Chapters 1 to 10, not the prologue plus 1 to 9.
     assert [s.number for s in sections[start:end]] == [0] + list(range(1, 11))
+
+
+def test_validate_rejects_chapter_title_template_when_not_one_file_per_chapter(tmp_path):
+    config = _config(tmp_path, batch_size=10, filename_template="{chapter_title}")
+    with pytest.raises(ValueError, match="one file per chapter"):
+        config.validate()
+
+
+def test_validate_accepts_chapter_title_template_for_one_file_per_chapter(tmp_path):
+    _config(tmp_path, batch_size=1, filename_template="{chapter_title}").validate()
+
+
+def test_validate_rejects_a_filename_template_with_an_unknown_placeholder(tmp_path):
+    config = _config(tmp_path, filename_template="{author}")
+    with pytest.raises(ValueError, match="Unsupported filename placeholder"):
+        config.validate()
+
+
+def test_resolved_filename_template_defaults_to_chapter_titles_for_one_file_per_chapter(tmp_path):
+    assert _config(tmp_path, batch_size=1).resolved_filename_template() == (
+        "{chapter:03d} - {chapter_title}"
+    )
+
+
+def test_resolved_filename_template_keeps_legacy_naming_for_multi_chapter_parts(tmp_path):
+    assert _config(tmp_path, batch_size=10).resolved_filename_template() is None
+
+
+def test_resolved_filename_template_prefers_an_explicit_template(tmp_path):
+    config = _config(tmp_path, batch_size=1, filename_template="{title} {chapter}")
+    assert config.resolved_filename_template() == "{title} {chapter}"
+
+
+def test_legacy_file_names_ignores_both_the_template_and_the_per_chapter_default(tmp_path):
+    assert _config(tmp_path, batch_size=1, legacy_file_names=True).resolved_filename_template() is None
+    config = _config(tmp_path, batch_size=10, filename_template="{title}", legacy_file_names=True)
+    assert config.resolved_filename_template() is None

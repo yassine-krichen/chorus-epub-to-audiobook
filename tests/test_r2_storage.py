@@ -182,7 +182,7 @@ def test_presign_get_ascii_fallback_replaces_non_ascii_characters_in_the_filenam
 
 # --- _content_disposition: defense-in-depth against header injection ------
 #
-# api.jobs.filenames already sanitizes rendered filenames before they reach
+# assemble.filenames already sanitizes rendered filenames before they reach
 # here, but this module must never trust a caller's sanitization blindly --
 # a quote or a raw CRLF in the filename could otherwise break out of the
 # quoted filename="..." header parameter.

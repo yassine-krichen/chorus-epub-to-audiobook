@@ -8,9 +8,10 @@ import {
 
 /**
  * Client-side shape/UX validation for the new-job form. Only
- * male_voice/female_voice, music_preset, and filename_template are actually
+ * male_voice/female_voice, music_preset, filename_template, batch_size (>= 0) and
+ * the {chapter_title}-needs-one-file-per-chapter rule are actually
  * enforced server-side (see book2audio.api.jobs.schemas.JobConfig) — the
- * numeric ranges below (speed, bitrate, batch_size, chapter_gap) are a UX
+ * numeric ranges below (speed, bitrate, chapter_gap) are a UX
  * convention only, not a real constraint the backend imposes.
  */
 export const jobConfigSchema = z.object({
@@ -22,7 +23,8 @@ export const jobConfigSchema = z.object({
   bitrate: z.string().min(1),
   chapter_limit: z.number().int().min(0),
   start_chapter: z.number().int().min(0).nullable(),
-  batch_size: z.number().int().min(1),
+  // 1 = one file per chapter, 0 = one file for the whole book (backend semantics).
+  batch_size: z.number().int().min(0),
   chapter_gap: z.number().min(0),
   music: z.boolean(),
   music_volume: z.number().min(0).max(1),
@@ -36,7 +38,10 @@ export const jobConfigSchema = z.object({
       message: "Invalid filename template",
     }),
   thumbnails: z.boolean(),
-});
+}).refine(
+  (config) => validateFilenameTemplate(config.filename_template, config.batch_size) === null,
+  { message: "Invalid filename template for this batch size", path: ["filename_template"] }
+);
 
 export const newJobFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(255),

@@ -28,7 +28,7 @@ export function NewJobWizard() {
   }
 
   const filenameError = config.filename_template
-    ? validateFilenameTemplate(config.filename_template)
+    ? validateFilenameTemplate(config.filename_template, config.batch_size)
     : "Filename template is required";
   const canSubmit =
     upload.state === "done" && Boolean(upload.objectKey) && title.trim().length > 0 && !filenameError;

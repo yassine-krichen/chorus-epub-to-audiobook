@@ -119,13 +119,14 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
       <div className="flex flex-col gap-2">
         <Label htmlFor="batch-size">Batch size</Label>
         <p className="text-xs text-muted-foreground">
-          How many chapters get bundled into each downloadable part. Lower = parts finish sooner
-          but more files to manage. 0 = single file for the whole book.
+          How many chapters get bundled into each downloadable file. Lower = files finish sooner
+          but more files to manage. 1 = one file per chapter, 0 = a single file for the whole
+          book.
         </p>
         <Input
           id="batch-size"
           type="number"
-          min={1}
+          min={0}
           value={config.batch_size}
           onChange={(event) => onChange({ batch_size: Number(event.target.value) })}
         />

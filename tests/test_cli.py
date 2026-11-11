@@ -407,3 +407,45 @@ def test_dry_run_table_prints_titles_with_square_brackets_literally(tmp_path, ca
 
     assert exit_code == 0
     assert "[/] [red]Odd[/]" in capsys.readouterr().out
+
+
+# --- --filename-template ---------------------------------------------------
+
+
+def test_parser_defaults_filename_template_to_none():
+    assert _build_parser().parse_args(["generate", "book.epub"]).filename_template is None
+
+
+def test_generate_passes_filename_template_through_to_config(monkeypatch, epub, tmp_path):
+    exit_code, config_kwargs = _run_and_capture_config(
+        monkeypatch,
+        _generate_argv(
+            epub, tmp_path, "--batch", "1", "--filename-template", "{chapter:03d} - {chapter_title}"
+        ),
+    )
+
+    assert exit_code == 0
+    assert config_kwargs["filename_template"] == "{chapter:03d} - {chapter_title}"
+
+
+def test_generate_rejects_a_chapter_title_template_without_one_file_per_chapter(
+    epub, tmp_path, capsys
+):
+    exit_code = main(_generate_argv(epub, tmp_path, "--filename-template", "{chapter_title}"))
+
+    assert exit_code == 1
+    assert "one file per chapter" in capsys.readouterr().out.replace("\n", " ")
+
+
+def test_dry_run_with_one_file_per_chapter_lists_the_planned_file_names(epub, tmp_path, capsys):
+    exit_code = main(_generate_argv(epub, tmp_path, "--batch", "1"))
+
+    assert exit_code == 0
+    assert "001 - The Start.m4b" in capsys.readouterr().out
+
+
+def test_dry_run_without_a_template_lists_no_planned_file_names(epub, tmp_path, capsys):
+    exit_code = main(_generate_argv(epub, tmp_path))
+
+    assert exit_code == 0
+    assert "Output files" not in capsys.readouterr().out

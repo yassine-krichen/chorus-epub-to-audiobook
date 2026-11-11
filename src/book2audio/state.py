@@ -24,6 +24,10 @@ class RenderState:
     chapter_titles: dict[str, str] = field(default_factory=dict)
     # chapter index -> hash of its source text, so edits invalidate stale audio.
     chapter_hashes: dict[str, str] = field(default_factory=dict)
+    # "<first chapter index>-<last chapter index>:<planned name>" -> file name
+    # chosen for that part, so a resumed run reuses it and a different run
+    # never takes over an existing file.
+    part_files: dict[str, str] = field(default_factory=dict)
 
     _path: str = field(default="", repr=False)
 

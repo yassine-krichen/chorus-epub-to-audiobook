@@ -16,7 +16,7 @@ from botocore.exceptions import ClientError
 
 # Characters that could break out of the quoted filename="..." parameter or
 # inject extra header/response content (CRLF etc). Callers (e.g.
-# api.jobs.filenames.render_filename) are expected to have already
+# assemble.filenames) are expected to have already
 # sanitized the filename -- this is a second, independent layer so this
 # module never trusts a caller's sanitization blindly.
 # Also bidi controls and line/paragraph separators, which can spoof the

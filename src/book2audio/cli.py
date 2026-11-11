@@ -80,7 +80,21 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=10,
         metavar="N",
-        help="Emit a playable .m4b every N chapters for early listening (0 = single file)",
+        help=(
+            "Emit a playable .m4b every N chapters for early listening (0 = single file). "
+            "--batch 1 writes one file per chapter, named like '001 - Nightmare Begins.m4b'"
+        ),
+    )
+    gen.add_argument(
+        "--filename-template",
+        default=None,
+        metavar="TEMPLATE",
+        help=(
+            "Name output files from a template, placed next to --out. Placeholders: {title} "
+            "{part} {part:0Nd} {chapter} {chapter:0Nd} (book number of the file's first chapter) "
+            "and {chapter_title} (only with --batch 1). Default with --batch 1: "
+            "'{chapter:03d} - {chapter_title}'; otherwise --out and <out>-part-NN are used"
+        ),
     )
     gen.add_argument(
         "--chapter-gap",
@@ -178,6 +192,7 @@ def _run_generate(args: argparse.Namespace, console: Console) -> int:
         chapter_limit=args.limit,
         start_chapter=args.start_chapter,
         batch_size=args.batch,
+        filename_template=args.filename_template,
         chapter_gap=args.chapter_gap,
         music=args.music,
         music_volume=args.music_volume,
@@ -215,9 +230,21 @@ def _dry_run(pipeline: Pipeline, console: Console) -> None:
     _print_chapter_table(book, pipeline.config, console)
     selected = pipeline._select_chapters(book)
     pipeline._report_plan(book, selected, cast)
+    _print_planned_files(pipeline.planned_file_names(selected, book.metadata), console)
     console.print("\n[bold]Full cast:[/bold]")
     for name, voice in cast.as_dict().items():
         console.print(f"  {name:<24} {voice}")
+
+
+def _print_planned_files(names: list[str], console: Console) -> None:
+    if not names:
+        return
+    shown = names[:12]
+    console.print("\n[bold]Output files:[/bold]")
+    for name in shown:
+        console.print(f"  {escape(name)}")
+    if len(names) > len(shown):
+        console.print(f"[dim]  ... and {len(names) - len(shown)} more[/dim]")
 
 
 def _print_chapter_table(book: Book, config: Config, console: Console) -> None:
