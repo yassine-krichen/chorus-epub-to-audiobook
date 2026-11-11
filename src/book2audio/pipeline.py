@@ -30,11 +30,13 @@ from book2audio.assemble.audiobook import ChapterAudio, build_m4b
 from book2audio.assemble.filenames import PartInfo, next_free_name, render_part_filenames
 from book2audio.assemble.music import LOOP_SECONDS, generate_bed_for_preset, mix_music_bed
 from book2audio.attribution import GenderVerdict, LLMAttributor, build_attributor
+from book2audio.attribution.gender import resolve_genders, resolved_genders
 from book2audio.cast_report import (
     build_cast_report,
     print_cast_report,
     write_cast_report,
 )
+from book2audio.cast_review import merge_characters
 from book2audio.config import Config
 from book2audio.epub import ParsedChapter, parse_epub
 from book2audio.models import NARRATOR, Book, BookMetadata, Chapter, Segment, SegmentKind
@@ -186,7 +188,31 @@ class Pipeline:
         self._aliases = attributor.aliases
         if isinstance(attributor, LLMAttributor):
             self._report_attribution(attributor, estimate_only)
+        self._apply_character_aliases(book)
         return book
+
+    def _apply_character_aliases(self, book: Book) -> None:
+        """Fold the characters the user merged in the cast review into their targets.
+
+        Runs after attribution, on labels that are already cached, so a resumed hosted
+        job pays for no new model call. Genders are worked out again for the merged cast,
+        and the old spelling counts towards its target's evidence.
+        """
+        merged = merge_characters(book.chapters, self.config.character_aliases)
+        if not merged:
+            return
+        survivors = [name for name in self._characters if name not in merged]
+        joined = {source: target for source, target in merged.items() if target != NARRATOR}
+        names = survivors + [t for t in dict.fromkeys(joined.values()) if t not in survivors]
+        self._aliases = {**self._aliases, **joined}
+        self._verdicts = resolve_genders(
+            names,
+            book.chapters,
+            overrides=self.config.gender_overrides,
+            aliases=self._aliases,
+        )
+        self._genders = resolved_genders(self._verdicts)
+        self._characters = self._order_by_frequency(names, book)
 
     def _report_attribution(self, attributor: LLMAttributor, estimate_only: bool) -> None:
         report = attributor.report

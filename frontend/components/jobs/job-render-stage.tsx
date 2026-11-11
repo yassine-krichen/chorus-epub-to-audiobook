@@ -8,6 +8,8 @@ function stageLabel(stage: RenderStage): string {
       return "Failed";
     case "canceled":
       return "Canceled";
+    case "awaiting-cast-review":
+      return "Waiting for you to check the cast";
     case "preparing-input":
       return "Preparing input…";
     case "casting-voices":

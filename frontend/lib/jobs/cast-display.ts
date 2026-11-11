@@ -48,7 +48,14 @@ export function summarizeCast(report: CastReport): CastSummary {
   };
 }
 
-/** The cast stays hidden until the worker has written it; it never changes mid-render. */
-export function shouldPollCast(status: string, hasReport: boolean): boolean {
-  return !hasReport && (status === "running" || status === "awaiting_cast_review");
+/**
+ * Whether to keep asking for the cast report. It is hidden until the worker has written
+ * it, and it never changes mid-render, with one exception: a job resumed after the cast
+ * review rewrites it with the user's fixes before its first chapter is done, so a report
+ * loaded earlier is refreshed until then.
+ */
+export function shouldPollCast(status: string, hasReport: boolean, chaptersDone: number): boolean {
+  if (status === "awaiting_cast_review") return !hasReport;
+  if (status === "running") return !hasReport || chaptersDone === 0;
+  return false;
 }

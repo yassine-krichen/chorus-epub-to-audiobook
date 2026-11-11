@@ -1,6 +1,19 @@
-export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceled";
+/** "awaiting_cast_review": the cast is worked out and the job waits for the user to
+ * check it before any audio is made. It is canceled if the review is never confirmed. */
+export type JobStatus =
+  | "queued"
+  | "running"
+  | "awaiting_cast_review"
+  | "succeeded"
+  | "failed"
+  | "canceled";
 
-export const ACTIVE_JOB_STATUSES: readonly JobStatus[] = ["queued", "running"];
+/** Jobs that can still change, so they are polled and can be canceled. */
+export const ACTIVE_JOB_STATUSES: readonly JobStatus[] = [
+  "queued",
+  "running",
+  "awaiting_cast_review",
+];
 
 /** "cast" gives each character a voice of their own gender (characters whose gender
  * is unclear are read by the narrator); "narrator_only" has the narrator read everything. */
@@ -17,6 +30,10 @@ export interface JobConfig {
   voice_overrides: Record<string, string>;
   /** Character name -> "m" or "f". The user's word beats what the app works out from the text. */
   gender_overrides: Record<string, "m" | "f">;
+  /** Detected name -> the name that takes over its lines. Set by the cast review. */
+  character_aliases: Record<string, string>;
+  /** Pause after the cast is worked out so the user can fix it before any audio is made. */
+  cast_review: boolean;
   male_voice: string | null;
   female_voice: string | null;
   speed: number;
@@ -46,6 +63,8 @@ export const DEFAULT_JOB_CONFIG: JobConfig = {
   narrator_voice: null,
   voice_overrides: {},
   gender_overrides: {},
+  character_aliases: {},
+  cast_review: true,
   male_voice: null,
   female_voice: null,
   speed: 1.0,
@@ -105,6 +124,8 @@ export interface JobDetail extends JobSummary {
   chapters: ChapterProgress[];
   parts: PartProgress[];
   error_message: string | null;
+  /** While the job waits for its cast review: when it is canceled if still unconfirmed. */
+  cast_review_expires_at?: string | null;
 }
 
 export interface JobListResponse {
@@ -145,6 +166,20 @@ export interface CastCharacter {
   sample_line: string;
   layer_counts: Record<string, number>;
   top_evidence: CastEvidence[];
+}
+
+/** The user's decision about one character in the cast review. Characters left alone are
+ * not listed. A merged or narrator-read character takes no gender or voice. */
+export interface CastReviewEdit {
+  name: string;
+  gender?: "m" | "f";
+  voice?: string;
+  merge_into?: string;
+  read_by_narrator?: boolean;
+}
+
+export interface CastReviewRequest {
+  characters: CastReviewEdit[];
 }
 
 /** Who speaks in a job's chapters and which voice reads each of them. */

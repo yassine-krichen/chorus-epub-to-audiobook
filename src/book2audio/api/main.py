@@ -27,6 +27,8 @@ def create_app() -> FastAPI:
     jobs_service.worker_mode()
     # Same for the flag that lets hosted jobs spend the LLM key.
     jobs_service.hosted_llm_attribution_enabled()
+    # And for how long a job waits for its cast review.
+    jobs_service.cast_review_timeout()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

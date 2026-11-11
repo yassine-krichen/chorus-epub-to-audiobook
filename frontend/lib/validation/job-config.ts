@@ -27,6 +27,8 @@ export const jobConfigSchema = z.object({
       message: `At most ${MAX_CHARACTER_OVERRIDES} characters can be set`,
     })
     .default({}),
+  character_aliases: z.record(z.string(), z.string()).default({}),
+  cast_review: z.boolean().default(true),
   male_voice: z.string().nullable(),
   female_voice: z.string().nullable(),
   speed: z.number().min(0.5).max(2.0),

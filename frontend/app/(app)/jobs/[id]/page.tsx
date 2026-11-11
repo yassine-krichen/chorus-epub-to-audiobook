@@ -4,6 +4,7 @@ import { use } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { CastPanel } from "@/components/jobs/job-detail/cast-panel";
+import { CastReviewPanel } from "@/components/jobs/job-detail/cast-review-panel";
 import { ChapterGrid } from "@/components/jobs/job-detail/chapter-grid";
 import { JobDetailHeader } from "@/components/jobs/job-detail/job-detail-header";
 import { JobErrorPanel } from "@/components/jobs/job-detail/job-error-panel";
@@ -18,7 +19,7 @@ interface JobDetailPageProps {
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = use(params);
   const { data: job, isLoading } = useJob(id);
-  const { data: cast } = useJobCast(id, job?.status);
+  const { data: cast } = useJobCast(id, job?.status, job?.chapters.length ?? 0);
 
   if (isLoading || !job) {
     return (
@@ -29,28 +30,39 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     );
   }
 
+  const awaitingReview = job.status === "awaiting_cast_review";
+
   return (
     <div className="flex flex-col gap-8">
       <JobDetailHeader job={job} />
 
       {job.status === "failed" && job.error_message && <JobErrorPanel message={job.error_message} />}
+      {job.status === "canceled" && job.error_message && (
+        <JobErrorPanel title="Job canceled" message={job.error_message} />
+      )}
 
-      {cast && (
+      {awaitingReview && <CastReviewPanel job={job} report={cast} />}
+
+      {!awaitingReview && cast && (
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-medium">Cast</h2>
           <CastPanel report={cast} />
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Chapters</h2>
-        <ChapterGrid totalChapters={job.total_chapters} chapters={job.chapters} />
-      </div>
+      {!awaitingReview && (
+        <>
+          <div className="flex flex-col gap-3">
+            <h2 className="text-lg font-medium">Chapters</h2>
+            <ChapterGrid totalChapters={job.total_chapters} chapters={job.chapters} />
+          </div>
 
-      <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Parts</h2>
-        <PartList parts={job.parts} />
-      </div>
+          <div className="flex flex-col gap-3">
+            <h2 className="text-lg font-medium">Parts</h2>
+            <PartList parts={job.parts} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

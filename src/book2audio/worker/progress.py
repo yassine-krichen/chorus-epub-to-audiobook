@@ -15,6 +15,7 @@ from typing import Callable
 
 from book2audio.attribution import CACHE_FILENAME as ATTRIBUTION_CACHE_FILENAME
 from book2audio.cast_report import cast_report_object_key
+from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
 from book2audio.images.enhanced import RESUME_FILENAMES, EnhancedThumbnails
@@ -87,6 +88,38 @@ def build_cast_report_uploader(job_id: uuid.UUID) -> Callable[[str], None]:
             logger.warning("could not upload the cast report for job %s", job_id, exc_info=True)
 
     return upload_cast_report
+
+
+class CastReviewRequested(Exception):
+    """Raised once a job is parked for cast review, to unwind the pipeline before it renders."""
+
+
+def build_cast_review_pause(
+    job_id: uuid.UUID, work_dir: str, object_prefix: str
+) -> Callable[[str], None]:
+    """A closure that parks the job for the user to review the cast, then stops the render.
+
+    Everything the resumed run needs is uploaded first (the report, ``state.json``, the
+    attribution cache), and only then does the status change, so a confirmation can never
+    outrun the files it depends on. Unlike the best-effort report upload this one may
+    raise: a job that cannot be resumed must fail loudly instead of waiting forever.
+    A job that was canceled in the meantime keeps its status, but still stops.
+    """
+
+    def pause_for_review(report_path: str) -> None:
+        upload_file(report_path, cast_report_object_key(job_id))
+        _upload_state_json(work_dir, object_prefix)
+        with SessionLocal() as session:
+            job = session.get(Job, job_id)
+            if job is not None and job.status == "running":
+                now = datetime.now(timezone.utc)
+                job.status = AWAITING_CAST_REVIEW
+                job.cast_review_requested_at = now
+                job.last_heartbeat_at = now
+                session.commit()
+        raise CastReviewRequested(str(job_id))
+
+    return pause_for_review
 
 
 def build_heartbeat(job_id: uuid.UUID) -> Callable[[], None]:

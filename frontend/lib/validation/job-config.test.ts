@@ -256,6 +256,21 @@ describe("jobConfigSchema smarter thumbnails", () => {
     expect(result.success && result.data.thumbnails_enhanced).toBe(false);
   });
 
+  it("checks the cast before rendering unless told otherwise", () => {
+    const result = jobConfigSchema.safeParse(validConfig());
+    expect(result.success && result.data.cast_review).toBe(true);
+  });
+
+  it("accepts skipping the cast review", () => {
+    const result = jobConfigSchema.safeParse({ ...validConfig(), cast_review: false });
+    expect(result.success && result.data.cast_review).toBe(false);
+  });
+
+  it("defaults character merges to none", () => {
+    const result = jobConfigSchema.safeParse(validConfig());
+    expect(result.success && result.data.character_aliases).toEqual({});
+  });
+
   it("defaults gender overrides to none when the field is missing", () => {
     const result = jobConfigSchema.safeParse(validConfig());
     expect(result.success && result.data.gender_overrides).toEqual({});

@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
   CastReport,
+  CastReviewRequest,
   CreateJobResponse,
   JobConfig,
   JobDetail,
@@ -18,6 +19,13 @@ export async function fetchJob(jobId: string) {
 
 export async function fetchJobCast(jobId: string) {
   return apiFetch<CastReport>(`/api/backend/jobs/${jobId}/cast`);
+}
+
+export async function confirmCastReview(jobId: string, review: CastReviewRequest) {
+  return apiFetch<CreateJobResponse>(`/api/backend/jobs/${jobId}/cast-review`, {
+    method: "POST",
+    body: JSON.stringify(review),
+  });
 }
 
 export async function cancelJob(jobId: string) {

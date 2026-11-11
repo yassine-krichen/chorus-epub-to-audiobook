@@ -172,13 +172,12 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
   and one gender. There is no flag to undo a merge yet. The cast report shows only the
   merged name.
 - Alternate names such as Changing Star for Nephis are not merged.
-- **The hosted worker writes `cast_report.json` but does not upload it.** On the website
-  the report is not visible yet. It is only in the worker's scratch folder.
+- **The hosted worker uploads `cast_report.json`.** The job page shows it in a Cast section,
+  and the cast review lets you fix it before rendering (see `cast-on-job-page.md` and
+  `cast-review.md`).
 
 ## Next steps
 
 - An AI gender judge for the characters that stay unresolved (only when AI speaker
   detection is on).
-- A cast review screen before rendering, where you see each character, gender, score,
-  sample line and voice, and fix the unclear ones with a click.
 - Better speaker detection for books like this one.

@@ -74,5 +74,8 @@ class Job(Base):
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
     artifacts_swept_at: Mapped[datetime | None] = mapped_column(nullable=True)
     cancel_requested_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # When the worker paused the job for the user to review the cast; the review
+    # window (and its expiry) counts from here.
+    cast_review_requested_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     user: Mapped[User] = relationship(back_populates="jobs")

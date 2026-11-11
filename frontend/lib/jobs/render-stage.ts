@@ -6,6 +6,7 @@ export type RenderStage =
   | { kind: "succeeded" }
   | { kind: "failed" }
   | { kind: "canceled" }
+  | { kind: "awaiting-cast-review" }
   | { kind: "preparing-input" }
   | { kind: "casting-voices" }
   | { kind: "assembling-part"; partNumber: number; totalParts: number }
@@ -37,6 +38,10 @@ function planBatches(totalChapters: number, batchSize: number): Batch[] {
 export function deriveRenderStage(job: JobDetail): RenderStage {
   if (job.status === "succeeded" || job.status === "failed" || job.status === "canceled") {
     return { kind: job.status };
+  }
+
+  if (job.status === "awaiting_cast_review") {
+    return { kind: "awaiting-cast-review" };
   }
 
   if (job.total_chapters == null) {

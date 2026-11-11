@@ -8,14 +8,16 @@ the one place that logic lives so the two entrypoints can't drift apart.
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Callable, Literal
 
 from rich.console import Console
 
 from book2audio.attribution import require_llm_attribution_configured
+from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.config import Config
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
@@ -27,10 +29,14 @@ from book2audio.pipeline import Pipeline
 from book2audio.storage.r2 import download_file
 from book2audio.worker.progress import (
     JOB_RESUME_FILENAMES,
+    CastReviewRequested,
     build_cast_report_uploader,
+    build_cast_review_pause,
     build_heartbeat,
     build_progress_hooks,
 )
+
+RenderOutcome = Literal["finished", "awaiting_cast_review"]
 
 
 def render_job(
@@ -41,7 +47,12 @@ def render_job(
     scratch_dir: str,
     *,
     after_chapter: Callable[[Chapter], None] | None = None,
-) -> None:
+) -> RenderOutcome:
+    """Run one job to the end, or to the cast review pause.
+
+    Returns ``AWAITING_CAST_REVIEW`` when the job was parked for the user (the caller
+    must then leave its status alone); ``"finished"`` when the render completed.
+    """
     object_prefix = f"jobs/{job_id}"
 
     epub_path = _download_inputs(epub_object_key, object_prefix, scratch_dir)
@@ -77,9 +88,43 @@ def render_job(
         on_part_ready=on_part_ready,
         on_attribution_progress=build_heartbeat(job_id),
         on_cast_ready=enhanced.set_cast if enhanced is not None else None,
-        on_cast_report=build_cast_report_uploader(job_id),
+        on_cast_report=_cast_report_hook(job_id, config, scratch_dir, object_prefix),
     )
-    pipeline.run()
+    try:
+        pipeline.run()
+    except CastReviewRequested:
+        return AWAITING_CAST_REVIEW
+    return "finished"
+
+
+def _cast_report_hook(
+    job_id: uuid.UUID, config: Config, scratch_dir: str, object_prefix: str
+) -> Callable[[str], None]:
+    """What to do with the cast report once it exists: publish it, or park the job on it.
+
+    A job with ``cast_review`` on pauses when it has at least one character to review;
+    with nobody to review (or narrator-only) it just carries on.
+    """
+    publish = build_cast_report_uploader(job_id)
+    if not (config.cast_review and config.voice_mode == "cast"):
+        return publish
+    pause_for_review = build_cast_review_pause(job_id, scratch_dir, object_prefix)
+
+    def on_cast_report(report_path: str) -> None:
+        if _report_has_characters(report_path):
+            pause_for_review(report_path)
+        else:
+            publish(report_path)
+
+    return on_cast_report
+
+
+def _report_has_characters(report_path: str) -> bool:
+    try:
+        with open(report_path, encoding="utf-8") as report_file:
+            return bool(json.load(report_file).get("characters"))
+    except (OSError, ValueError):
+        return False  # an unreadable report is nothing to review: render rather than stall
 
 
 def _download_inputs(epub_object_key: str, object_prefix: str, scratch_dir: str) -> str:

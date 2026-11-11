@@ -18,6 +18,7 @@ from book2audio.assemble.filenames import (
 from book2audio.assemble.music import MUSIC_PRESETS
 from book2audio.attribution.base import ATTRIBUTOR_MODES, VOICE_MODES
 from book2audio.attribution.gender import validate_gender_overrides
+from book2audio.cast_review import validate_character_aliases
 from book2audio.tts.voices import (
     CHARACTER_VOICE_POOL,
     DEFAULT_NARRATOR_VOICE,
@@ -114,6 +115,12 @@ class Config:
     voice_mode: str = "cast"
     # Character name -> "m" or "f". The user's word beats every inference.
     gender_overrides: dict[str, str] = field(default_factory=dict)
+    # Detected name -> name that takes over its lines (the user's "same person" fixes
+    # from the cast review). The target may be the narrator.
+    character_aliases: dict[str, str] = field(default_factory=dict)
+    # Hosted jobs only: pause once the cast is known so the user can fix it before any
+    # audio is made. Ignored for narrator_only, which has no cast. The CLI never pauses.
+    cast_review: bool = False
 
     def validate(self) -> None:
         import os
@@ -153,6 +160,7 @@ class Config:
                 f"Unknown voice_mode {self.voice_mode!r}. Known: {', '.join(VOICE_MODES)}"
             )
         validate_gender_overrides(self.gender_overrides)
+        validate_character_aliases(self.character_aliases)
         if self.thumbnails_enhanced and not self.thumbnails:
             raise ValueError("thumbnails_enhanced requires thumbnails to be on")
         if self.chapter_limit < 0:

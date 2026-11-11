@@ -22,6 +22,7 @@ from rich.console import Console
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
 from book2audio.worker.render import render_job
@@ -82,7 +83,7 @@ def _process_job(claimed: _ClaimedJob) -> None:
     scratch_dir = os.path.join(tempfile.gettempdir(), f"book2audio-job-{claimed.id}")
     os.makedirs(scratch_dir, exist_ok=True)
     try:
-        render_job(
+        outcome = render_job(
             claimed.id,
             claimed.epub_object_key,
             claimed.config,
@@ -97,7 +98,12 @@ def _process_job(claimed: _ClaimedJob) -> None:
         _mark_failed(claimed.id, str(exc))
         console.print(f"[bold red]Worker failed:[/bold red] {exc}")
     else:
-        _mark_succeeded(claimed.id)
+        if outcome == AWAITING_CAST_REVIEW:
+            # Parked for the user: the status is already set. Confirming the cast queues
+            # the job again, and the resumed render restores its state from storage.
+            console.print(f"[yellow]Job {claimed.id} waits for its cast review.[/yellow]")
+        else:
+            _mark_succeeded(claimed.id)
     finally:
         shutil.rmtree(scratch_dir, ignore_errors=True)
 

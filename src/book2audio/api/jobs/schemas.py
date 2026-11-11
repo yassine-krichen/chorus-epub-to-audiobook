@@ -15,7 +15,16 @@ from book2audio.assemble.filenames import (
 from book2audio.assemble.music import MUSIC_PRESETS
 from book2audio.attribution.base import ATTRIBUTOR_MODES, VOICE_MODES
 from book2audio.attribution.gender import validate_gender_overrides
-from book2audio.tts.voices import FEMALE_VOICES, MALE_VOICES
+from book2audio.cast_review import validate_character_aliases
+from book2audio.tts.voices import (
+    CHARACTER_VOICE_POOL,
+    DEFAULT_NARRATOR_VOICE,
+    FEMALE_VOICES,
+    MALE_VOICES,
+)
+
+# Every voice a client may pick, the narrator's included.
+_KNOWN_VOICES = frozenset(CHARACTER_VOICE_POOL) | {DEFAULT_NARRATOR_VOICE}
 
 
 class UploadUrlRequest(BaseModel):
@@ -60,6 +69,23 @@ class JobConfig(BaseModel):
     voice_mode: str = "cast"
     # Character name -> "m" or "f"; the user's word beats the gender inference.
     gender_overrides: dict[str, str] = Field(default_factory=dict)
+    # Detected name -> the name that takes over its lines; set by the cast review, not the wizard.
+    character_aliases: dict[str, str] = Field(default_factory=dict)
+    # Pause after speakers and genders are worked out, so the user can fix the cast before
+    # any audio is made. On by default; a narrator-only job has no cast, so it never pauses.
+    cast_review: bool = True
+
+    @field_validator("character_aliases")
+    @classmethod
+    def _validate_character_aliases(cls, value: dict[str, str]) -> dict[str, str]:
+        validate_character_aliases(value)
+        return value
+
+    @model_validator(mode="after")
+    def _narrator_only_has_nothing_to_review(self) -> "JobConfig":
+        if self.voice_mode == "narrator_only":
+            self.cast_review = False
+        return self
 
     @field_validator("voice_mode")
     @classmethod
@@ -187,6 +213,8 @@ class JobDetail(JobSummary):
     chapters: list[ChapterProgress]
     parts: list[PartProgress]
     error_message: str | None
+    # Only while the job waits for its cast review: when the review lapses and the job is canceled.
+    cast_review_expires_at: datetime | None = None
 
 
 class JobListResponse(BaseModel):
@@ -218,6 +246,50 @@ class CastCharacter(BaseModel):
     sample_line: str = Field(max_length=300)
     layer_counts: dict[str, int] = Field(default_factory=dict)
     top_evidence: list[CastEvidence] = Field(default_factory=list, max_length=10)
+
+
+class CastReviewEdit(BaseModel):
+    """What the user decided about one character in the cast review.
+
+    A character is left alone (no entry), given a gender and/or a voice, merged into
+    another character, or handed to the narrator. Merging and the narrator replace the
+    character entirely, so they cannot be combined with a gender or a voice.
+    """
+
+    name: str = Field(min_length=1, max_length=200)
+    gender: Literal["m", "f"] | None = None
+    voice: str | None = None
+    merge_into: str | None = Field(default=None, min_length=1, max_length=200)
+    read_by_narrator: bool = False
+
+    @field_validator("voice")
+    @classmethod
+    def _validate_voice(cls, value: str | None) -> str | None:
+        if value is not None and value not in _KNOWN_VOICES:
+            raise ValueError(f"Unknown voice {value!r}. Known: {', '.join(sorted(_KNOWN_VOICES))}")
+        return value
+
+    @model_validator(mode="after")
+    def _one_decision_per_character(self) -> "CastReviewEdit":
+        replaced = self.merge_into is not None or self.read_by_narrator
+        if self.merge_into is not None and self.read_by_narrator:
+            raise ValueError("a character is either merged into another or read by the narrator")
+        if replaced and (self.gender is not None or self.voice is not None):
+            raise ValueError("a merged or narrator-read character takes no gender or voice")
+        return self
+
+
+class CastReviewRequest(BaseModel):
+    """The user's fixes to the detected cast. An empty list confirms it as it is."""
+
+    characters: list[CastReviewEdit] = Field(default_factory=list, max_length=500)
+
+    @model_validator(mode="after")
+    def _one_edit_per_character(self) -> "CastReviewRequest":
+        names = [edit.name for edit in self.characters]
+        if len(set(names)) != len(names):
+            raise ValueError("each character can appear only once")
+        return self
 
 
 class CastReport(BaseModel):

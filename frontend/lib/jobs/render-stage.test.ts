@@ -62,6 +62,18 @@ function makePart(
 }
 
 describe("deriveRenderStage", () => {
+  describe("cast review", () => {
+    it("returns awaiting-cast-review for a job waiting for the user, whatever else is known", () => {
+      const job = baseJob({ status: "awaiting_cast_review", total_chapters: 10 });
+      expect(deriveRenderStage(job)).toEqual({ kind: "awaiting-cast-review" });
+    });
+
+    it("returns awaiting-cast-review even before the chapter count is known", () => {
+      const job = baseJob({ status: "awaiting_cast_review", total_chapters: null });
+      expect(deriveRenderStage(job)).toEqual({ kind: "awaiting-cast-review" });
+    });
+  });
+
   describe("terminal statuses", () => {
     it("returns succeeded for a job with status succeeded", () => {
       const job = baseJob({ status: "succeeded", total_chapters: 5 });

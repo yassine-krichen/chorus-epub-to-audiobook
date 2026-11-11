@@ -16,14 +16,16 @@ import google.auth.exceptions
 import httpx
 from fastapi import HTTPException, status
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from book2audio.api.jobs import cloud_run
 from book2audio.api.jobs.schemas import (
     CastReport,
+    CastReviewRequest,
     ChapterProgress,
     CreateJobRequest,
+    JobConfig,
     JobDetail,
     JobListResponse,
     JobSummary,
@@ -35,7 +37,9 @@ from book2audio.assemble.filenames import (
     render_part_filenames,
 )
 from book2audio.cast_report import cast_report_object_key
+from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import Job
+from book2audio.models import NARRATOR
 from book2audio.storage.r2 import presign_get, read_object
 
 logger = logging.getLogger(__name__)
@@ -47,6 +51,31 @@ _MAX_CAST_REPORT_BYTES = 2 * 1024 * 1024
 # Beyond this, a "running" job with no heartbeat is treated as possibly stuck
 # and reconciled against the real Cloud Run execution state before responding.
 _STALE_HEARTBEAT = timedelta(minutes=15)
+
+_DEFAULT_CAST_REVIEW_TIMEOUT_HOURS = 48
+_MAX_CAST_REVIEW_TIMEOUT_HOURS = 24 * 30
+
+
+def cast_review_timeout() -> timedelta:
+    """How long a job may wait for its cast review before it is canceled.
+
+    ``CAST_REVIEW_TIMEOUT_HOURS`` (default 48). A bad value raises, and the API
+    checks it at startup like ``WORKER_MODE``, so a typo cannot silently mean
+    "never expires" or "expires at once".
+    """
+    raw = os.environ.get("CAST_REVIEW_TIMEOUT_HOURS", "")
+    if raw == "":
+        return timedelta(hours=_DEFAULT_CAST_REVIEW_TIMEOUT_HOURS)
+    try:
+        hours = int(raw)
+    except ValueError:
+        hours = 0
+    if not 1 <= hours <= _MAX_CAST_REVIEW_TIMEOUT_HOURS:
+        raise RuntimeError(
+            "CAST_REVIEW_TIMEOUT_HOURS must be a whole number of hours from 1 to "
+            f"{_MAX_CAST_REVIEW_TIMEOUT_HOURS}, got {raw!r}"
+        )
+    return timedelta(hours=hours)
 
 
 def _cloud_run_job_name() -> str:
@@ -227,7 +256,153 @@ def cancel_job(db: Session, user_id: uuid.UUID, job_id: uuid.UUID) -> Job | None
     return job
 
 
+def confirm_cast_review(
+    db: Session, user_id: uuid.UUID, job_id: uuid.UUID, payload: CastReviewRequest
+) -> Job | None:
+    """Apply the user's cast fixes and resume the paused job.
+
+    The job's settings gain the fixes (gender and voice choices, merges, narrator
+    hand-offs) and ``cast_review`` goes off so the resumed run renders. Resuming reuses
+    the attribution cache the worker stored, so no model call is paid twice.
+    ``None`` means no such job for this user; a job that is not waiting (or whose review
+    lapsed) is a 409, a fix naming someone who is not in the cast is a 422.
+    """
+    job = db.scalar(select(Job).where(Job.id == job_id, Job.user_id == user_id))
+    if job is None:
+        return None
+    _reconcile_if_stale(db, job)  # an overdue review is canceled here, not resumed
+    if job.status != AWAITING_CAST_REVIEW:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This job is not waiting for a cast review"
+        )
+    report = get_cast_report(job)
+    if report is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "The detected cast is no longer available. Cancel this job and create it again.",
+        )
+    new_config = _config_with_review(job.config, report, payload)
+
+    local = worker_mode() == "local"
+    requested_at = job.cast_review_requested_at
+    # Only one confirmation can win: a second click, or the expiry, finds the status
+    # already changed and updates no row.
+    claimed = db.execute(
+        update(Job)
+        .where(Job.id == job.id, Job.status == AWAITING_CAST_REVIEW)
+        .values(
+            config=new_config,
+            status="queued" if local else "running",
+            cast_review_requested_at=None,
+            last_heartbeat_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+    if claimed.rowcount != 1:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This job is not waiting for a cast review"
+        )
+    db.refresh(job)
+    if local:
+        return job  # the local daemon picks the queued job up and resumes it
+
+    try:
+        execution = _trigger_render(job)
+    except (httpx.HTTPError, google.auth.exceptions.GoogleAuthError):
+        # Back to waiting, so the user can press the button again.
+        db.execute(
+            update(Job)
+            .where(Job.id == job.id, Job.status == "running")
+            .values(status=AWAITING_CAST_REVIEW, cast_review_requested_at=requested_at)
+        )
+        db.commit()
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "Failed to start render job"
+        ) from None
+    job.cloud_run_execution_name = execution
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def _config_with_review(
+    config: dict, report: CastReport, payload: CastReviewRequest
+) -> dict:
+    """The job's settings with the review's fixes folded in, validated as a whole."""
+    detected = {character.name for character in report.characters}
+    aliases = dict(config.get("character_aliases", {}))
+    genders = dict(config.get("gender_overrides", {}))
+    voices = dict(config.get("voice_overrides", {}))
+
+    for edit in payload.characters:
+        if edit.name not in detected:
+            raise HTTPException(
+                422, f"{edit.name!r} is not in the detected cast"
+            )
+        if edit.merge_into is not None and edit.merge_into not in detected:
+            raise HTTPException(
+                422,
+                f"{edit.merge_into!r} is not in the detected cast",
+            )
+        if edit.merge_into is not None or edit.read_by_narrator:
+            aliases[edit.name] = edit.merge_into if edit.merge_into is not None else NARRATOR
+            genders.pop(edit.name, None)
+            voices.pop(edit.name, None)
+            continue
+        if edit.gender is not None:
+            genders[edit.name] = edit.gender
+        if edit.voice is not None:
+            voices[edit.name] = edit.voice
+
+    merged = {
+        **config,
+        "character_aliases": aliases,
+        "gender_overrides": genders,
+        "voice_overrides": voices,
+        "cast_review": False,
+    }
+    try:
+        return JobConfig.model_validate(merged).model_dump()
+    except ValidationError as error:
+        message = str(error.errors()[0]["msg"]).removeprefix("Value error, ")
+        raise HTTPException(422, message) from None
+
+
+def cast_review_expires_at(job: Job) -> datetime | None:
+    """When a job waiting for its cast review is canceled if still unconfirmed."""
+    if job.status != AWAITING_CAST_REVIEW:
+        return None
+    started = job.cast_review_requested_at or job.last_heartbeat_at or job.created_at
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return started + cast_review_timeout()
+
+
+def _expire_review_if_lapsed(db: Session, job: Job) -> None:
+    expires_at = cast_review_expires_at(job)
+    if expires_at is None or datetime.now(timezone.utc) < expires_at:
+        return
+    # Conditional, so a confirmation that lands at the same moment is not overwritten.
+    db.execute(
+        update(Job)
+        .where(Job.id == job.id, Job.status == AWAITING_CAST_REVIEW)
+        .values(
+            status="canceled",
+            error_message=(
+                "The cast review was not confirmed in time, so nothing was rendered. "
+                "Create the job again to start over."
+            ),
+            finished_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+    db.refresh(job)
+
+
 def _reconcile_if_stale(db: Session, job: Job) -> None:
+    if job.status == AWAITING_CAST_REVIEW:
+        _expire_review_if_lapsed(db, job)
+        return
     if job.status != "running":
         return
     heartbeat = job.last_heartbeat_at
@@ -288,6 +463,7 @@ def to_detail(job: Job) -> JobDetail:
         chapters=[_to_chapter_progress(c, job) for c in job.chapters],
         parts=parts,
         error_message=job.error_message,
+        cast_review_expires_at=cast_review_expires_at(job),
     )
 
 

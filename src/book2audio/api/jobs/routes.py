@@ -1,4 +1,4 @@
-"""Job endpoints: upload URL, create, list, detail, cast report, cancel.
+"""Job endpoints: upload URL, create, list, detail, cast report, cast review, cancel.
 
 Stays thin — parses/validates the request, checks ownership where relevant,
 and delegates everything else to service.py.
@@ -15,6 +15,7 @@ from book2audio.api.deps import get_current_user, get_db
 from book2audio.api.jobs import service
 from book2audio.api.jobs.schemas import (
     CastReport,
+    CastReviewRequest,
     CreateJobRequest,
     CreateJobResponse,
     JobDetail,
@@ -90,6 +91,19 @@ def get_job_cast(
     if report is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Cast report not available")
     return report
+
+
+@router.post("/{job_id}/cast-review", response_model=CreateJobResponse)
+def confirm_cast_review(
+    job_id: uuid.UUID,
+    payload: CastReviewRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CreateJobResponse:
+    job = service.confirm_cast_review(db, current_user.id, job_id, payload)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+    return CreateJobResponse(job_id=job.id, status=job.status)
 
 
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -21,6 +21,8 @@ interface VoicePickerProps {
   value: string | null;
   onChange: (value: string | null) => void;
   allowNoPreference?: boolean;
+  /** Text of the option that maps to `null`. */
+  noPreferenceLabel?: string;
   placeholder?: string;
 }
 
@@ -31,6 +33,7 @@ export function VoicePicker({
   value,
   onChange,
   allowNoPreference = false,
+  noPreferenceLabel = "No preference",
   placeholder = "Select a voice",
 }: VoicePickerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -55,7 +58,7 @@ export function VoicePicker({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {allowNoPreference && <SelectItem value={NO_PREFERENCE}>No preference</SelectItem>}
+        {allowNoPreference && <SelectItem value={NO_PREFERENCE}>{noPreferenceLabel}</SelectItem>}
         {voices.map((voice) => {
           const canPlaySample = voice.sample_url && !brokenSamples.has(voice.id);
           return (

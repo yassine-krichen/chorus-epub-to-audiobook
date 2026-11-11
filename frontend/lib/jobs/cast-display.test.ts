@@ -85,17 +85,25 @@ describe("summarizeCast", () => {
 
 describe("shouldPollCast", () => {
   it("polls while a job is working and the report is not there yet", () => {
-    expect(shouldPollCast("running", false)).toBe(true);
-    expect(shouldPollCast("awaiting_cast_review", false)).toBe(true);
+    expect(shouldPollCast("running", false, 0)).toBe(true);
+    expect(shouldPollCast("awaiting_cast_review", false, 0)).toBe(true);
   });
 
-  it("stops once the report is loaded", () => {
-    expect(shouldPollCast("running", true)).toBe(false);
+  it("stops once the report is loaded and the first chapter is done", () => {
+    expect(shouldPollCast("running", true, 1)).toBe(false);
+  });
+
+  it("keeps refreshing a loaded report until the first chapter is done, for a resumed job", () => {
+    expect(shouldPollCast("running", true, 0)).toBe(true);
+  });
+
+  it("stops polling a job that waits for review once the report is loaded", () => {
+    expect(shouldPollCast("awaiting_cast_review", true, 0)).toBe(false);
   });
 
   it("does not poll for jobs that are queued or already over", () => {
-    expect(shouldPollCast("queued", false)).toBe(false);
-    expect(shouldPollCast("succeeded", false)).toBe(false);
-    expect(shouldPollCast("failed", false)).toBe(false);
+    expect(shouldPollCast("queued", false, 0)).toBe(false);
+    expect(shouldPollCast("succeeded", false, 0)).toBe(false);
+    expect(shouldPollCast("failed", false, 0)).toBe(false);
   });
 });

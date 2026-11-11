@@ -111,6 +111,25 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
           />
         </div>
       )}
+      {!narratorOnly && (
+        <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="cast-review-switch">Check the cast before rendering</Label>
+            <p className="text-xs text-muted-foreground">
+              After we work out who speaks, the job pauses and shows you each character with their
+              gender and voice. Fix what is wrong, merge two names for the same person, or hand a
+              character to the narrator, then start rendering. If you never confirm, the job is
+              canceled after two days and nothing is rendered. Turn this off to render straight
+              away.
+            </p>
+          </div>
+          <Switch
+            id="cast-review-switch"
+            checked={config.cast_review}
+            onCheckedChange={(checked) => onChange({ cast_review: checked })}
+          />
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">
         Narrator voice reads all narration. Male/female pickers bias (not force) character
         casting when a character&apos;s gender is worked out from the text. Defaults work fine if

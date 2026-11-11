@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 from rich.console import Console
 
+from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
 from book2audio.worker.render import (  # noqa: F401 - re-exported for tests/callers
@@ -39,11 +40,17 @@ def main() -> int:
     os.makedirs(scratch_dir, exist_ok=True)
 
     try:
-        render_job(job_id, epub_object_key, job_config, console, scratch_dir)
+        outcome = render_job(job_id, epub_object_key, job_config, console, scratch_dir)
     except Exception as exc:  # noqa: BLE001 - top-level worker boundary
         _mark_failed(job_id, str(exc))
         console.print(f"[bold red]Worker failed:[/bold red] {exc}")
         return 1
+
+    if outcome == AWAITING_CAST_REVIEW:
+        # Parked for the user: the status is already set, and confirming the cast
+        # starts a fresh execution that resumes from the uploaded state.
+        console.print("[yellow]Cast ready for review, stopping until it is confirmed.[/yellow]")
+        return 0
 
     _mark_succeeded(job_id)
     return 0
