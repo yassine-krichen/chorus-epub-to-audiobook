@@ -67,8 +67,14 @@ MAX_RETRY_AFTER_SECONDS = 10.0
 # One unusable reply is often just that window; a model that fails twice in a
 # row is not worth another request.
 MAX_BAD_REPLIES = 2
-# Auth failures belong to the key, not the model: rotating cannot help.
-_KEY_WIDE_STATUSES = frozenset({401, 403})
+# A rejected key belongs to the key, not the model: rotating cannot help. 403 is
+# deliberately not here: some gateways answer it for "model not on your tier".
+_KEY_WIDE_STATUSES = frozenset({401})
+# How long a model rests after a timeout, a 5xx without Retry-After or a network
+# error: the outage is probably brief, so it must not be skipped for the whole run.
+OUTAGE_COOLDOWN_SECONDS = 120.0
+# Status for an unknown model name: no later request can fix that.
+_UNKNOWN_MODEL_STATUS = 404
 
 _FENCE = re.compile(r"^```[a-zA-Z0-9_-]*\s*\n?(.*?)\n?```\s*$", re.DOTALL)
 
@@ -87,11 +93,13 @@ class _ModelFailure(Exception):
         retryable: bool = False,
         retry_after: float | None = None,
         bad_reply: bool = False,
+        outage: bool = False,
     ) -> None:
         super().__init__(message)
         self.retryable = retryable  # worth another attempt on the same model
         self.retry_after = retry_after  # seconds the provider asked us to wait
         self.bad_reply = bad_reply  # the model answered, but not usably
+        self.outage = outage  # probably brief (timeout, 5xx): cool for a finite time
 
 
 def require_llm_attribution_configured() -> None:
@@ -128,6 +136,8 @@ class LLMClient:
 
     One instance is one run: it remembers which models it has cooled. ``model``
     (a name or a comma-separated list) overrides the environment, e.g. for evals.
+    Not thread-safe: the cooling state and counters are plain attributes, so
+    give each thread its own instance.
     """
 
     def __init__(
@@ -168,8 +178,8 @@ class LLMClient:
         Per model: a timeout, connect error or 5xx is retried once (``max_attempts``
         in total, with a short backoff), and so is a 429 whose ``Retry-After`` is
         short. Any other 429, and any other failure, cools the model at once.
-        Auth errors (401/403) fail the whole call: another model would get the
-        same answer. :class:`LLMError` means every live model failed this request.
+        A 401 fails the whole call: another model would get the same answer.
+        :class:`LLMError` means every live model failed this request.
         """
         failures: list[str] = []
         for model in self._live_models():
@@ -219,10 +229,13 @@ class LLMClient:
             self._bad_replies[model] = strikes
             if strikes < MAX_BAD_REPLIES:
                 return
-        # A Retry-After says when the model is usable again; without one the
-        # cap is assumed to last (free-tier daily limits send no header).
+        # A Retry-After says when the model is usable again. Without one, a 429
+        # is assumed to be a daily cap (free tiers send no header) and lasts for
+        # the run, while an outage gets a finite rest.
         wait = failure.retry_after
-        self._cooled_until[model] = math.inf if wait is None else time.monotonic() + wait
+        if wait is None:
+            wait = OUTAGE_COOLDOWN_SECONDS if failure.outage else math.inf
+        self._cooled_until[model] = time.monotonic() + wait
         logger.warning(
             "LLM model %s cooled (%s); the next model in the chain takes over", model, failure
         )
@@ -250,9 +263,15 @@ class LLMClient:
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=self.timeout,
             )
-        # TransportError covers timeouts, connect, read and protocol errors.
-        except httpx.TransportError as exc:
-            raise _ModelFailure(f"{type(exc).__name__}: {exc}", retryable=True) from exc
+        # HTTPError is the base of everything httpx raises while sending: transport
+        # errors (timeouts, connect, protocol) are worth a retry; the rest
+        # (too many redirects, bad URL, undecodable body) are not.
+        except httpx.HTTPError as exc:
+            raise _ModelFailure(
+                f"{type(exc).__name__}: {exc}",
+                retryable=isinstance(exc, httpx.TransportError),
+                outage=True,
+            ) from exc
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -270,11 +289,18 @@ class LLMClient:
                 raise _ModelFailure(message, retryable=short, retry_after=retry_after) from exc
             if status >= 500:
                 raise _ModelFailure(
-                    message, retryable=retry_after is None or short, retry_after=retry_after
+                    message,
+                    retryable=retry_after is None or short,
+                    retry_after=retry_after,
+                    outage=True,
                 ) from exc
-            # Other 4xx (unknown model, prompt too large for this one): the
-            # request is wrong for this model, so retrying it cannot help.
-            raise _ModelFailure(message) from exc
+            if status == _UNKNOWN_MODEL_STATUS:
+                # The name is wrong, and that stays true for the whole run.
+                raise _ModelFailure(message) from exc
+            # Other 4xx (content filter, prompt too large for this one, validation)
+            # are about this request, not the model: retrying it cannot help, but
+            # the model may well answer the next window, so it only takes a strike.
+            raise _ModelFailure(message, bad_reply=True) from exc
         try:
             content = response.json()["choices"][0]["message"]["content"]
         except (KeyError, IndexError, ValueError, TypeError) as exc:

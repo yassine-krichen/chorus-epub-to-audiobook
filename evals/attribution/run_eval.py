@@ -121,7 +121,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _pinned_model(cli_model: str | None) -> str:
-    model = (cli_model or os.environ.get("FREELLMAPI_MODEL") or "").strip()
+    model = (
+        cli_model
+        or os.environ.get("FREELLMAPI_MODEL_ATTRIBUTION")
+        or os.environ.get("FREELLMAPI_MODEL")
+        or ""
+    ).strip()
     if not model or model.lower() == "auto":
         raise ValueError(
             "refusing to evaluate with model 'auto' (or none): set FREELLMAPI_MODEL (or --model) "

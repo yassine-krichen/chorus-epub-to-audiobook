@@ -76,7 +76,11 @@ class AttributionReport:
     windows_skipped: int = 0  # dialogue windows with no target line (hybrid)
     windows_failed: int = 0
     windows_unprocessed: int = 0  # not attempted: budget exhausted or breaker open
+    # ``calls`` counts windows sent (what the budget caps); ``requests`` counts the
+    # HTTP requests behind them, which retries and model rotation can multiply.
     calls: int = 0
+    requests: int = 0
+    rate_limited: int = 0  # of those requests, answered 429
     cache_hits: int = 0
     lines_targeted: int = 0
     lines_changed: int = 0
@@ -86,7 +90,8 @@ class AttributionReport:
 
     def summary(self) -> str:
         return (
-            f"LLM attribution ({self.mode}): {self.calls} call(s), "
+            f"LLM attribution ({self.mode}): {self.calls} call(s) "
+            f"({self.requests} request(s), {self.rate_limited} rate limited), "
             f"{self.cache_hits} cache hit(s), {self.windows} window(s) "
             f"({self.windows_skipped} skipped, {self.windows_failed} failed, "
             f"{self.windows_unprocessed} unprocessed), {self.lines_targeted} line(s) "
@@ -213,6 +218,7 @@ class LLMAttributor:
     def attribute(self, chapters: list[Chapter]) -> list[str]:
         self._heuristic.attribute(chapters)
         self.report = report = AttributionReport(mode=self.mode)
+        requests_before, limited_before = self._client_counters()
         known = self._known_names(chapters)
 
         # Snapshot before any change: prompts and the changed-lines count must
@@ -261,11 +267,19 @@ class LLMAttributor:
             for i, seg in enumerate(c.segments)
             if seg.kind == SegmentKind.DIALOGUE and seg.speaker != before[(c.index, i)]
         )
+        requests_after, limited_after = self._client_counters()
+        report.requests = requests_after - requests_before
+        report.rate_limited = limited_after - limited_before
         self._finish_warnings(report)
 
         names = self._speaker_names(chapters)
         self._heuristic.infer_genders(names, chapters)
         return names
+
+    def _client_counters(self) -> tuple[int, int]:
+        # Duck-typed clients (test doubles, custom transports) may not count.
+        client = self._client
+        return (getattr(client, "requests", 0), getattr(client, "rate_limited", 0))
 
     def _attribute_window(self, window: _Window, before: dict, known: list[str]) -> str:
         """Label one window. Returns ``cached``, ``answered``, ``failed`` or ``unprocessed``.

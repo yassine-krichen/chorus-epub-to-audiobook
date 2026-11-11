@@ -82,7 +82,17 @@ stateDiagram-v2
   Retry-After time, when the gateway sends one) and a warning is logged. Nothing in the
   website or the job page changes.
 - The job's request budget still counts one per window, not one per HTTP request, so a
-  window that tries two models uses one unit of budget.
+  window that tries two models uses one unit of budget. The run summary also prints the
+  real number of HTTP requests and how many were rate limited.
+- A model that times out or answers 5xx without a Retry-After rests for two minutes, not
+  the whole run. A 429 without Retry-After (a daily cap) and an unknown model (404) rest
+  for the whole run. A 400, 413 or 422 (content filter, prompt too large) is held against
+  the request, not the model: it takes a strike and is cooled only after two in a row.
+  Only a 401 stops the call at once; a 403 moves on to the next model.
+- **One-time cache reset.** This release changes what the attribution and scene-brief
+  caches are keyed on, so the first resume of an existing job asks the models again for
+  every window once. After that the caches work as before.
+- One `LLMClient` is one run and is not thread-safe: give each thread its own.
 
 ## Defaults (when nothing is set)
 

@@ -299,6 +299,7 @@ def test_a_changed_download_hash_is_refused_without_repin(workspace, monkeypatch
 def llm_env(monkeypatch):
     monkeypatch.setenv("FREELLMAPI_BASE_URL", "https://example.invalid/v1")
     monkeypatch.setenv("FREELLMAPI_API_KEY", "sk-test-SECRET-9f3a")
+    monkeypatch.delenv("FREELLMAPI_MODEL_ATTRIBUTION", raising=False)
 
 
 @pytest.mark.parametrize("model", ["auto", "AUTO", " auto ", ""])
@@ -320,6 +321,20 @@ def test_pinned_model_accepts_a_concrete_model_from_env_or_flag(monkeypatch, llm
     monkeypatch.setenv("FREELLMAPI_MODEL", "gpt-oss-120b")
     assert run_eval._pinned_model(None) == "gpt-oss-120b"
     assert run_eval._pinned_model("other-model") == "other-model"
+
+
+def test_pinned_model_accepts_the_per_task_attribution_variable(monkeypatch, llm_env):
+    monkeypatch.setenv("FREELLMAPI_MODEL", "shared-model")
+    monkeypatch.setenv("FREELLMAPI_MODEL_ATTRIBUTION", "gpt-oss-120b")
+
+    assert run_eval._pinned_model(None) == "gpt-oss-120b"
+
+
+def test_pinned_model_refuses_a_chain_in_the_attribution_variable(monkeypatch, llm_env):
+    monkeypatch.setenv("FREELLMAPI_MODEL_ATTRIBUTION", "a,b")
+
+    with pytest.raises(ValueError, match="model list"):
+        run_eval._pinned_model(None)
 
 
 def test_pinned_model_refuses_a_model_chain(monkeypatch, llm_env):

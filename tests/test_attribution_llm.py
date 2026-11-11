@@ -701,6 +701,17 @@ def test_the_report_summary_is_a_single_line(monkeypatch):
     assert "1 call(s)" in summary and "budget exhausted: no" in summary
 
 
+def test_the_report_counts_http_requests_apart_from_windows(monkeypatch):
+    _install(monkeypatch, _echo_post("Nephis"))
+    attributor = _attributor("hybrid")
+    attributor.attribute([_alternation_chapter()])
+
+    report = attributor.report
+
+    assert report.calls == 1 and report.requests == 1 and report.rate_limited == 0
+    assert "1 request(s), 0 rate limited" in report.summary()
+
+
 # --- client ------------------------------------------------------------------
 
 

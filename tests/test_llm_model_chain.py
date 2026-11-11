@@ -215,14 +215,110 @@ def test_a_model_the_gateway_does_not_know_is_skipped(monkeypatch):
     assert asked == ["typo", "b"]  # a 404 is not retried
 
 
-@pytest.mark.parametrize("status", [401, 403])
-def test_a_rejected_key_fails_the_call_without_rotating(monkeypatch, status):
-    asked = _gateway(monkeypatch, {"a": _error(status), "b": _ok()})
+def test_a_rejected_key_fails_the_call_without_rotating(monkeypatch):
+    asked = _gateway(monkeypatch, {"a": _error(401), "b": _ok()})
 
-    with pytest.raises(LLMError, match=str(status)):
+    with pytest.raises(LLMError, match="401"):
         LLMClient(model="a,b").complete_json("sys", "user")
 
     assert asked == ["a"]
+
+
+def test_a_403_rotates_because_some_gateways_use_it_for_a_model_not_on_the_tier(monkeypatch):
+    asked = _gateway(monkeypatch, {"a": _error(403, "model not on your tier"), "b": _ok()})
+
+    LLMClient(model="a,b").complete_json("sys", "user")
+
+    assert asked == ["a", "b"]
+
+
+def test_an_unknown_model_is_cooled_for_the_rest_of_the_run(monkeypatch):
+    _gateway(monkeypatch, {"typo": _error(404), "b": _ok()})
+    client = LLMClient(model="typo,b")
+
+    client.complete_json("sys", "user")
+
+    assert client.cooled_models == ("typo",)
+
+
+@pytest.mark.parametrize("status", [400, 413, 422])
+def test_a_request_the_model_rejected_takes_a_strike_instead_of_cooling_it(monkeypatch, status):
+    # A content filter or an oversized prompt is about one window, not the model.
+    asked = _gateway(monkeypatch, {"a": [_error(status), _ok()], "b": _ok()})
+    client = LLMClient(model="a,b")
+
+    client.complete_json("sys", "one")
+    assert asked == ["a", "b"]
+    assert client.cooled_models == ()  # first strike only
+
+    client.complete_json("sys", "two")  # a answers this window
+    assert asked == ["a", "b", "a"]
+    assert client.cooled_models == ()
+
+
+@pytest.mark.parametrize("status", [400, 413, 422])
+def test_two_rejected_requests_in_a_row_cool_the_model(monkeypatch, status):
+    _gateway(monkeypatch, {"a": _error(status), "b": _ok()})
+    client = LLMClient(model="a,b")
+
+    client.complete_json("sys", "one")
+    client.complete_json("sys", "two")
+
+    assert client.cooled_models == ("a",)
+
+
+def test_an_outage_cools_the_model_for_a_while_not_for_the_whole_run(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(llm_client.time, "monotonic", lambda: now[0])
+    _gateway(monkeypatch, {"a": [_error(503), _error(503), _ok()], "b": _ok()})
+    client = LLMClient(model="a,b")
+
+    client.complete_json("sys", "one")
+    assert client.cooled_models == ("a",)
+
+    now[0] += llm_client.OUTAGE_COOLDOWN_SECONDS + 1
+    assert client.cooled_models == ()
+
+
+def test_a_timeout_cooldown_is_finite_too(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(llm_client.time, "monotonic", lambda: now[0])
+    _gateway(monkeypatch, {"a": httpx.ReadTimeout("slow"), "b": _ok()})
+    client = LLMClient(model="a,b")
+
+    client.complete_json("sys", "one")
+    assert client.cooled_models == ("a",)
+
+    now[0] += llm_client.OUTAGE_COOLDOWN_SECONDS + 1
+    assert client.cooled_models == ()
+
+
+def test_a_429_without_retry_after_still_cools_for_the_rest_of_the_run(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(llm_client.time, "monotonic", lambda: now[0])
+    _gateway(monkeypatch, {"a": _error(429), "b": _ok()})
+    client = LLMClient(model="a,b")
+
+    client.complete_json("sys", "one")
+
+    now[0] += 10**9
+    assert client.cooled_models == ("a",)
+
+
+def test_a_non_transport_http_error_rotates_without_a_retry(monkeypatch, _sleeps):
+    asked = _gateway(monkeypatch, {"a": httpx.TooManyRedirects("loop"), "b": _ok()})
+
+    LLMClient(model="a,b").complete_json("sys", "user")
+
+    assert asked == ["a", "b"]
+    assert _sleeps == []
+
+
+def test_a_non_transport_http_error_on_every_model_is_an_llm_error(monkeypatch):
+    _gateway(monkeypatch, {"a": httpx.DecodingError("bad gzip")})
+
+    with pytest.raises(LLMError, match="DecodingError"):
+        LLMClient(model="a").complete_json("sys", "user")
 
 
 # --- Retry-After -------------------------------------------------------------------

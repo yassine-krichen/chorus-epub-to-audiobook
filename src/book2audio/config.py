@@ -102,8 +102,9 @@ class Config:
     # Who speaks each line: the offline heuristic, or an LLM (``llm`` asks about
     # every line, ``hybrid`` only about lines the heuristic had to guess). LLM
     # modes need freellmapi credentials and stop calling after
-    # ``attribution_max_calls`` windows (a retried request is not counted again),
-    # keeping heuristic labels for the rest.
+    # ``attribution_max_calls`` windows, keeping heuristic labels for the rest.
+    # That caps windows, not HTTP requests: a retry or a rotation to the next model
+    # sends another request for the same window (the run summary reports both).
     attributor: str = "heuristic"
     attribution_max_calls: int = 150
 
