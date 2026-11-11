@@ -72,3 +72,21 @@ def test_gender_inferred_from_dialogue_tag_pronouns():
     attr.attribute([ch])
     assert ch.segments[0].speaker == "Sunny"
     assert attr.genders.get("Sunny") == "m"
+
+
+def test_trailing_tag_keeps_the_period_of_an_abbreviated_title():
+    ch = _chapter([_dlg("Come here."), _nar("said Mrs. Schofield.")])
+    HeuristicAttributor().attribute([ch])
+    assert ch.segments[0].speaker == "Mrs. Schofield"
+
+
+def test_name_before_verb_keeps_the_period_of_an_abbreviated_title():
+    ch = _chapter([_dlg("Stop that."), _nar("Mr. Williams exclaimed.")])
+    HeuristicAttributor().attribute([ch])
+    assert ch.segments[0].speaker == "Mr. Williams"
+
+
+def test_saint_and_doctor_titles_survive_in_speaker_names():
+    ch = _chapter([_dlg("Hold still."), _nar("said Dr. Watson."), _dlg("No."), _nar("said St. Clair.")])
+    HeuristicAttributor().attribute([ch])
+    assert [ch.segments[0].speaker, ch.segments[2].speaker] == ["Dr. Watson", "St. Clair"]

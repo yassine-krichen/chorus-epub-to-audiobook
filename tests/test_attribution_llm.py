@@ -1127,3 +1127,46 @@ def test_pipeline_only_attributes_the_selected_chapters_with_the_model(monkeypat
     pipeline._load_and_prepare()
 
     assert post.call_count == 1
+
+
+def _titled_chapter():
+    # Line 3 is untagged, so the heuristic alternates it onto Mr. Schofield.
+    return _chapter(
+        [
+            _dlg("Where is he?"),
+            _nar("asked Mrs. Schofield."),
+            _dlg("Upstairs."),
+            _nar("said Mr. Schofield."),
+            _dlg("Go and get him."),
+        ]
+    )
+
+
+def test_known_titled_names_are_offered_to_the_model_with_their_titles(monkeypatch):
+    post = MagicMock(return_value=_chat_body(_labels()))
+    _install(monkeypatch, post)
+
+    _attributor("llm").attribute([_titled_chapter()])
+
+    known = re.search(r"Known characters: (.*)", _prompt(post.call_args.kwargs))
+    assert known is not None
+    assert "Mrs. Schofield" in known.group(1) and "Mr. Schofield" in known.group(1)
+    assert not re.search(r"\bMrs?(?![.\w])", known.group(1))
+
+
+def test_a_titled_reply_survives_intact_and_never_collapses_to_the_bare_title(monkeypatch):
+    chapter = _titled_chapter()
+    _install(monkeypatch, MagicMock(return_value=_chat_body(_labels((5, "Mrs. Schofield")))))
+
+    _attributor("hybrid").attribute([chapter])
+
+    assert chapter.segments[4].speaker == "Mrs. Schofield"
+
+
+def test_a_reply_missing_the_title_period_canonicalizes_to_the_known_cast_name(monkeypatch):
+    chapter = _titled_chapter()
+    _install(monkeypatch, MagicMock(return_value=_chat_body(_labels((5, "Mrs Schofield")))))
+
+    _attributor("hybrid").attribute([chapter])
+
+    assert chapter.segments[4].speaker == "Mrs. Schofield"

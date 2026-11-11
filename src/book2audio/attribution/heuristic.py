@@ -28,8 +28,13 @@ _SPEECH_VERBS = (
     "interrupted|offered|warned|agreed|insisted|admitted|observed|scoffed"
 )
 
-# A proper name: one or two capitalized words. Avoids all-caps shouting.
-_NAME = r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?"
+# Abbreviated titles end in a period. Without handling them the name pattern
+# stops at that period and "Mrs. Schofield" is captured as just "Mrs".
+_TITLE = r"(?:(?:Mr|Mrs|Ms|Dr|St|Prof|Capt|Col|Gen|Rev|Messrs)\.\s+)?"
+
+# A proper name: an optional abbreviated title, then one or two capitalized
+# words. Avoids all-caps shouting.
+_NAME = _TITLE + r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?"
 
 # "said Sunny" / "asked the Changing Star" (verb precedes name)
 _VERB_THEN_NAME = re.compile(rf"\b(?:{_SPEECH_VERBS})\b\s+(?:the\s+)?({_NAME})")

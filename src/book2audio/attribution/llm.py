@@ -390,7 +390,7 @@ class LLMAttributor:
     ) -> int:
         """Apply the valid labels and return how many were applied."""
         by_id = {window.prompt_id(position): position for position in window.targets}
-        known_lookup = {name.lower(): name for name in known}
+        known_lookup = {_lookup_key(name): name for name in known}
         shown_text = window.shown_text()
         # Names found in this window only: a name must be present in the text
         # of every window it is used in, not just the first.
@@ -516,8 +516,8 @@ def _resolve_speaker(
     lowered = name.lower()
     if lowered == NARRATOR.lower():
         return NARRATOR
-    if lowered in known_lookup:
-        return known_lookup[lowered]
+    if _lookup_key(name) in known_lookup:
+        return known_lookup[_lookup_key(name)]
     if lowered in accepted_new:
         return accepted_new[lowered]
     # A new name must be backed by the text, otherwise it is a hallucination.
@@ -533,6 +533,11 @@ def _resolve_speaker(
         return None
     accepted_new[lowered] = name
     return name
+
+
+def _lookup_key(name: str) -> str:
+    """Case- and period-insensitive key, so "Mrs Jones" matches "Mrs. Jones"."""
+    return name.lower().replace(".", "")
 
 
 def _looks_like_name(name: str) -> bool:
