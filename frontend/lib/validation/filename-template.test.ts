@@ -93,3 +93,33 @@ describe("previewFilenameTemplate", () => {
     expect(previewFilenameTemplate("{unknown}", "My Book")).toBe("{unknown}");
   });
 });
+
+describe("validateFilenameTemplate hardening", () => {
+  it("rejects a part width above the cap", () => {
+    expect(validateFilenameTemplate("{part:011d}")).not.toBeNull();
+    expect(validateFilenameTemplate("{part:0999999999d}")).not.toBeNull();
+  });
+
+  it("accepts a part width at the cap", () => {
+    expect(validateFilenameTemplate("{part:010d}")).toBeNull();
+  });
+
+  it("rejects a template longer than 200 characters", () => {
+    expect(validateFilenameTemplate("a".repeat(201))).not.toBeNull();
+    expect(validateFilenameTemplate("a".repeat(200))).toBeNull();
+  });
+
+  it("rejects bidi and separator characters in literal text", () => {
+    for (const char of ["\u202e", "\u200f", "\u2066", "\u2028"]) {
+      expect(validateFilenameTemplate(`a${char}b{title}`)).not.toBeNull();
+    }
+  });
+
+  it("allows ZWNJ and ZWJ in literal text", () => {
+    expect(validateFilenameTemplate("a\u200cb\u200d{title}")).toBeNull();
+  });
+
+  it("rejects a part width written with non-ASCII digits", () => {
+    expect(validateFilenameTemplate("{part:0\u0661\u0660d}")).not.toBeNull();
+  });
+});

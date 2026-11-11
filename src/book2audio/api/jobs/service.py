@@ -7,6 +7,7 @@ a queue consumer or cron tomorrow) without dragging FastAPI along.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -29,6 +30,8 @@ from book2audio.api.jobs.schemas import (
 )
 from book2audio.db.models import Job
 from book2audio.storage.r2 import presign_get
+
+logger = logging.getLogger(__name__)
 
 # Beyond this, a "running" job with no heartbeat is treated as possibly stuck
 # and reconciled against the real Cloud Run execution state before responding.
@@ -248,15 +251,24 @@ def to_detail(job: Job) -> JobDetail:
     )
 
 
+def _render_download_filename(job: Job, part_number: int) -> str | None:
+    template = job.config.get("filename_template")
+    if not template:
+        return None
+    try:
+        return render_filename(template, title=job.title, part=part_number)
+    except ValueError:
+        # Jobs stored before the width cap / bidi checks can hold a template
+        # that no longer renders; serve the download under its storage name
+        # rather than failing the whole job detail response.
+        logger.warning("job.filename_template_invalid", extra={"job_id": str(job.id)})
+        return None
+
+
 def _to_part_progress(part: dict, job: Job) -> PartProgress:
     download_url = None
     if part.get("status") == "done" and job.artifacts_swept_at is None:
-        template = job.config.get("filename_template")
-        download_filename = (
-            render_filename(template, title=job.title, part=part["part_number"])
-            if template
-            else None
-        )
+        download_filename = _render_download_filename(job, part["part_number"])
         download_url = presign_get(part["r2_key"], download_filename=download_filename)
     return PartProgress(**part, download_url=download_url)
 

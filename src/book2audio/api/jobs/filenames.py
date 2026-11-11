@@ -11,11 +11,23 @@ from __future__ import annotations
 import re
 
 # Allowed placeholders: {title}, {part}, or {part:0Nd} (zero-padded width N).
+# The width is at most two ASCII digits (``\d`` would also match other Unicode
+# digits) and capped by MAX_PART_WIDTH: ``zfill`` with a client-chosen width
+# like 999999999 would allocate ~1 GB per request.
+MAX_PART_WIDTH = 10
 _PLACEHOLDER = re.compile(r"\{[^{}]*\}")
-_ALLOWED = re.compile(r"^\{title\}$|^\{part\}$|^\{part:0(?P<width>\d+)d\}$")
+_ALLOWED = re.compile(r"^\{title\}$|^\{part\}$|^\{part:0(?P<width>[0-9]{1,2})d\}$")
 
 # Filesystem-unsafe characters across Windows/macOS/Linux, plus control chars.
 _UNSAFE_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+# Unicode control characters (Cc), line/paragraph separators (Zl, Zp) and bidi
+# controls: invisible, and able to spoof a filename's displayed extension or
+# direction in a Content-Disposition header. Other format characters (ZWNJ,
+# ZWJ, soft hyphen) are deliberately kept: Persian and emoji titles need them.
+_UNSAFE_UNICODE = re.compile(
+    r"[\x00-\x1f\x7f-\x9f\u2028\u2029\u200e\u200f\u202a-\u202e\u2066-\u2069]"
+)
 
 
 def validate_filename_template(template: str) -> None:
@@ -32,16 +44,28 @@ def validate_filename_template(template: str) -> None:
     downstream (see ``storage.r2._content_disposition``).
     """
     for match in _PLACEHOLDER.finditer(template):
-        if not _ALLOWED.match(match.group(0)):
+        allowed = _ALLOWED.match(match.group(0))
+        if not allowed:
             raise ValueError(
                 f"Unsupported filename placeholder {match.group(0)!r}. "
                 "Allowed placeholders: {title}, {part}, {part:0Nd}"
             )
+        _check_part_width(allowed)
     _reject_unsafe_literal_text(_PLACEHOLDER.sub("", template))
 
 
+def _check_part_width(allowed: re.Match[str]) -> None:
+    width = allowed.group("width")
+    if width is not None and int(width) > MAX_PART_WIDTH:
+        raise ValueError(
+            f"Part width {int(width)} in {allowed.group(0)!r} exceeds the "
+            f"maximum of {MAX_PART_WIDTH}"
+        )
+
+
 def _sanitize_title(title: str) -> str:
-    cleaned = _UNSAFE_CHARS.sub("_", title).strip().strip(".")
+    cleaned = _UNSAFE_UNICODE.sub("", _UNSAFE_CHARS.sub("_", title))
+    cleaned = cleaned.strip().strip(".")
     return cleaned or "book"
 
 
@@ -50,11 +74,11 @@ def _reject_unsafe_literal_text(literal_text: str) -> None:
     characters that could break out of a quoted HTTP header parameter
     (``"``, ``\\``), traverse the filesystem (``..``, ``/``), or inject
     header/line content (control characters, including ``\\r``/``\\n``)."""
-    if _UNSAFE_CHARS.search(literal_text):
+    if _UNSAFE_CHARS.search(literal_text) or _UNSAFE_UNICODE.search(literal_text):
         raise ValueError(
             "filename_template contains unsafe characters outside its "
             "placeholders (quotes, backslashes, path separators, or "
-            "control characters are not allowed)"
+            "control or bidi characters are not allowed)"
         )
     if ".." in literal_text:
         raise ValueError("filename_template cannot contain '..' outside its placeholders")
@@ -81,6 +105,7 @@ def render_filename(template: str, *, title: str, part: int, extension: str = "m
             return safe_title
         if placeholder == "{part}":
             return str(part)
+        _check_part_width(allowed)
         width = int(allowed.group("width"))
         return str(part).zfill(width)
 

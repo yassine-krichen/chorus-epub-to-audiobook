@@ -157,3 +157,55 @@ def test_render_filename_accepts_normal_punctuation_in_literal_text():
         "{title} (Part {part:02d}) - Audiobook, vol. 1!", title="My Book", part=2
     )
     assert result == "My Book (Part 02) - Audiobook, vol. 1!.m4b"
+
+
+# --- resource-exhaustion and invisible-character hardening ------------------
+
+
+@pytest.mark.parametrize("template", ["{part:011d}", "{part:099d}", "{part:0999999999d}"])
+def test_part_width_above_cap_is_rejected(template):
+    with pytest.raises(ValueError):
+        validate_filename_template(template)
+    with pytest.raises(ValueError):
+        render_filename(template, title="Book", part=1)
+
+
+def test_part_width_at_cap_is_accepted():
+    validate_filename_template("{part:010d}")  # must not raise
+    assert render_filename("{part:010d}", title="Book", part=7) == "0000000007.m4b"
+
+
+def test_filename_template_longer_than_200_chars_is_rejected():
+    from pydantic import ValidationError
+
+    from book2audio.api.jobs.schemas import JobConfig
+
+    JobConfig(filename_template="a" * 200)  # boundary must not raise
+    with pytest.raises(ValidationError, match="at most 200"):
+        JobConfig(filename_template="a" * 201)
+
+
+def test_bidi_override_in_title_is_stripped_from_filename():
+    result = render_filename("{title}", title="Book\u202etxt.exe\u2066", part=1)
+    assert result == "Booktxt.exe.m4b"
+
+
+def test_line_separator_in_title_is_stripped_from_filename():
+    assert render_filename("{title}", title="a\u2028b\u2029c", part=1) == "abc.m4b"
+
+
+def test_zero_width_joiners_in_title_survive_for_persian_and_emoji_titles():
+    title = "\u06a9\u062a\u0627\u0628\u200c\u0647\u0627 \U0001f468\u200d\U0001f469"
+    assert render_filename("{title}", title=title, part=1) == f"{title}.m4b"
+
+
+@pytest.mark.parametrize("char", ["\u202e", "\u200f", "\u2066", "\u2028"])
+def test_validate_filename_template_rejects_bidi_and_separator_chars_in_literal_text(char):
+    with pytest.raises(ValueError, match="unsafe characters"):
+        validate_filename_template(f"a{char}b{{title}}")
+
+
+def test_part_width_with_non_ascii_digits_is_rejected():
+    # Arabic-Indic digits: Python's \d matches them, int() accepts them.
+    with pytest.raises(ValueError, match="Unsupported filename placeholder"):
+        validate_filename_template("{part:0\u0661\u0660d}")

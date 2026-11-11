@@ -6,16 +6,31 @@
  */
 
 const PLACEHOLDER = /\{[^{}]*\}/g;
-const ALLOWED = /^\{title\}$|^\{part\}$|^\{part:0(\d+)d\}$/;
+const ALLOWED = /^\{title\}$|^\{part\}$|^\{part:0([0-9]{1,2})d\}$/;
 
-// Filesystem-unsafe characters across Windows/macOS/Linux, plus control chars.
-const UNSAFE_CHARS = /[<>:"/\\|?*\x00-\x1f]/;
+export const MAX_FILENAME_TEMPLATE_LENGTH = 200;
+const MAX_PART_WIDTH = 10;
+
+// Filesystem-unsafe characters across Windows/macOS/Linux, plus control chars,
+// plus Unicode control (Cc), line/paragraph separators (Zl, Zp) and bidi
+// controls, mirroring the backend. ZWNJ/ZWJ are allowed on purpose: Persian
+// and emoji titles need them.
+const UNSAFE_CHARS =
+  /[<>:"/\\|?*\x00-\x1f\x7f-\x9f\u2028\u2029\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
 
 export function validateFilenameTemplate(template: string): string | null {
+  if (template.length > MAX_FILENAME_TEMPLATE_LENGTH) {
+    return `Template cannot be longer than ${MAX_FILENAME_TEMPLATE_LENGTH} characters.`;
+  }
+
   const placeholders = template.match(PLACEHOLDER) ?? [];
   for (const placeholder of placeholders) {
-    if (!ALLOWED.test(placeholder)) {
+    const allowed = ALLOWED.exec(placeholder);
+    if (!allowed) {
       return `Unsupported placeholder ${placeholder}. Allowed: {title}, {part}, {part:0Nd}`;
+    }
+    if (allowed[1] !== undefined && Number(allowed[1]) > MAX_PART_WIDTH) {
+      return `Part width in ${placeholder} cannot exceed ${MAX_PART_WIDTH}.`;
     }
   }
 

@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import { MUSIC_PRESETS } from "@/lib/constants/music-presets";
-import { validateFilenameTemplate } from "@/lib/validation/filename-template";
+import {
+  MAX_FILENAME_TEMPLATE_LENGTH,
+  validateFilenameTemplate,
+} from "@/lib/validation/filename-template";
 
 /**
  * Client-side shape/UX validation for the new-job form. Only
@@ -28,6 +31,7 @@ export const jobConfigSchema = z.object({
   filename_template: z
     .string()
     .min(1)
+    .max(MAX_FILENAME_TEMPLATE_LENGTH)
     .refine((value) => validateFilenameTemplate(value) === null, {
       message: "Invalid filename template",
     }),

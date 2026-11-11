@@ -209,6 +209,16 @@ def test_presign_get_rejects_a_download_filename_containing_a_backslash(fake_cli
     fake_client.generate_presigned_url.assert_not_called()
 
 
+@pytest.mark.parametrize("char", ["\u202e", "\u200f", "\u2066", "\u2028", "\x7f"])
+def test_presign_get_rejects_a_download_filename_containing_a_bidi_or_separator_char(
+    fake_client, char
+):
+    with pytest.raises(ValueError, match="Unsafe characters"):
+        r2.presign_get("k", download_filename=f"a{char}b.m4b")
+
+    fake_client.generate_presigned_url.assert_not_called()
+
+
 # --- list_objects: pages through list_objects_v2 ---------------------------
 
 

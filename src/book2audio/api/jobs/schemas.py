@@ -45,7 +45,7 @@ class JobConfig(BaseModel):
     music_volume: float = 0.22
     music_preset: str = "ambient"
     expressive: bool = True
-    filename_template: str | None = None
+    filename_template: str | None = Field(default=None, max_length=200)
     thumbnails: bool = False
     attributor: str = "heuristic"
 

@@ -19,7 +19,11 @@ from botocore.exceptions import ClientError
 # api.jobs.filenames.render_filename) are expected to have already
 # sanitized the filename -- this is a second, independent layer so this
 # module never trusts a caller's sanitization blindly.
-_UNSAFE_DISPOSITION_CHARS = re.compile(r'["\\\x00-\x1f]')
+# Also bidi controls and line/paragraph separators, which can spoof the
+# displayed filename (e.g. an RTL override flipping the extension).
+_UNSAFE_DISPOSITION_CHARS = re.compile(
+    r'["\\\x00-\x1f\x7f-\x9f\u200e\u200f\u202a-\u202e\u2066-\u2069\u2028\u2029]'
+)
 
 
 def _bucket() -> str:

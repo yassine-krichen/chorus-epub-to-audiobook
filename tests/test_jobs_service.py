@@ -426,6 +426,33 @@ def test_to_part_progress_omits_a_download_filename_when_no_template_is_configur
     presign_get.assert_called_once_with("jobs/1/part-01.m4b", download_filename=None)
 
 
+@pytest.mark.parametrize("template", ["{part:0999999999d}", "a\u202eb{title}"])
+def test_job_detail_with_legacy_invalid_template_returns_no_download_filename(
+    monkeypatch, template
+):
+    """Jobs stored before the width cap / bidi checks must not 500 on read."""
+    presign_get = MagicMock(return_value="https://signed-url")
+    monkeypatch.setattr(service, "presign_get", presign_get)
+    job = SimpleNamespace(
+        id=uuid.uuid4(),
+        title="My Book",
+        config={"filename_template": template},
+        artifacts_swept_at=None,
+    )
+    part = {
+        "part_number": 1,
+        "first_index": 1,
+        "last_index": 1,
+        "r2_key": "jobs/1/part-01.m4b",
+        "status": "done",
+    }
+
+    result = service._to_part_progress(part, job)
+
+    assert result.download_url == "https://signed-url"
+    presign_get.assert_called_once_with("jobs/1/part-01.m4b", download_filename=None)
+
+
 def test_to_part_progress_does_not_presign_a_part_that_is_not_yet_done(monkeypatch):
     presign_get = MagicMock()
     monkeypatch.setattr(service, "presign_get", presign_get)
