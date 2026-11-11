@@ -53,6 +53,8 @@ class JobConfig(BaseModel):
     expressive: bool = True
     filename_template: str | None = Field(default=None, max_length=200)
     thumbnails: bool = False
+    # "Smarter thumbnails": a language model reads each chapter before its picture.
+    thumbnails_enhanced: bool = False
     attributor: str = "heuristic"
     # "cast" = a voice per character; "narrator_only" = the narrator reads everything.
     voice_mode: str = "cast"
@@ -87,6 +89,12 @@ class JobConfig(BaseModel):
         if value is not None:
             validate_filename_template(value)
         return value
+
+    @model_validator(mode="after")
+    def _validate_enhanced_thumbnails_need_thumbnails(self) -> "JobConfig":
+        if self.thumbnails_enhanced and not self.thumbnails:
+            raise ValueError("thumbnails_enhanced requires thumbnails to be on")
+        return self
 
     @model_validator(mode="after")
     def _validate_chapter_title_needs_one_file_per_chapter(self) -> "JobConfig":

@@ -94,6 +94,10 @@ class Config:
     # Per-chapter cover thumbnails via freellmapi. Off by default; enabling it
     # without freellmapi credentials configured fails fast at worker startup.
     thumbnails: bool = False
+    # Level 2 thumbnails: a language model reads each chapter first and writes a scene
+    # brief for the picture. Only valid with ``thumbnails``; without chat credentials
+    # the job quietly stays at the plain template prompt.
+    thumbnails_enhanced: bool = False
 
     # Who speaks each line: the offline heuristic, or an LLM (``llm`` asks about
     # every line, ``hybrid`` only about lines the heuristic had to guess). LLM
@@ -149,6 +153,8 @@ class Config:
                 f"Unknown voice_mode {self.voice_mode!r}. Known: {', '.join(VOICE_MODES)}"
             )
         validate_gender_overrides(self.gender_overrides)
+        if self.thumbnails_enhanced and not self.thumbnails:
+            raise ValueError("thumbnails_enhanced requires thumbnails to be on")
         if self.chapter_limit < 0:
             raise ValueError("chapter_limit cannot be negative")
         if self.start_chapter is not None and self.start_chapter < 0:

@@ -10,10 +10,12 @@ from __future__ import annotations
 import os
 
 import numpy as np
+import pytest
 
 import book2audio.pipeline as pipeline_module
+from book2audio.attribution.gender import GenderVerdict
 from book2audio.config import Config
-from book2audio.models import BookMetadata, Chapter, Segment, SegmentKind
+from book2audio.models import Book, BookMetadata, Chapter, Segment, SegmentKind
 from book2audio.pipeline import Pipeline
 from book2audio.state import RenderState
 from book2audio.tts.voices import VoiceCast
@@ -149,3 +151,31 @@ def test_on_chapter_done_is_not_required_and_defaults_to_none(tmp_path, monkeypa
     )
 
     assert len(outputs) == 1
+
+
+class _StopRun(Exception):
+    """Ends Pipeline.run() right after the stage under test."""
+
+
+def test_on_cast_ready_receives_the_characters_and_their_gender_verdicts_before_rendering(
+    tmp_path, monkeypatch
+):
+    (tmp_path / "book.epub").write_bytes(b"fake")
+    received = []
+    cfg, p = _pipeline(tmp_path, on_cast_ready=lambda names, verdicts: received.append((names, verdicts)))
+
+    def _fake_load_and_prepare(**_):
+        p._characters = ["Sunny", "Nephis"]
+        p._verdicts = {"Sunny": GenderVerdict("Sunny", "m", 0.9, ())}
+        return Book(metadata=BookMetadata(title="Book", author="A"), chapters=[])
+
+    def _stop(_book):
+        raise _StopRun
+
+    monkeypatch.setattr(p, "_load_and_prepare", _fake_load_and_prepare)
+    monkeypatch.setattr(p, "_cast_voices", _stop)
+
+    with pytest.raises(_StopRun):
+        p.run()
+
+    assert received == [(["Sunny", "Nephis"], {"Sunny": GenderVerdict("Sunny", "m", 0.9, ())})]

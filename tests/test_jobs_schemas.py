@@ -42,6 +42,19 @@ def test_job_config_accepts_thumbnails_true():
     assert JobConfig(thumbnails=True).thumbnails is True
 
 
+def test_job_config_defaults_enhanced_thumbnails_to_false():
+    assert JobConfig().thumbnails_enhanced is False
+
+
+def test_job_config_accepts_enhanced_thumbnails_together_with_thumbnails():
+    assert JobConfig(thumbnails=True, thumbnails_enhanced=True).thumbnails_enhanced is True
+
+
+def test_job_config_rejects_enhanced_thumbnails_without_thumbnails():
+    with pytest.raises(ValidationError, match="thumbnails_enhanced requires thumbnails"):
+        JobConfig(thumbnails=False, thumbnails_enhanced=True)
+
+
 # --- male_voice / female_voice / music_preset validation --------------------
 #
 # These fields previously had no pydantic-level validation, so a bad value

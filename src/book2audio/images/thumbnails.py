@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Bump whenever the prompt template changes: it is part of the content hash, so
 # thumbnails cached under an older template are regenerated on the next run.
-TEMPLATE_VERSION = "template-v1"
+TEMPLATE_VERSION = "template-v2"
 
 _EXCERPT_CHARS = 400
 _EXCERPT_MIN_SENTENCE_CHARS = 150
@@ -116,7 +116,7 @@ def _chapter_title_without_number(title: str) -> str:
     return _CHAPTER_PREFIX.sub("", title, count=1).strip() or title.strip()
 
 
-def _prompt_safe(text: str) -> str:
+def prompt_safe(text: str) -> str:
     """Flatten untrusted epub text to plain words: no newlines, invisible
     control characters, or quote/bracket characters that could break the prompt."""
     text = _CONTROL_CHARS.sub(" ", text)
@@ -124,7 +124,7 @@ def _prompt_safe(text: str) -> str:
     return " ".join(text.split())
 
 
-def _cap_at_word(text: str, limit: int) -> str:
+def cap_at_word(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     cut = text[:limit]
@@ -144,34 +144,43 @@ def _excerpt(chapter: Chapter) -> str:
     sentence_end = max(cut.rfind(mark) for mark in ".!?")
     if sentence_end >= _EXCERPT_MIN_SENTENCE_CHARS:
         return cut[: sentence_end + 1]
-    return _cap_at_word(cut, _EXCERPT_CHARS)
+    return cap_at_word(cut, _EXCERPT_CHARS)
 
 
-def build_prompt(book_title: str, chapter: Chapter) -> str:
-    """Fill the engineered key-art template (no LLM call).
+def build_prompt(book_title: str, chapter: Chapter, *, scene: str | None = None) -> str:
+    """Fill the engineered illustration template (no LLM call).
 
     freellmapi's image endpoint has no negative-prompt field, so the
-    "no text / watermark" constraints are spelled out inline.
+    "no text / watermark" constraints are spelled out inline. ``scene`` (the
+    enhanced level's already-sanitised scene description) replaces the raw
+    excerpt; the style, composition and no-text constraints stay the same.
     """
-    title = _cap_at_word(_prompt_safe(clean_book_title(book_title)), _TITLE_MAX_CHARS)
-    book = f"the book {title}" if title else "an untitled book"
+    title = cap_at_word(prompt_safe(clean_book_title(book_title)), _TITLE_MAX_CHARS)
+    book = f"the novel {title}" if title else "an untitled novel"
 
-    chapter_title = _cap_at_word(
-        _prompt_safe(_chapter_title_without_number(chapter.title)), _TITLE_MAX_CHARS
+    chapter_title = cap_at_word(
+        prompt_safe(_chapter_title_without_number(chapter.title)), _TITLE_MAX_CHARS
     )
     # Number 0 is front matter or a prologue: there is no chapter number to name.
     if chapter.number > 0:
-        subject = f"chapter {chapter.number}, titled {chapter_title}"
+        subject = f"chapter {chapter.number}, called {chapter_title}"
     else:
-        subject = f"the section titled {chapter_title}"
+        subject = f"the section called {chapter_title}"
 
-    excerpt = _prompt_safe(_excerpt(chapter))
-    if excerpt and excerpt[-1] not in ".!?":
-        excerpt += "..."
+    if scene is None:
+        excerpt = prompt_safe(_excerpt(chapter))
+        if excerpt and excerpt[-1] not in ".!?":
+            excerpt += "..."
+        scene_sentence = f"Scene inspired by this passage: {excerpt} "
+    else:
+        scene_sentence = f"Scene: {scene} "
 
     return (
-        f"Webnovel light-novel key art for {book}: an illustration for {subject}. "
-        f"Scene inspired by this passage: {excerpt} "
+        # No "key art", "cover", "title" or site names here: in a real test the image
+        # model painted the opening words of the prompt onto the picture as lettering.
+        f"Digital painting in the style of anime light-novel illustration: a scene from "
+        f"{book}, {subject}. "
+        f"{scene_sentence}"
         "Style: painterly digital illustration, manhwa-inspired character rendering, "
         "rich detail, saturated fantasy color palette. "
         "Lighting and mood: dramatic cinematic lighting, deep shadows, one strong rim light, "
@@ -211,13 +220,17 @@ def image_file_type(data: bytes) -> tuple[str, str]:
     return "png", "image/png"
 
 
-def try_generate_thumbnail(book_title: str, chapter: Chapter) -> bytes | None:
+def try_generate_thumbnail(
+    book_title: str, chapter: Chapter, *, prompt: str | None = None
+) -> bytes | None:
     """Generate a chapter thumbnail, or ``None`` on any failure.
 
     Must never raise: thumbnails are a best-effort enhancement, not a reason
-    to fail an otherwise-successful render.
+    to fail an otherwise-successful render. ``prompt`` overrides the template
+    prompt (the enhanced level passes its own).
     """
-    prompt = build_prompt(book_title, chapter)
+    if prompt is None:
+        prompt = build_prompt(book_title, chapter)
     try:
         return generate_image(prompt)
     except ImageGenError as exc:

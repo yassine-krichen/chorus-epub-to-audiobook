@@ -8,7 +8,8 @@ import {
 
 /**
  * Client-side shape/UX validation for the new-job form. Only
- * voice_mode, attributor, male_voice/female_voice, music_preset, filename_template, batch_size (>= 0) and
+ * voice_mode, attributor, male_voice/female_voice, music_preset, filename_template, batch_size (>= 0),
+ * thumbnails_enhanced-needs-thumbnails and
  * the {chapter_title}-needs-one-file-per-chapter rule are actually
  * enforced server-side (see book2audio.api.jobs.schemas.JobConfig) — the
  * numeric ranges below (speed, bitrate, chapter_gap) are a UX
@@ -40,10 +41,16 @@ export const jobConfigSchema = z.object({
       message: "Invalid filename template",
     }),
   thumbnails: z.boolean(),
-}).refine(
-  (config) => validateFilenameTemplate(config.filename_template, config.batch_size) === null,
-  { message: "Invalid filename template for this batch size", path: ["filename_template"] }
-);
+  thumbnails_enhanced: z.boolean().default(false),
+})
+  .refine(
+    (config) => validateFilenameTemplate(config.filename_template, config.batch_size) === null,
+    { message: "Invalid filename template for this batch size", path: ["filename_template"] }
+  )
+  .refine((config) => !config.thumbnails_enhanced || config.thumbnails, {
+    message: "Smarter thumbnails need chapter thumbnails to be on",
+    path: ["thumbnails_enhanced"],
+  });
 
 export const newJobFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(255),

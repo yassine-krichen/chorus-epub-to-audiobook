@@ -312,3 +312,13 @@ def test_legacy_file_names_ignores_both_the_template_and_the_per_chapter_default
     assert _config(tmp_path, batch_size=1, legacy_file_names=True).resolved_filename_template() is None
     config = _config(tmp_path, batch_size=10, filename_template="{title}", legacy_file_names=True)
     assert config.resolved_filename_template() is None
+
+
+def test_validate_raises_when_enhanced_thumbnails_are_on_without_thumbnails(tmp_path):
+    config = _config(tmp_path, thumbnails=False, thumbnails_enhanced=True)
+    with pytest.raises(ValueError, match="thumbnails_enhanced requires thumbnails"):
+        config.validate()
+
+
+def test_validate_accepts_enhanced_thumbnails_together_with_thumbnails(tmp_path):
+    _config(tmp_path, thumbnails=True, thumbnails_enhanced=True).validate()  # must not raise

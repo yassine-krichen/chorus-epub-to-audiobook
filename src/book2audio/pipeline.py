@@ -93,6 +93,7 @@ class Pipeline:
         on_chapter_done: Callable[[Chapter], None] | None = None,
         on_part_ready: Callable[[int, str, list[Chapter]], None] | None = None,
         on_attribution_progress: Callable[[], None] | None = None,
+        on_cast_ready: Callable[[list[str], dict[str, GenderVerdict]], None] | None = None,
     ) -> None:
         self.config = config
         self.console = console or Console()
@@ -102,6 +103,10 @@ class Pipeline:
         # Attribution can run for many minutes before the first chapter
         # finishes, so hosted workers need a liveness signal from it.
         self._on_attribution_progress = on_attribution_progress
+        # Told who the characters are (most frequent speaker first) and what is
+        # known of their gender, once the book is attributed and before any
+        # chapter renders: the enhanced thumbnails need the cast.
+        self._on_cast_ready = on_cast_ready
         self._characters: list[str] = []
         self._genders: dict[str, str] = {}
         self._verdicts: dict[str, GenderVerdict] = {}
@@ -115,6 +120,8 @@ class Pipeline:
         os.makedirs(chapters_dir, exist_ok=True)
 
         book = self._load_and_prepare()
+        if self._on_cast_ready is not None:
+            self._on_cast_ready(list(self._characters), dict(self._verdicts))
         cast = self._cast_voices(book)
         state = self._init_state(book, cast)
 

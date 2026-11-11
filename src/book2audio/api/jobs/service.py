@@ -91,6 +91,13 @@ def create_job(db: Session, user_id: uuid.UUID, payload: CreateJobRequest) -> Jo
             "AI speaker detection isn't available on this server yet. "
             'Turn off "AI speaker detection" and try again.',
         )
+    if payload.config.thumbnails_enhanced and not hosted_llm_attribution_enabled():
+        # Same gate as AI speaker detection: it spends the operator's chat key too.
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Smarter thumbnails aren't available on this server yet. "
+            'Turn off "Smarter thumbnails" and try again.',
+        )
     job = Job(
         user_id=user_id,
         title=payload.title,

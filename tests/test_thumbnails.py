@@ -168,8 +168,16 @@ def test_build_prompt_names_no_chapter_number_for_front_matter():
 
     prompt = build_prompt("Book", chapter)
 
-    assert "an illustration for the section titled SYNOPSIS." in prompt
+    assert "the section called SYNOPSIS." in prompt
     assert "chapter 0" not in prompt
+
+
+def test_build_prompt_opening_has_no_words_that_invite_lettering():
+    prompt = build_prompt("Book", _chapter(number=3, title="The Gate"))
+
+    opening = prompt.split("Scene")[0].lower()
+    for word in ("webnovel", "key art", "cover", "titled"):
+        assert word not in opening
 
 
 @pytest.mark.parametrize(
@@ -189,14 +197,14 @@ def test_build_prompt_names_no_chapter_number_for_front_matter():
 def test_build_prompt_removes_only_a_real_chapter_prefix_from_the_chapter_title(title, expected):
     prompt = build_prompt("Book", _chapter(number=3, title=title))
 
-    assert f"chapter 3, titled {expected}." in prompt
+    assert f"chapter 3, called {expected}." in prompt
 
 
 def test_build_prompt_calls_a_blank_book_title_an_untitled_book():
     prompt = build_prompt("   ", _chapter())
 
-    assert "key art for an untitled book:" in prompt
-    assert "the book  " not in prompt
+    assert "a scene from an untitled novel," in prompt
+    assert "the novel  " not in prompt
 
 
 def test_build_prompt_caps_very_long_titles_on_a_word_boundary():
@@ -206,7 +214,7 @@ def test_build_prompt_caps_very_long_titles_on_a_word_boundary():
     prompt = build_prompt(long_title, chapter)
 
     assert "word " * 30 not in prompt
-    assert "key art for the book " + ("word " * 24).strip() + ":" in prompt
+    assert "a scene from the novel " + ("word " * 24).strip() + "," in prompt
 
 
 def test_build_prompt_strips_bidi_controls_and_unicode_line_separators():

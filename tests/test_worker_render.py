@@ -55,13 +55,20 @@ class _FakePipeline:
     (and optionally wraps) the hook correctly, without a real render."""
 
     def __init__(
-        self, config, console, on_chapter_done=None, on_part_ready=None, on_attribution_progress=None
+        self,
+        config,
+        console,
+        on_chapter_done=None,
+        on_part_ready=None,
+        on_attribution_progress=None,
+        on_cast_ready=None,
     ):
         self.config = config
         self.console = console
         self.on_chapter_done = on_chapter_done
         self.on_part_ready = on_part_ready
         self.on_attribution_progress = on_attribution_progress
+        self.on_cast_ready = on_cast_ready
 
     def run(self) -> None:
         if self.on_chapter_done is not None:
@@ -103,6 +110,31 @@ def test_download_inputs_ignores_a_missing_resume_state_and_still_returns_the_ep
     epub_path = render_module._download_inputs("uploads/x.epub", "jobs/1", str(tmp_path))
 
     assert epub_path == str(tmp_path / "book.epub")
+
+
+def test_download_inputs_best_effort_downloads_the_attribution_cache(monkeypatch, tmp_path):
+    download_file = MagicMock()
+    monkeypatch.setattr(render_module, "download_file", download_file)
+
+    render_module._download_inputs("uploads/x.epub", "jobs/1", str(tmp_path))
+
+    download_file.assert_any_call(
+        "jobs/1/attribution-cache.json", str(tmp_path / "attribution-cache.json")
+    )
+
+
+def test_download_inputs_best_effort_downloads_the_appearance_sheet_and_scene_briefs(
+    monkeypatch, tmp_path
+):
+    download_file = MagicMock()
+    monkeypatch.setattr(render_module, "download_file", download_file)
+
+    render_module._download_inputs("uploads/x.epub", "jobs/1", str(tmp_path))
+
+    download_file.assert_any_call(
+        "jobs/1/appearance_sheet.json", str(tmp_path / "appearance_sheet.json")
+    )
+    download_file.assert_any_call("jobs/1/scene_briefs.json", str(tmp_path / "scene_briefs.json"))
 
 
 # --- _set_total_chapters -------------------------------------------------
@@ -411,3 +443,63 @@ def test_hosted_worker_uses_legacy_scratch_names_even_for_one_file_per_chapter(t
 
     assert config.legacy_file_names is True
     assert config.resolved_filename_template() is None
+
+
+# --- enhanced thumbnails wiring ----------------------------------------------
+
+
+def test_render_job_wires_the_cast_hook_when_enhanced_thumbnails_are_on(
+    db_session, monkeypatch, tmp_path
+):
+    job = _make_job(db_session)
+    _mock_common_deps(monkeypatch)
+    _CapturingPipeline.instances = []
+    monkeypatch.setattr(render_module, "Pipeline", _CapturingPipeline)
+    monkeypatch.setattr(render_module, "require_freellmapi_configured", MagicMock())
+    enhanced = MagicMock()
+    monkeypatch.setattr(render_module, "build_enhanced_thumbnails", lambda *a: enhanced)
+
+    render_module.render_job(
+        job.id,
+        job.epub_object_key,
+        {"thumbnails": True, "thumbnails_enhanced": True},
+        Console(),
+        str(tmp_path),
+    )
+
+    assert _CapturingPipeline.instances[0].on_cast_ready == enhanced.set_cast
+
+
+def test_render_job_stays_at_the_template_level_without_chat_credentials(
+    db_session, monkeypatch, tmp_path
+):
+    job = _make_job(db_session)
+    _mock_common_deps(monkeypatch)
+    _CapturingPipeline.instances = []
+    monkeypatch.setattr(render_module, "Pipeline", _CapturingPipeline)
+    monkeypatch.setattr(render_module, "require_freellmapi_configured", MagicMock())
+    monkeypatch.delenv("FREELLMAPI_BASE_URL", raising=False)
+    monkeypatch.delenv("FREELLMAPI_API_KEY", raising=False)
+
+    render_module.render_job(
+        job.id,
+        job.epub_object_key,
+        {"thumbnails": True, "thumbnails_enhanced": True},
+        Console(),
+        str(tmp_path),
+    )
+
+    assert _CapturingPipeline.instances[0].on_cast_ready is None
+
+
+def test_render_job_builds_no_enhancer_when_enhanced_thumbnails_are_off(
+    db_session, monkeypatch, tmp_path
+):
+    job = _make_job(db_session)
+    _mock_common_deps(monkeypatch)
+    builder = MagicMock()
+    monkeypatch.setattr(render_module, "build_enhanced_thumbnails", builder)
+
+    render_module.render_job(job.id, job.epub_object_key, {}, Console(), str(tmp_path))
+
+    builder.assert_not_called()

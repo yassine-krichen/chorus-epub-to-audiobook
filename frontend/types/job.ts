@@ -31,6 +31,8 @@ export interface JobConfig {
   expressive: boolean;
   filename_template: string | null;
   thumbnails: boolean;
+  /** "Smarter thumbnails": an AI model reads each chapter before its picture. Needs thumbnails. */
+  thumbnails_enhanced: boolean;
 }
 
 /** Every JobConfig field has a server-side default, so a new job's config
@@ -58,6 +60,7 @@ export const DEFAULT_JOB_CONFIG: JobConfig = {
   // this to a real template so downloads work.
   filename_template: "{title} - Part {part:02d}",
   thumbnails: false,
+  thumbnails_enhanced: false,
 };
 
 export interface ChapterProgress {

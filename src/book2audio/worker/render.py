@@ -20,11 +20,16 @@ from book2audio.config import Config
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
 from book2audio.epub import parse_epub
+from book2audio.images.enhanced import build_enhanced_thumbnails
 from book2audio.images.freellmapi import require_freellmapi_configured
 from book2audio.models import Chapter
 from book2audio.pipeline import Pipeline
 from book2audio.storage.r2 import download_file
-from book2audio.worker.progress import build_heartbeat, build_progress_hooks
+from book2audio.worker.progress import (
+    JOB_RESUME_FILENAMES,
+    build_heartbeat,
+    build_progress_hooks,
+)
 
 
 def render_job(
@@ -45,6 +50,9 @@ def render_job(
     if config.attributor != "heuristic" and config.voice_mode == "cast":
         require_llm_attribution_configured()
     book_title = _set_total_chapters(job_id, config)
+    enhanced = (
+        build_enhanced_thumbnails(scratch_dir, book_title) if config.thumbnails_enhanced else None
+    )
 
     on_chapter_done, on_part_ready = build_progress_hooks(
         job_id,
@@ -52,6 +60,7 @@ def render_job(
         object_prefix,
         thumbnails_enabled=config.thumbnails,
         book_title=book_title,
+        enhanced=enhanced,
     )
     if after_chapter is not None:
         _base_on_chapter_done = on_chapter_done
@@ -66,6 +75,7 @@ def render_job(
         on_chapter_done=on_chapter_done,
         on_part_ready=on_part_ready,
         on_attribution_progress=build_heartbeat(job_id),
+        on_cast_ready=enhanced.set_cast if enhanced is not None else None,
     )
     pipeline.run()
 
@@ -76,11 +86,11 @@ def _download_inputs(epub_object_key: str, object_prefix: str, scratch_dir: str)
 
     # Best-effort resume: a prior partial execution's state.json and chapter
     # wavs let RenderState skip already-rendered chapters.
-    state_path = os.path.join(scratch_dir, "state.json")
-    try:
-        download_file(f"{object_prefix}/state.json", state_path)
-    except Exception:
-        pass
+    for filename in JOB_RESUME_FILENAMES:
+        try:
+            download_file(f"{object_prefix}/{filename}", os.path.join(scratch_dir, filename))
+        except Exception:
+            pass
     return epub_path
 
 

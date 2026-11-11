@@ -13,8 +13,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable
 
+from book2audio.attribution import CACHE_FILENAME as ATTRIBUTION_CACHE_FILENAME
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
+from book2audio.images.enhanced import RESUME_FILENAMES, EnhancedThumbnails
 from book2audio.images.thumbnails import (
     chapter_content_hash,
     image_file_type,
@@ -25,6 +27,11 @@ from book2audio.storage.r2 import upload_bytes, upload_file
 
 logger = logging.getLogger(__name__)
 
+# Files a resumed hosted job gets back from storage. The attribution cache keeps an
+# LLM-attributed resume from asking the model again, and from labelling lines
+# differently the second time (which would re-render chapters).
+JOB_RESUME_FILENAMES = ("state.json", ATTRIBUTION_CACHE_FILENAME, *RESUME_FILENAMES)
+
 
 def build_progress_hooks(
     job_id: uuid.UUID,
@@ -33,6 +40,7 @@ def build_progress_hooks(
     *,
     thumbnails_enabled: bool = False,
     book_title: str = "",
+    enhanced: EnhancedThumbnails | None = None,
 ) -> tuple[Callable[[Chapter], None], Callable[[int, str, list[Chapter]], None]]:
     def on_chapter_done(chapter: Chapter) -> None:
         with SessionLocal() as session:
@@ -40,7 +48,7 @@ def build_progress_hooks(
             if job is None:
                 return
             thumbnail_fields = (
-                _thumbnail_fields(job.chapters, chapter, epub_object_prefix, book_title)
+                _thumbnail_fields(job.chapters, chapter, epub_object_prefix, book_title, enhanced)
                 if thumbnails_enabled
                 else {}
             )
@@ -101,15 +109,25 @@ def _upsert_chapter(chapters: list[dict], chapter: Chapter, thumbnail_fields: di
 
 
 def _thumbnail_fields(
-    chapters: list[dict], chapter: Chapter, epub_object_prefix: str, book_title: str
+    chapters: list[dict],
+    chapter: Chapter,
+    epub_object_prefix: str,
+    book_title: str,
+    enhanced: EnhancedThumbnails | None = None,
 ) -> dict:
     """Generate (or reuse, on resume) this chapter's thumbnail.
 
     Never raises: thumbnails are best-effort, so any failure is recorded as
-    ``thumbnail_status="failed"`` and the chapter still ends up "done".
+    ``thumbnail_status="failed"`` and the chapter still ends up "done". With
+    ``enhanced`` the prompt comes from a scene brief; if that cannot be had the
+    template prompt is used instead.
     """
     try:
-        content_hash = chapter_content_hash(chapter, book_title)
+        content_hash = (
+            enhanced.content_hash(chapter)
+            if enhanced is not None
+            else chapter_content_hash(chapter, book_title)
+        )
         existing = next((c for c in chapters if c.get("index") == chapter.index), None)
         if existing is not None and existing.get("thumbnail_hash") == content_hash:
             return {
@@ -118,7 +136,10 @@ def _thumbnail_fields(
                 "thumbnail_status": existing.get("thumbnail_status", "ready"),
             }
 
-        image_bytes = try_generate_thumbnail(book_title, chapter)
+        prompt = None
+        if enhanced is not None:
+            prompt, content_hash = enhanced.prompt_and_hash(chapter)
+        image_bytes = try_generate_thumbnail(book_title, chapter, prompt=prompt)
         if image_bytes is None:
             return {"thumbnail_hash": content_hash, "thumbnail_status": "failed"}
 
@@ -155,6 +176,9 @@ def _upsert_part(
 
 
 def _upload_state_json(work_dir: str, epub_object_prefix: str) -> None:
-    state_path = os.path.join(work_dir, "state.json")
-    if os.path.exists(state_path):
-        upload_file(state_path, f"{epub_object_prefix}/state.json")
+    # A resumed hosted job starts on a fresh scratch dir: without these files it would
+    # re-ask the model for every attribution window and every scene brief.
+    for filename in JOB_RESUME_FILENAMES:
+        path = os.path.join(work_dir, filename)
+        if os.path.exists(path):
+            upload_file(path, f"{epub_object_prefix}/{filename}")

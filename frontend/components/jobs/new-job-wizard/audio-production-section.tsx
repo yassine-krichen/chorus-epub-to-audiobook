@@ -210,9 +210,31 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
         <Switch
           id="thumbnails-switch"
           checked={config.thumbnails}
-          onCheckedChange={(checked) => onChange({ thumbnails: checked })}
+          onCheckedChange={(checked) =>
+            onChange(checked ? { thumbnails: true } : { thumbnails: false, thumbnails_enhanced: false })
+          }
         />
       </div>
+
+      {config.thumbnails && (
+        <div className="flex items-center justify-between rounded-lg border p-3 ml-3">
+          <div className="flex flex-col gap-0.5">
+            <Label htmlFor="thumbnails-enhanced-switch">
+              Smarter thumbnails (AI reads the chapter first)
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Pictures show the characters and the scene from each chapter, and the main
+              character keeps a consistent look. If the AI is unavailable, the standard picture is
+              used instead.
+            </p>
+          </div>
+          <Switch
+            id="thumbnails-enhanced-switch"
+            checked={config.thumbnails_enhanced}
+            onCheckedChange={(checked) => onChange({ thumbnails_enhanced: checked })}
+          />
+        </div>
+      )}
     </div>
   );
 }

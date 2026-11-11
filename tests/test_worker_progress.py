@@ -400,3 +400,117 @@ def test_heartbeat_swallows_database_errors_so_a_blip_cannot_abort_the_render(mo
     monkeypatch.setattr(progress_module, "SessionLocal", broken_session)
 
     progress_module.build_heartbeat(uuid.uuid4())()  # must not raise
+
+
+# --- enhanced thumbnails -------------------------------------------------------
+
+
+class _FakeEnhanced:
+    """Stands in for EnhancedThumbnails: fixed prompt and fingerprint."""
+
+    def __init__(self, prompt="scene prompt", content_hash="enhanced-hash"):
+        self.prompt = prompt
+        self.content_hash_value = content_hash
+
+    def content_hash(self, chapter):
+        return self.content_hash_value
+
+    def prompt_and_hash(self, chapter):
+        return self.prompt, self.content_hash_value
+
+
+def test_on_chapter_done_with_enhanced_thumbnails_generates_from_the_enhanced_prompt(
+    db_session, monkeypatch
+):
+    monkeypatch.setattr(progress_module, "upload_bytes", MagicMock())
+    generate = MagicMock(return_value=b"png-bytes")
+    monkeypatch.setattr(progress_module, "try_generate_thumbnail", generate)
+    job = _make_job(db_session)
+    on_chapter_done, _ = build_progress_hooks(
+        job.id,
+        "/tmp/work",
+        "jobs/1",
+        thumbnails_enabled=True,
+        book_title="Book",
+        enhanced=_FakeEnhanced(),
+    )
+
+    on_chapter_done(_chapter(index=1, title="One"))
+
+    db_session.refresh(job)
+    assert generate.call_args.kwargs["prompt"] == "scene prompt"
+    assert job.chapters[0]["thumbnail_hash"] == "enhanced-hash"
+    assert job.chapters[0]["thumbnail_status"] == "ready"
+
+
+def test_on_chapter_done_with_enhanced_thumbnails_reuses_a_matching_picture_without_a_brief(
+    db_session, monkeypatch
+):
+    generate = MagicMock()
+    monkeypatch.setattr(progress_module, "try_generate_thumbnail", generate)
+    job = _make_job(
+        db_session,
+        chapters=[
+            {
+                "index": 1,
+                "number": 1,
+                "title": "One",
+                "status": "done",
+                "thumbnail_r2_key": "jobs/1/thumbnails/chapter-0001.jpg",
+                "thumbnail_hash": "enhanced-hash",
+                "thumbnail_status": "ready",
+            }
+        ],
+    )
+    enhanced = _FakeEnhanced()
+    enhanced.prompt_and_hash = MagicMock()
+    on_chapter_done, _ = build_progress_hooks(
+        job.id, "/tmp/work", "jobs/1", thumbnails_enabled=True, book_title="Book", enhanced=enhanced
+    )
+
+    on_chapter_done(_chapter(index=1, title="One"))
+
+    generate.assert_not_called()
+    enhanced.prompt_and_hash.assert_not_called()
+
+
+def test_on_chapter_done_marks_the_thumbnail_failed_but_keeps_the_chapter_when_the_image_fails(
+    db_session, monkeypatch
+):
+    monkeypatch.setattr(progress_module, "try_generate_thumbnail", MagicMock(return_value=None))
+    job = _make_job(db_session)
+    on_chapter_done, _ = build_progress_hooks(
+        job.id,
+        "/tmp/work",
+        "jobs/1",
+        thumbnails_enabled=True,
+        book_title="Book",
+        enhanced=_FakeEnhanced(),
+    )
+
+    on_chapter_done(_chapter(index=1, title="One"))
+
+    db_session.refresh(job)
+    assert job.chapters[0]["status"] == "done"
+    assert job.chapters[0]["thumbnail_status"] == "failed"
+
+
+def test_on_part_ready_uploads_every_resume_file_that_exists(monkeypatch, tmp_path):
+    upload_file = MagicMock()
+    monkeypatch.setattr(progress_module, "upload_file", upload_file)
+    for name in (
+        "state.json",
+        "attribution-cache.json",
+        "appearance_sheet.json",
+        "scene_briefs.json",
+    ):
+        (tmp_path / name).write_text("{}")
+    progress_module._upload_state_json(str(tmp_path), "jobs/1")
+
+    uploaded = {call.args[1] for call in upload_file.call_args_list}
+    assert uploaded == {
+        "jobs/1/state.json",
+        "jobs/1/attribution-cache.json",
+        "jobs/1/appearance_sheet.json",
+        "jobs/1/scene_briefs.json",
+    }

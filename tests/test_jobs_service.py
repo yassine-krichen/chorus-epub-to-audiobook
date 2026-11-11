@@ -793,3 +793,35 @@ def test_legacy_invalid_template_yields_no_custom_names_for_any_part():
     )
 
     assert service._render_download_filenames(job, job.parts) == {}
+
+
+def _enhanced_thumbnails_payload():
+    return CreateJobRequest(
+        epub_object_key="uploads/book.epub",
+        title="A Book",
+        config=JobConfig(thumbnails=True, thumbnails_enhanced=True),
+    )
+
+
+def test_create_job_rejects_enhanced_thumbnails_by_default_and_creates_nothing(
+    db_session, monkeypatch
+):
+    monkeypatch.delenv("HOSTED_LLM_ATTRIBUTION", raising=False)
+    user = _make_user(db_session)
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.create_job(db_session, user.id, _enhanced_thumbnails_payload())
+
+    assert exc_info.value.status_code == 403
+    assert "Smarter thumbnails" in exc_info.value.detail
+    assert db_session.scalar(service.select(Job).where(Job.user_id == user.id)) is None
+
+
+def test_create_job_allows_enhanced_thumbnails_when_the_flag_is_enabled(db_session, monkeypatch):
+    monkeypatch.setenv("HOSTED_LLM_ATTRIBUTION", "enabled")
+    monkeypatch.setenv("WORKER_MODE", "local")
+    user = _make_user(db_session)
+
+    job = service.create_job(db_session, user.id, _enhanced_thumbnails_payload())
+
+    assert job.config["thumbnails_enhanced"] is True

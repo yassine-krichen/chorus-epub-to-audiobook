@@ -230,3 +230,29 @@ describe("newJobFormSchema", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("jobConfigSchema smarter thumbnails", () => {
+  it("accepts smarter thumbnails together with thumbnails", () => {
+    const result = jobConfigSchema.safeParse({
+      ...validConfig(),
+      thumbnails: true,
+      thumbnails_enhanced: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects smarter thumbnails when thumbnails are off", () => {
+    const result = jobConfigSchema.safeParse({
+      ...validConfig(),
+      thumbnails: false,
+      thumbnails_enhanced: true,
+    });
+    expect(result.success).toBe(false);
+    expect(!result.success && result.error.issues[0].path).toEqual(["thumbnails_enhanced"]);
+  });
+
+  it("defaults smarter thumbnails to off when the field is missing", () => {
+    const result = jobConfigSchema.safeParse(validConfig());
+    expect(result.success && result.data.thumbnails_enhanced).toBe(false);
+  });
+});
