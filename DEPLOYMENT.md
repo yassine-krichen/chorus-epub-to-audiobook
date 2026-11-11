@@ -85,6 +85,13 @@ per-render by the API via the Cloud Run Admin API.
    `FREELLMAPI_BASE_URL`, `FREELLMAPI_API_KEY`, `FREELLMAPI_IMAGE_MODEL`.
    See "About freellmapi" below — this is the one piece that could not be
    verified against a live deployment.
+   AI speaker detection and smarter thumbnails call the chat endpoint of the same
+   gateway with `FREELLMAPI_BASE_URL` and `FREELLMAPI_API_KEY`. Model choice is optional:
+   `FREELLMAPI_MODEL_ATTRIBUTION` and `FREELLMAPI_MODEL_LIGHT` take comma-separated lists
+   tried in order (a model that hits its daily limit is skipped), and `FREELLMAPI_MODEL`
+   sets one list for both. Leave all three unset to use the built-in lists
+   (`docs/features/llm-model-chain.md`). Unlike the image variables they are never
+   required: the worker only checks the base URL and key.
 6. Create a service account with the `roles/run.developer` role (lets it
    trigger/cancel/inspect executions of this one job) and download a JSON
    key — Render's API process needs this to authenticate to the Cloud Run

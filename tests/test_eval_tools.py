@@ -322,6 +322,13 @@ def test_pinned_model_accepts_a_concrete_model_from_env_or_flag(monkeypatch, llm
     assert run_eval._pinned_model("other-model") == "other-model"
 
 
+def test_pinned_model_refuses_a_model_chain(monkeypatch, llm_env):
+    monkeypatch.setenv("FREELLMAPI_MODEL", "gpt-oss-120b,llama-4-scout")
+
+    with pytest.raises(ValueError, match="model list"):
+        run_eval._pinned_model(None)
+
+
 def test_pinned_model_requires_credentials(monkeypatch):
     monkeypatch.delenv("FREELLMAPI_BASE_URL", raising=False)
     monkeypatch.delenv("FREELLMAPI_API_KEY", raising=False)

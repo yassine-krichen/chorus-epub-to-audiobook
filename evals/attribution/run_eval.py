@@ -127,6 +127,12 @@ def _pinned_model(cli_model: str | None) -> str:
             "refusing to evaluate with model 'auto' (or none): set FREELLMAPI_MODEL (or --model) "
             "to one concrete model so the result is attributable"
         )
+    if "," in model:
+        # A chain answers each window with whichever model was free, so the
+        # numbers could not be attributed to one model.
+        raise ValueError(
+            "refusing to evaluate a model list: pin one model so the result is attributable"
+        )
     require_llm_attribution_configured()
     return model
 

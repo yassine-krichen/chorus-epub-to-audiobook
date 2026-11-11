@@ -188,17 +188,19 @@ def _name_needles(name: str | None) -> list[str]:
 
 def brief_cache_key(
     *,
-    model: str,
     book_title: str,
     chapter: Chapter,
     cast: Sequence[CastMember],
     sheet_entry: AppearanceEntry | None,
 ) -> str:
-    """Fingerprint of everything the model is shown, including its name."""
+    """Fingerprint of everything the model is shown.
+
+    Not the model's name: which model of the chain answers depends on rate limits, so
+    a resumed job must not treat the same input as new (see llm_client).
+    """
     main = cast[0].name if cast else None
     parts = [
         BRIEF_VERSION,
-        model,
         clean_book_title(book_title),
         str(chapter.number),
         chapter.title,

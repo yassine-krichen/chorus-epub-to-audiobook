@@ -11,8 +11,8 @@ consecutive segments, the model is asked who speaks each target dialogue line:
 The model is never trusted blindly. Replies are validated line by line and
 anything missing or invalid keeps the heuristic label, so a bad reply, an
 outage or an exhausted budget degrades to the heuristic result instead of
-failing the render. Responses are cached on disk (keyed by prompt, model and
-window text) so re-running a book costs nothing.
+failing the render. Responses are cached on disk (keyed by prompt and window
+text, not by model: see ``_cache_key``) so re-running a book costs nothing.
 """
 
 from __future__ import annotations
@@ -294,7 +294,11 @@ class LLMAttributor:
 
         report.calls += 1
         try:
-            labels = _extract_labels(self._client.complete_json(SYSTEM_PROMPT, user_prompt))
+            # The shape check runs inside the client so a model that replies with
+            # the wrong structure hands the window to the next model in the chain.
+            labels = _extract_labels(
+                self._client.complete_json(SYSTEM_PROMPT, user_prompt, validate=_extract_labels)
+            )
         except LLMError:
             report.windows_failed += 1
             return "failed"
@@ -379,12 +383,18 @@ class LLMAttributor:
         )
 
     def _cache_key(self, user_prompt: str) -> str:
-        """Everything that shapes the request: instructions, model, sampling, prompt."""
+        """Everything that shapes the request: instructions, sampling, prompt.
+
+        The model is deliberately not part of the key. Which model of the chain
+        answers a window depends on which ones were rate limited at the time, so
+        keying on it would make a resumed run (the usual way past a daily cap)
+        re-ask every window another model already answered. The cost: after
+        switching to a better model, delete the cache file to re-attribute.
+        """
         client = self._client
         blob = json.dumps(
             [
                 prompt_fingerprint(),
-                client.model if client else "",
                 client.temperature if client else 0.0,
                 client.max_tokens if client else 0,
                 user_prompt,

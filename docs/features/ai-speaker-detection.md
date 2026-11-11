@@ -107,8 +107,11 @@ stateDiagram-v2
 
 - AI speaker detection is off (`attributor` is `heuristic`). On means `hybrid`.
 - At most 150 requests per book. When they run out, the remaining windows keep the offline
-  labels.
-- 3 failed requests in a row stop the AI for the rest of the book.
+  labels. A window that had to try a second model still counts once.
+- The AI is a list of models, not one (see [llm-model-chain.md](llm-model-chain.md)). A
+  rate-limited model is skipped and the next one answers.
+- 3 failed requests in a row stop the AI for the rest of the book. "Failed" means every
+  model in the list failed that window, not one model hitting its limit.
 - The AI only decides lines that were guesses. A name written in the text always wins.
 
 ## What happens when the AI fails
@@ -116,8 +119,9 @@ stateDiagram-v2
 The code never fails a render because of the AI (`LLMAttributor.attribute` in
 `src/book2audio/attribution/llm.py`):
 
-- One request fails (timeout, network error, bad reply shape): that window keeps its
-  offline labels and the run goes on.
+- One model fails (limit reached, timeout, network error, bad reply shape): the next model
+  in the list gets the same window. Only when every model fails does that window keep its
+  offline labels, and the run goes on.
 - A reply with some missing or invalid lines: those lines keep their offline label, the
   valid ones are used.
 - 3 failures in a row: the AI is not asked again for this book. The rest keep their
@@ -143,15 +147,18 @@ On the machine that runs the worker (the local worker's `.env`):
 
 - `FREELLMAPI_BASE_URL`, including `/v1`.
 - `FREELLMAPI_API_KEY`.
-- `FREELLMAPI_MODEL`, set to a concrete model name. If it is missing the code falls back to
-  `auto`. It is currently not set in the local `.env`, so set it before the first AI job.
+- Optional: `FREELLMAPI_MODEL_ATTRIBUTION` (or `FREELLMAPI_MODEL`), a comma-separated list
+  of model names tried in order, so one model's daily limit does not stop a book. If both
+  are unset the built-in list is used (`gemini-2.5-flash-lite`, `gpt-oss-120b`,
+  `llama-4-scout`). The local `.env` sets `FREELLMAPI_MODEL_ATTRIBUTION` to that list. See
+  [llm-model-chain.md](llm-model-chain.md).
 
 Restart the worker after changing `.env`. Do not put these values in the frontend or in
 Vercel: only the worker talks to the AI gateway.
 
 ## How to try it
 
-1. Set the three worker variables above and `HOSTED_LLM_ATTRIBUTION=enabled` on Render.
+1. Set the two required worker variables above and `HOSTED_LLM_ATTRIBUTION=enabled` on Render.
 2. On the website, upload a book, open Voice Casting and turn on "AI speaker detection".
 3. Create the job. Without step 1 on Render you get the 403 message instead.
 
@@ -161,8 +168,9 @@ sending any. The command line ignores `HOSTED_LLM_ATTRIBUTION`.
 
 ## Honest limits
 
-- Accuracy against a hand-labelled gold list has not been measured yet for the AI mode.
-  It is expected to help but it is not proven here.
+- On the 80-line speaker spot check (Shadow Slave book 1) the offline rules get 33 right
+  and the AI mode with the default model list gets 61. That is one run of 80 lines, an
+  estimate. Details in [llm-model-chain.md](llm-model-chain.md).
 - The AI can be wrong too. It only replaces guesses, never a name found in the text.
 - Book text for guessed lines is sent to the freellmapi gateway.
 - The AI step does not decide gender. Gender still comes from the text evidence, and an
