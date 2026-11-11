@@ -145,6 +145,24 @@ export interface CreateJobResponse {
   status: string;
 }
 
+/** One narratable section of an uploaded book, as the chapter picker lists it. */
+export interface BookChapter {
+  /** Position in reading order. */
+  index: number;
+  /** The chapter number the book uses; 0 for material before Chapter 1. */
+  number: number;
+  title: string;
+  /** Synopsis, info pages and the like: skipped unless the user asks for them. */
+  front_matter: boolean;
+  word_count: number;
+}
+
+export interface BookInspection {
+  title: string;
+  author: string;
+  chapters: BookChapter[];
+}
+
 /** "m" / "f", or null when the app is not sure enough to give the character a gendered voice. */
 export type CastGender = "m" | "f" | null;
 

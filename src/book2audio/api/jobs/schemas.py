@@ -224,6 +224,26 @@ class JobListResponse(BaseModel):
     page_size: int
 
 
+class InspectRequest(BaseModel):
+    epub_object_key: str = Field(min_length=1, max_length=600)
+
+
+class ChapterInfo(BaseModel):
+    """One narratable section of an uploaded book, as the chapter picker lists it."""
+
+    index: int  # position in reading order (the parser's identity key)
+    number: int  # the chapter number the book uses; 0 before Chapter 1
+    title: str
+    front_matter: bool  # synopsis, info pages: skipped unless the user asks
+    word_count: int
+
+
+class BookInspection(BaseModel):
+    title: str
+    author: str
+    chapters: list[ChapterInfo]
+
+
 class CastEvidence(BaseModel):
     """One reason the app believes a character is male or female."""
 

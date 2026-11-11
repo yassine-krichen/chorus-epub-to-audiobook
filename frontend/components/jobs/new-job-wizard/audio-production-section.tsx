@@ -12,7 +12,6 @@ import type { JobConfig } from "@/types/job";
 // ranges (see book2audio.api.jobs.schemas.JobConfig), except for
 // music_preset which is server-validated against MUSIC_PRESETS.
 const BITRATE_PRESETS = ["32k", "64k", "96k", "128k", "192k"] as const;
-const PREVIEW_CHAPTER_LIMIT = 3;
 
 function firstSliderValue(value: number | readonly number[]): number {
   return Array.isArray(value) ? value[0] : (value as number);
@@ -71,49 +70,6 @@ export function AudioProductionSection({ config, onChange }: AudioProductionSect
             placeholder="e.g. 80k"
           />
         )}
-      </div>
-
-      <div className="flex items-center justify-between rounded-lg border p-3">
-        <div className="flex flex-col gap-0.5">
-          <Label htmlFor="preview-mode">Preview mode</Label>
-          <p className="text-xs text-muted-foreground">
-            Only process the first {PREVIEW_CHAPTER_LIMIT} chapters.
-          </p>
-        </div>
-        <Switch
-          id="preview-mode"
-          checked={config.chapter_limit === PREVIEW_CHAPTER_LIMIT}
-          onCheckedChange={(checked) => onChange({ chapter_limit: checked ? PREVIEW_CHAPTER_LIMIT : 0 })}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="chapter-limit">Chapter limit (0 = all chapters)</Label>
-        <Input
-          id="chapter-limit"
-          type="number"
-          min={0}
-          value={config.chapter_limit}
-          onChange={(event) => onChange({ chapter_limit: Number(event.target.value) })}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="start-chapter">Start at chapter</Label>
-        <p className="text-xs text-muted-foreground">
-          Leave empty and we start at the story&apos;s first chapter (synopsis and info pages are
-          skipped). Enter 0 to include them.
-        </p>
-        <Input
-          id="start-chapter"
-          type="number"
-          min={0}
-          placeholder="Automatic"
-          value={config.start_chapter ?? ""}
-          onChange={(event) =>
-            onChange({ start_chapter: event.target.value === "" ? null : Number(event.target.value) })
-          }
-        />
       </div>
 
       <div className="flex flex-col gap-2">

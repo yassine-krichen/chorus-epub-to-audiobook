@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
+  BookInspection,
   CastReport,
   CastReviewRequest,
   CreateJobResponse,
@@ -36,6 +37,13 @@ export async function requestUploadUrl(filename: string) {
   return apiFetch<UploadUrlResponse>("/api/backend/jobs/upload-url", {
     method: "POST",
     body: JSON.stringify({ filename }),
+  });
+}
+
+export async function inspectEpub(epubObjectKey: string) {
+  return apiFetch<BookInspection>("/api/backend/jobs/inspect", {
+    method: "POST",
+    body: JSON.stringify({ epub_object_key: epubObjectKey }),
   });
 }
 

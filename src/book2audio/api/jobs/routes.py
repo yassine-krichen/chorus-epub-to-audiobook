@@ -1,4 +1,4 @@
-"""Job endpoints: upload URL, create, list, detail, cast report, cast review, cancel.
+"""Job endpoints: upload URL, inspect, create, list, detail, cast report, cast review, cancel.
 
 Stays thin — parses/validates the request, checks ownership where relevant,
 and delegates everything else to service.py.
@@ -11,13 +11,16 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from book2audio.api.auth.rate_limit import enforce_inspect_rate_limit
 from book2audio.api.deps import get_current_user, get_db
-from book2audio.api.jobs import service
+from book2audio.api.jobs import inspection, service
 from book2audio.api.jobs.schemas import (
+    BookInspection,
     CastReport,
     CastReviewRequest,
     CreateJobRequest,
     CreateJobResponse,
+    InspectRequest,
     JobDetail,
     JobListResponse,
     UploadUrlRequest,
@@ -42,6 +45,15 @@ def create_upload_url(
 ) -> UploadUrlResponse:
     object_key = f"uploads/{current_user.id}/{uuid.uuid4()}-{payload.filename}"
     return UploadUrlResponse(upload_url=presign_put(object_key), object_key=object_key)
+
+
+@router.post("/inspect", response_model=BookInspection)
+def inspect_upload(
+    payload: InspectRequest, current_user: User = Depends(get_current_user)
+) -> BookInspection:
+    """The chapters of an uploaded EPUB, so the wizard can offer a chapter picker."""
+    enforce_inspect_rate_limit(current_user.id)
+    return inspection.inspect_uploaded_epub(current_user.id, payload.epub_object_key)
 
 
 @router.post("", response_model=CreateJobResponse, status_code=status.HTTP_201_CREATED)

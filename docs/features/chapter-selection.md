@@ -100,7 +100,8 @@ stateDiagram-v2
 - Books that do not number their chapters (or number them oddly, like the Penrod sample)
   behave as before: sections are counted by position, nothing is skipped.
 - In the website form, "Start at chapter" can be left empty. Empty means automatic; 0
-  includes the synopsis and info pages.
+  includes the synopsis and info pages. The wizard's Chapters tab lets you pick the range
+  from the book's own list instead of typing (see `chapter-picker.md`).
 - Chapter cards on the job page show the book number when the job has one. Jobs created
   before this change still load and look the same as before.
 

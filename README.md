@@ -230,7 +230,11 @@ The CLI needs no environment variables. These names are read in `src/`.
 
 `POST /jobs/upload-url` — presigned URL for the EPUB upload.
 
+`POST /jobs/inspect` — the chapters of an uploaded EPUB (number, title, front matter flag, word count), for the wizard's chapter picker. Limited to 20 books per user per 10 minutes (`INSPECT_RATE_LIMIT_PER_USER`, `INSPECT_RATE_LIMIT_WINDOW_SECONDS`).
+
 `POST /jobs` — creates a render job. `GET /jobs`, `GET /jobs/{id}`, `DELETE /jobs/{id}` — list, inspect, delete.
+
+`GET /jobs/{id}/cast` — who speaks in a job, with gender, confidence and voice (owner only). `POST /jobs/{id}/cast-review` — applies the user's fixes to the cast and resumes a job in `awaiting_cast_review`.
 
 `GET /voices` — available voices.
 

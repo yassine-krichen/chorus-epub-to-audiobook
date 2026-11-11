@@ -96,6 +96,22 @@ _refresh_per_ip_limiter = SlidingWindowLimiter(
 )
 
 
+# Reading an uploaded EPUB downloads and parses it, which is far more work than
+# a login attempt, so it is limited per signed-in user.
+_inspect_per_user_limiter = SlidingWindowLimiter(
+    max_attempts=_int_env("INSPECT_RATE_LIMIT_PER_USER", 20),
+    window_seconds=_float_env("INSPECT_RATE_LIMIT_WINDOW_SECONDS", 600),
+)
+
+
+def enforce_inspect_rate_limit(user_id: object) -> None:
+    if not _inspect_per_user_limiter.hit(str(user_id)):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many books read in a short time. Try again in a few minutes.",
+        )
+
+
 def _client_ip(request: Request) -> str:
     # As seen by the Render process. Per the architecture notes, for browser
     # traffic that's Vercel's egress IP, not the real visitor IP — so this is
@@ -127,3 +143,4 @@ def reset_all() -> None:
     _login_per_email_limiter.reset()
     _login_per_ip_limiter.reset()
     _refresh_per_ip_limiter.reset()
+    _inspect_per_user_limiter.reset()
