@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -194,3 +194,40 @@ class JobListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class CastEvidence(BaseModel):
+    """One reason the app believes a character is male or female."""
+
+    layer: str = Field(max_length=40)
+    gender: Literal["m", "f"]
+    snippet: str = Field(max_length=300)
+
+
+class CastCharacter(BaseModel):
+    """One character who speaks, as the worker's cast report describes them."""
+
+    name: str = Field(min_length=1, max_length=200)
+    lines: int = Field(ge=0)
+    # None = not sure enough: the narrator voice reads this character.
+    gender: Literal["m", "f"] | None
+    confidence: float = Field(ge=0, le=1)
+    needs_review: bool
+    voice: str = Field(max_length=40)
+    voice_source: Literal["override", "gender", "narrator"]
+    sample_line: str = Field(max_length=300)
+    layer_counts: dict[str, int] = Field(default_factory=dict)
+    top_evidence: list[CastEvidence] = Field(default_factory=list, max_length=10)
+
+
+class CastReport(BaseModel):
+    """Who speaks in a job's selected chapters, with the voice each one gets.
+
+    Validated field by field from the stored cast_report.json: only these fields
+    reach the client, whatever else the worker wrote into the file.
+    """
+
+    voice_mode: Literal["cast", "narrator_only"]
+    narrator_voice: str = Field(max_length=40)
+    confidence_threshold: float = Field(ge=0, le=1)
+    characters: list[CastCharacter] = Field(max_length=500)

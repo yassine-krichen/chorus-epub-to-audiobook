@@ -94,6 +94,7 @@ class Pipeline:
         on_part_ready: Callable[[int, str, list[Chapter]], None] | None = None,
         on_attribution_progress: Callable[[], None] | None = None,
         on_cast_ready: Callable[[list[str], dict[str, GenderVerdict]], None] | None = None,
+        on_cast_report: Callable[[str], None] | None = None,
     ) -> None:
         self.config = config
         self.console = console or Console()
@@ -107,6 +108,9 @@ class Pipeline:
         # known of their gender, once the book is attributed and before any
         # chapter renders: the enhanced thumbnails need the cast.
         self._on_cast_ready = on_cast_ready
+        # Handed the path of cast_report.json once it is written, before the
+        # TTS model loads: hosted workers publish it so the job page can show the cast.
+        self._on_cast_report = on_cast_report
         self._characters: list[str] = []
         self._genders: dict[str, str] = {}
         self._verdicts: dict[str, GenderVerdict] = {}
@@ -127,7 +131,9 @@ class Pipeline:
 
         selected = self._select_chapters(book)
         self._report_plan(book, selected, cast)
-        self.report_cast(selected, cast)
+        report_path = self.report_cast(selected, cast)
+        if self._on_cast_report is not None:
+            self._on_cast_report(report_path)
 
         engine = self._load_engine(book.metadata)
         self._music_bed = generate_bed_for_preset(cfg.music_preset) if cfg.music else None
@@ -225,8 +231,8 @@ class Pipeline:
         cast.cast(self._characters, self._genders)
         return cast
 
-    def report_cast(self, selected: list[Chapter], cast: VoiceCast) -> None:
-        """Print the cast report and save it as ``cast_report.json`` in the work dir."""
+    def report_cast(self, selected: list[Chapter], cast: VoiceCast) -> str:
+        """Print the cast report, save it as ``cast_report.json`` in the work dir, return its path."""
         entries = build_cast_report(self._characters, self._verdicts, selected, cast)
         mode, narrator = self.config.voice_mode, cast.narrator_voice
         print_cast_report(self.console, entries, voice_mode=mode, narrator_voice=narrator)
@@ -240,6 +246,7 @@ class Pipeline:
                 "[yellow]Warning:[/yellow] --gender names that match no character: "
                 f"{escape(', '.join(unmatched))}"
             )
+        return path
 
     def _unmatched_gender_overrides(self) -> list[str]:
         if self.config.voice_mode == "narrator_only":

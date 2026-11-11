@@ -368,3 +368,49 @@ def test_object_exists_re_raises_a_client_error_that_is_not_a_404(fake_client):
 
     with pytest.raises(ClientError):
         r2.object_exists("voice-samples/am_adam.wav")
+
+
+# --- object_size / read_object: small objects read into memory ----------------
+
+
+def _not_found() -> ClientError:
+    return ClientError(
+        {"Error": {"Code": "404"}, "ResponseMetadata": {"HTTPStatusCode": 404}}, "HeadObject"
+    )
+
+
+def test_object_size_returns_the_content_length(fake_client):
+    fake_client.head_object.return_value = {"ContentLength": 1234}
+
+    assert r2.object_size("jobs/1/cast_report.json") == 1234
+
+
+def test_object_size_returns_none_for_a_missing_object(fake_client):
+    fake_client.head_object.side_effect = _not_found()
+
+    assert r2.object_size("jobs/1/cast_report.json") is None
+
+
+def test_read_object_returns_the_body_bytes(fake_client):
+    fake_client.head_object.return_value = {"ContentLength": 5}
+    fake_client.get_object.return_value = {"Body": MagicMock(read=lambda: b"hello")}
+
+    assert r2.read_object("jobs/1/cast_report.json", max_bytes=100) == b"hello"
+    fake_client.get_object.assert_called_once_with(
+        Bucket="test-bucket", Key="jobs/1/cast_report.json"
+    )
+
+
+def test_read_object_returns_none_for_a_missing_object(fake_client):
+    fake_client.head_object.side_effect = _not_found()
+
+    assert r2.read_object("jobs/1/cast_report.json", max_bytes=100) is None
+    fake_client.get_object.assert_not_called()
+
+
+def test_read_object_refuses_an_object_over_the_limit_without_downloading_it(fake_client):
+    fake_client.head_object.return_value = {"ContentLength": 101}
+
+    with pytest.raises(ValueError, match="more than the 100 byte limit"):
+        r2.read_object("jobs/1/cast_report.json", max_bytes=100)
+    fake_client.get_object.assert_not_called()

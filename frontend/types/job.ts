@@ -120,3 +120,34 @@ export interface CreateJobResponse {
   job_id: string;
   status: string;
 }
+
+/** "m" / "f", or null when the app is not sure enough to give the character a gendered voice. */
+export type CastGender = "m" | "f" | null;
+
+export interface CastEvidence {
+  layer: string;
+  gender: "m" | "f";
+  snippet: string;
+}
+
+export interface CastCharacter {
+  name: string;
+  lines: number;
+  gender: CastGender;
+  confidence: number;
+  needs_review: boolean;
+  voice: string;
+  /** override = chosen by the user, gender = from the voice pool, narrator = read by the narrator. */
+  voice_source: "override" | "gender" | "narrator";
+  sample_line: string;
+  layer_counts: Record<string, number>;
+  top_evidence: CastEvidence[];
+}
+
+/** Who speaks in a job's chapters and which voice reads each of them. */
+export interface CastReport {
+  voice_mode: VoiceMode;
+  narrator_voice: string;
+  confidence_threshold: number;
+  characters: CastCharacter[];
+}

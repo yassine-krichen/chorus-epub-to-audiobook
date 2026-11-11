@@ -27,6 +27,7 @@ from book2audio.pipeline import Pipeline
 from book2audio.storage.r2 import download_file
 from book2audio.worker.progress import (
     JOB_RESUME_FILENAMES,
+    build_cast_report_uploader,
     build_heartbeat,
     build_progress_hooks,
 )
@@ -76,6 +77,7 @@ def render_job(
         on_part_ready=on_part_ready,
         on_attribution_progress=build_heartbeat(job_id),
         on_cast_ready=enhanced.set_cast if enhanced is not None else None,
+        on_cast_report=build_cast_report_uploader(job_id),
     )
     pipeline.run()
 

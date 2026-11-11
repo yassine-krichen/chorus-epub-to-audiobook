@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
+  CastReport,
   CreateJobResponse,
   JobConfig,
   JobDetail,
@@ -13,6 +14,10 @@ export async function fetchJobs(page: number, pageSize = 20) {
 
 export async function fetchJob(jobId: string) {
   return apiFetch<JobDetail>(`/api/backend/jobs/${jobId}`);
+}
+
+export async function fetchJobCast(jobId: string) {
+  return apiFetch<CastReport>(`/api/backend/jobs/${jobId}/cast`);
 }
 
 export async function cancelJob(jobId: string) {

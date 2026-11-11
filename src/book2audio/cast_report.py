@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
@@ -22,6 +23,13 @@ from book2audio.models import Chapter, SegmentKind
 from book2audio.tts.voices import VoiceCast
 
 CAST_REPORT_FILENAME = "cast_report.json"
+
+
+def cast_report_object_key(job_id: uuid.UUID) -> str:
+    """Where a hosted job's cast report lives in storage (next to its other artifacts)."""
+    return f"jobs/{job_id}/{CAST_REPORT_FILENAME}"
+
+
 # The only TTS engine today; named per entry so a second engine can slot in.
 VOICE_PROVIDER = "kokoro"
 # A resolved gender below this confidence is still shown as "check this one".

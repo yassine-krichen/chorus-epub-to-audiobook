@@ -15,11 +15,13 @@ from datetime import datetime, timedelta, timezone
 import google.auth.exceptions
 import httpx
 from fastapi import HTTPException, status
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from book2audio.api.jobs import cloud_run
 from book2audio.api.jobs.schemas import (
+    CastReport,
     ChapterProgress,
     CreateJobRequest,
     JobDetail,
@@ -32,10 +34,15 @@ from book2audio.assemble.filenames import (
     default_filename_template,
     render_part_filenames,
 )
+from book2audio.cast_report import cast_report_object_key
 from book2audio.db.models import Job
-from book2audio.storage.r2 import presign_get
+from book2audio.storage.r2 import presign_get, read_object
 
 logger = logging.getLogger(__name__)
+
+# A cast report is a few KB per character; this only stops a corrupt or hostile
+# object from being pulled into the API's memory.
+_MAX_CAST_REPORT_BYTES = 2 * 1024 * 1024
 
 # Beyond this, a "running" job with no heartbeat is treated as possibly stuck
 # and reconciled against the real Cloud Run execution state before responding.
@@ -173,6 +180,24 @@ def get_job(db: Session, user_id: uuid.UUID, job_id: uuid.UUID) -> Job | None:
         return None
     _reconcile_if_stale(db, job)
     return job
+
+
+def get_cast_report(job: Job) -> CastReport | None:
+    """The job's cast report, or ``None`` when there is none to show.
+
+    ``None`` covers a worker that has not reached casting yet, artifacts already
+    swept, and a stored file that is missing or not a valid report: the job page
+    then simply has no cast panel.
+    """
+    if job.artifacts_swept_at is not None:
+        return None
+    key = cast_report_object_key(job.id)
+    try:
+        raw = read_object(key, max_bytes=_MAX_CAST_REPORT_BYTES)
+        return None if raw is None else CastReport.model_validate_json(raw)
+    except (ValueError, ValidationError):
+        logger.warning("job.cast_report_invalid", extra={"job_id": str(job.id)})
+        return None
 
 
 def cancel_job(db: Session, user_id: uuid.UUID, job_id: uuid.UUID) -> Job | None:

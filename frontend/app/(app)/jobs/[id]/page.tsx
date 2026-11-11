@@ -3,10 +3,12 @@
 import { use } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { CastPanel } from "@/components/jobs/job-detail/cast-panel";
 import { ChapterGrid } from "@/components/jobs/job-detail/chapter-grid";
 import { JobDetailHeader } from "@/components/jobs/job-detail/job-detail-header";
 import { JobErrorPanel } from "@/components/jobs/job-detail/job-error-panel";
 import { PartList } from "@/components/jobs/job-detail/part-list";
+import { useJobCast } from "@/hooks/use-job-cast";
 import { useJob } from "@/hooks/use-jobs";
 
 interface JobDetailPageProps {
@@ -16,6 +18,7 @@ interface JobDetailPageProps {
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = use(params);
   const { data: job, isLoading } = useJob(id);
+  const { data: cast } = useJobCast(id, job?.status);
 
   if (isLoading || !job) {
     return (
@@ -31,6 +34,13 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
       <JobDetailHeader job={job} />
 
       {job.status === "failed" && job.error_message && <JobErrorPanel message={job.error_message} />}
+
+      {cast && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-medium">Cast</h2>
+          <CastPanel report={cast} />
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">Chapters</h2>

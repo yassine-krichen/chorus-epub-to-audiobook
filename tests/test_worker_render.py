@@ -19,6 +19,7 @@ from book2audio.config import Config
 from book2audio.db.models import Job, User
 from book2audio.epub import ParsedChapter
 from book2audio.models import BookMetadata, Chapter
+from book2audio.worker import progress as worker_progress_module
 from book2audio.worker import render as render_module
 
 
@@ -62,6 +63,7 @@ class _FakePipeline:
         on_part_ready=None,
         on_attribution_progress=None,
         on_cast_ready=None,
+        on_cast_report=None,
     ):
         self.config = config
         self.console = console
@@ -69,6 +71,7 @@ class _FakePipeline:
         self.on_part_ready = on_part_ready
         self.on_attribution_progress = on_attribution_progress
         self.on_cast_ready = on_cast_ready
+        self.on_cast_report = on_cast_report
 
     def run(self) -> None:
         if self.on_chapter_done is not None:
@@ -503,3 +506,24 @@ def test_render_job_builds_no_enhancer_when_enhanced_thumbnails_are_off(
     render_module.render_job(job.id, job.epub_object_key, {}, Console(), str(tmp_path))
 
     builder.assert_not_called()
+
+
+def test_render_job_publishes_the_cast_report_through_the_pipeline_hook(
+    db_session, monkeypatch, tmp_path
+):
+    job = _make_job(db_session)
+    _mock_common_deps(monkeypatch)
+    uploads = []
+    monkeypatch.setattr(
+        worker_progress_module, "upload_file", lambda path, key: uploads.append((path, key))
+    )
+
+    class _ReportingPipeline(_FakePipeline):
+        def run(self) -> None:
+            self.on_cast_report("scratch/cast_report.json")
+
+    monkeypatch.setattr(render_module, "Pipeline", _ReportingPipeline)
+
+    render_module.render_job(job.id, job.epub_object_key, {}, Console(), str(tmp_path))
+
+    assert uploads == [("scratch/cast_report.json", f"jobs/{job.id}/cast_report.json")]

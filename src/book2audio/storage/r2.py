@@ -103,6 +103,36 @@ def object_exists(key: str) -> bool:
     return True
 
 
+def object_size(key: str) -> int | None:
+    """Size in bytes of ``key``, or ``None`` when it does not exist.
+
+    Same 404 handling as :func:`object_exists`: only a genuine "not found" is
+    swallowed, every other error propagates.
+    """
+    try:
+        head = _client().head_object(Bucket=_bucket(), Key=key)
+    except ClientError as exc:
+        if exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+            return None
+        raise
+    return int(head["ContentLength"])
+
+
+def read_object(key: str, *, max_bytes: int) -> bytes | None:
+    """The contents of ``key``, or ``None`` when it does not exist.
+
+    Raises ``ValueError`` when the object is larger than ``max_bytes``, so a
+    caller that parses small JSON never pulls a huge object into memory.
+    """
+    size = object_size(key)
+    if size is None:
+        return None
+    if size > max_bytes:
+        raise ValueError(f"{key!r} is {size} bytes, more than the {max_bytes} byte limit")
+    body = _client().get_object(Bucket=_bucket(), Key=key)["Body"]
+    return body.read()
+
+
 def _content_disposition(filename: str) -> str:
     """RFC 6266 ``Content-Disposition``, with an ASCII fallback for clients
     that only understand the legacy ``filename=`` parameter.

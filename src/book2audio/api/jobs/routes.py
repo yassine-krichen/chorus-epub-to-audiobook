@@ -1,4 +1,4 @@
-"""Job endpoints: upload URL, create, list, detail, cancel.
+"""Job endpoints: upload URL, create, list, detail, cast report, cancel.
 
 Stays thin — parses/validates the request, checks ownership where relevant,
 and delegates everything else to service.py.
@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from book2audio.api.deps import get_current_user, get_db
 from book2audio.api.jobs import service
 from book2audio.api.jobs.schemas import (
+    CastReport,
     CreateJobRequest,
     CreateJobResponse,
     JobDetail,
@@ -74,6 +75,21 @@ def get_job(
         # "doesn't exist" from "exists but isn't yours".
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
     return service.to_detail(job)
+
+
+@router.get("/{job_id}/cast", response_model=CastReport)
+def get_job_cast(
+    job_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CastReport:
+    job = service.get_job(db, current_user.id, job_id)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
+    report = service.get_cast_report(job)
+    if report is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cast report not available")
+    return report
 
 
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)

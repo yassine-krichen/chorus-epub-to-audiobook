@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from book2audio.attribution import CACHE_FILENAME as ATTRIBUTION_CACHE_FILENAME
+from book2audio.cast_report import cast_report_object_key
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
 from book2audio.images.enhanced import RESUME_FILENAMES, EnhancedThumbnails
@@ -70,6 +71,22 @@ def build_progress_hooks(
             session.commit()
 
     return on_chapter_done, on_part_ready
+
+
+def build_cast_report_uploader(job_id: uuid.UUID) -> Callable[[str], None]:
+    """A closure that publishes ``cast_report.json`` so the job page can show the cast.
+
+    Never raises: the report is informational, so a storage hiccup must not
+    abort a render that is otherwise fine.
+    """
+
+    def upload_cast_report(report_path: str) -> None:
+        try:
+            upload_file(report_path, cast_report_object_key(job_id))
+        except Exception:  # noqa: BLE001 - the report is best-effort
+            logger.warning("could not upload the cast report for job %s", job_id, exc_info=True)
+
+    return upload_cast_report
 
 
 def build_heartbeat(job_id: uuid.UUID) -> Callable[[], None]:
