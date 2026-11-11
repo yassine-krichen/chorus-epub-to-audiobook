@@ -239,14 +239,14 @@ The CLI needs no environment variables. These names are read in `src/`.
 uv run pytest
 ```
 
-575 tests are collected (`pytest --collect-only -q`). They cover segmentation, attribution, voice casting, normalization, music, EPUB parsing, pipeline batching and callbacks, config, auth and rate limiting, job ownership and the worker entrypoints. Real synthesis is exercised through the `--limit` render path rather than mocked.
+1002 tests are collected (`pytest --collect-only -q`). They cover segmentation, attribution, gender resolution, voice casting, chapter numbering, output file naming, thumbnails, normalization, music, EPUB parsing, pipeline batching and callbacks, config, auth and rate limiting, job ownership and the worker entrypoints. Real synthesis is exercised through the `--limit` render path rather than mocked.
 
 ## Roadmap
 
 | Status | Item |
 | --- | --- |
 | Done | CLI pipeline, multi-voice casting, resumable and batched `.m4b` output, music bed, hosted API and worker |
-| In progress | LLM attribution (`--attributor llm` or `hybrid`) is implemented; accuracy against hand-labelled gold is not yet measured. Casting by personality, age and role is still planned |
+| In progress | LLM attribution (`--attributor llm` or `hybrid`) is implemented. On a hand-labelled 80-line Shadow Slave sample (chapters 1-10 and 36-43) hybrid picked the right speaker for 60/80 lines vs 33/80 for the heuristic (`evals/gender/`). Casting by personality, age and role is still planned |
 | Planned | Word-level emphasis, which needs a TTS backend with SSML/prosody control; Kokoro takes plain text only |
 | Planned | Chapter images, pending a local-vs-cloud decision on GPU, latency and cost |
 | Planned | Library, player and voice-preview GUI |

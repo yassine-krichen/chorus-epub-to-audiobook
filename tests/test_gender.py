@@ -456,7 +456,9 @@ def test_a_huge_run_of_abbreviations_is_split_in_linear_time():
 
     resolve_genders(["Mr. A"], [chapter])
 
-    assert time.perf_counter() - started < 1.0
+    # Linear splitting takes ~0.03 s here and the old quadratic one ~160 s; the
+    # generous bound keeps the guard meaningful on a machine busy rendering.
+    assert time.perf_counter() - started < 10.0
 
 
 def test_an_override_for_an_alias_is_matched_case_insensitively():
