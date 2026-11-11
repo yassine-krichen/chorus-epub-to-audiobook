@@ -14,6 +14,7 @@ import uuid
 from datetime import datetime, timezone
 
 from rich.console import Console
+from sqlalchemy import update
 
 from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import Job
@@ -64,23 +65,24 @@ def _required_env(name: str) -> str:
 
 
 def _mark_succeeded(job_id: uuid.UUID) -> None:
+    # Conditional UPDATEs: only a job still "running" is finished by its worker, so a
+    # cancel (or a job parked for review) is never overwritten by a stale write.
     with SessionLocal() as session:
-        job = session.get(Job, job_id)
-        if job is None:
-            return
-        job.status = "succeeded"
-        job.finished_at = datetime.now(timezone.utc)
+        session.execute(
+            update(Job)
+            .where(Job.id == job_id, Job.status == "running")
+            .values(status="succeeded", finished_at=datetime.now(timezone.utc))
+        )
         session.commit()
 
 
 def _mark_failed(job_id: uuid.UUID, message: str) -> None:
     with SessionLocal() as session:
-        job = session.get(Job, job_id)
-        if job is None:
-            return
-        job.status = "failed"
-        job.error_message = message
-        job.finished_at = datetime.now(timezone.utc)
+        session.execute(
+            update(Job)
+            .where(Job.id == job_id, Job.status.in_(("queued", "running")))
+            .values(status="failed", error_message=message, finished_at=datetime.now(timezone.utc))
+        )
         session.commit()
 
 

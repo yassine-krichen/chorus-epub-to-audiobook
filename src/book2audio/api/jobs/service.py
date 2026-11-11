@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 import google.auth.exceptions
 import httpx
+from botocore.exceptions import ClientError
 from fastapi import HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy import func, select, update
@@ -38,7 +39,9 @@ from book2audio.assemble.filenames import (
 )
 from book2audio.api.jobs.uploads import require_owned_upload
 from book2audio.cast_report import cast_report_object_key
+from book2audio import review_window
 from book2audio.cast_review import AWAITING_CAST_REVIEW
+from book2audio.review_window import cast_review_timeout  # noqa: F401 - startup check
 from book2audio.db.models import Job
 from book2audio.models import NARRATOR
 from book2audio.storage.r2 import presign_get, read_object
@@ -52,32 +55,6 @@ _MAX_CAST_REPORT_BYTES = 2 * 1024 * 1024
 # Beyond this, a "running" job with no heartbeat is treated as possibly stuck
 # and reconciled against the real Cloud Run execution state before responding.
 _STALE_HEARTBEAT = timedelta(minutes=15)
-
-_DEFAULT_CAST_REVIEW_TIMEOUT_HOURS = 48
-_MAX_CAST_REVIEW_TIMEOUT_HOURS = 24 * 30
-
-
-def cast_review_timeout() -> timedelta:
-    """How long a job may wait for its cast review before it is canceled.
-
-    ``CAST_REVIEW_TIMEOUT_HOURS`` (default 48). A bad value raises, and the API
-    checks it at startup like ``WORKER_MODE``, so a typo cannot silently mean
-    "never expires" or "expires at once".
-    """
-    raw = os.environ.get("CAST_REVIEW_TIMEOUT_HOURS", "")
-    if raw == "":
-        return timedelta(hours=_DEFAULT_CAST_REVIEW_TIMEOUT_HOURS)
-    try:
-        hours = int(raw)
-    except ValueError:
-        hours = 0
-    if not 1 <= hours <= _MAX_CAST_REVIEW_TIMEOUT_HOURS:
-        raise RuntimeError(
-            "CAST_REVIEW_TIMEOUT_HOURS must be a whole number of hours from 1 to "
-            f"{_MAX_CAST_REVIEW_TIMEOUT_HOURS}, got {raw!r}"
-        )
-    return timedelta(hours=hours)
-
 
 def _cloud_run_job_name() -> str:
     name = os.environ.get("CLOUD_RUN_JOB_NAME")
@@ -230,6 +207,12 @@ def get_cast_report(job: Job) -> CastReport | None:
     except (ValueError, ValidationError):
         logger.warning("job.cast_report_invalid", extra={"job_id": str(job.id)})
         return None
+    except ClientError:
+        logger.warning("job.cast_report_unreadable", extra={"job_id": str(job.id)}, exc_info=True)
+        return None
+
+
+_OPEN_STATUSES = ("queued", "running", AWAITING_CAST_REVIEW)
 
 
 def cancel_job(db: Session, user_id: uuid.UUID, job_id: uuid.UUID) -> Job | None:
@@ -239,24 +222,37 @@ def cancel_job(db: Session, user_id: uuid.UUID, job_id: uuid.UUID) -> Job | None
     if job.status in ("succeeded", "failed", "canceled"):
         return job
 
+    was_running = job.status == "running"
+    execution_before = job.cloud_run_execution_name
+    now = datetime.now(timezone.utc)
+    values: dict = {"status": "canceled", "finished_at": now}
     if worker_mode() == "local":
         # Set unconditionally, not just for "running" jobs: a job that's still
         # "queued" right now can be claimed by the local daemon a moment later
         # (see local_daemon.py::_claim_next_job) -- without this, that race
         # lets the daemon render a job the API already canceled, with no way
         # to notice mid-render.
-        job.cancel_requested_at = datetime.now(timezone.utc)
-    elif job.status == "running" and job.cloud_run_execution_name:
-        try:
-            cloud_run.cancel_execution(job.cloud_run_execution_name)
-        except (httpx.HTTPError, google.auth.exceptions.GoogleAuthError):
-            pass  # best-effort: still mark canceled locally so the user isn't blocked
-
-    job.status = "canceled"
-    job.finished_at = datetime.now(timezone.utc)
+        values["cancel_requested_at"] = now
+    # Conditional on the job still being open: a worker that finished (or failed) the
+    # job in the meantime keeps its result, and a confirmation and a cancel cannot
+    # overwrite each other half way.
+    db.execute(update(Job).where(Job.id == job.id, Job.status.in_(_OPEN_STATUSES)).values(**values))
     db.commit()
     db.refresh(job)
+
+    # A confirmation may have started a worker between the read above and the update.
+    started_meanwhile = job.cloud_run_execution_name != execution_before
+    has_worker = worker_mode() != "local" and job.cloud_run_execution_name
+    if has_worker and (was_running or started_meanwhile):
+        _cancel_execution_best_effort(job.cloud_run_execution_name)
     return job
+
+
+def _cancel_execution_best_effort(execution_name: str) -> None:
+    try:
+        cloud_run.cancel_execution(execution_name)
+    except (httpx.HTTPError, google.auth.exceptions.GoogleAuthError):
+        pass  # best-effort: the job is marked canceled anyway so the user isn't blocked
 
 
 def confirm_cast_review(
@@ -288,6 +284,7 @@ def confirm_cast_review(
 
     local = worker_mode() == "local"
     requested_at = job.cast_review_requested_at
+    old_config = job.config
     # Only one confirmation can win: a second click, or the expiry, finds the status
     # already changed and updates no row.
     claimed = db.execute(
@@ -316,7 +313,11 @@ def confirm_cast_review(
         db.execute(
             update(Job)
             .where(Job.id == job.id, Job.status == "running")
-            .values(status=AWAITING_CAST_REVIEW, cast_review_requested_at=requested_at)
+            .values(
+                status=AWAITING_CAST_REVIEW,
+                cast_review_requested_at=requested_at,
+                config=old_config,
+            )
         )
         db.commit()
         raise HTTPException(
@@ -325,6 +326,9 @@ def confirm_cast_review(
     job.cloud_run_execution_name = execution
     db.commit()
     db.refresh(job)
+    if job.status == "canceled" and execution:
+        # The user canceled between the claim and the worker starting: stop it again.
+        _cancel_execution_best_effort(execution)
     return job
 
 
@@ -372,39 +376,12 @@ def _config_with_review(
 
 
 def cast_review_expires_at(job: Job) -> datetime | None:
-    """When a job waiting for its cast review is canceled if still unconfirmed."""
-    if job.status != AWAITING_CAST_REVIEW:
-        return None
-    started = job.cast_review_requested_at or job.last_heartbeat_at or job.created_at
-    if started.tzinfo is None:
-        started = started.replace(tzinfo=timezone.utc)
-    return started + cast_review_timeout()
-
-
-def _expire_review_if_lapsed(db: Session, job: Job) -> None:
-    expires_at = cast_review_expires_at(job)
-    if expires_at is None or datetime.now(timezone.utc) < expires_at:
-        return
-    # Conditional, so a confirmation that lands at the same moment is not overwritten.
-    db.execute(
-        update(Job)
-        .where(Job.id == job.id, Job.status == AWAITING_CAST_REVIEW)
-        .values(
-            status="canceled",
-            error_message=(
-                "The cast review was not confirmed in time, so nothing was rendered. "
-                "Create the job again to start over."
-            ),
-            finished_at=datetime.now(timezone.utc),
-        )
-    )
-    db.commit()
-    db.refresh(job)
+    return review_window.expires_at(job)
 
 
 def _reconcile_if_stale(db: Session, job: Job) -> None:
     if job.status == AWAITING_CAST_REVIEW:
-        _expire_review_if_lapsed(db, job)
+        review_window.expire_if_lapsed(db, job)
         return
     if job.status != "running":
         return

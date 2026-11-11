@@ -34,7 +34,8 @@ def downgrade() -> None:
     # Jobs paused for review would lose their place, so they are failed first
     # rather than left in a status the older code does not know.
     op.execute(
-        "UPDATE jobs SET status = 'failed', "
+        # finished_at too: the cleanup sweep only picks up finished jobs.
+        "UPDATE jobs SET status = 'failed', finished_at = CURRENT_TIMESTAMP, "
         "error_message = 'Cast review was rolled back before it was confirmed' "
         "WHERE status = 'awaiting_cast_review'"
     )

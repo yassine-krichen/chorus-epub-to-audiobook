@@ -12,8 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { VoicePicker } from "@/components/voices/voice-picker";
 import { useVoices } from "@/hooks/use-voices";
-import { confirmCastReview } from "@/lib/api/jobs";
-import { evidenceSummary, genderLabel } from "@/lib/jobs/cast-display";
+import { cancelJob, confirmCastReview } from "@/lib/api/jobs";
+import { evidenceSummary, genderLabel, reviewCastState } from "@/lib/jobs/cast-display";
 import {
   buildReviewRequest,
   canBeReplaced,
@@ -21,6 +21,7 @@ import {
   draftFor,
   formatDeadline,
   mergeTargets,
+  overrideLimitProblem,
   treatAsToValue,
   updateDraft,
   valueToTreatAs,
@@ -104,6 +105,7 @@ function CharacterRow({ character, report, drafts, voices, disabled, onChange }:
         <div className="flex flex-col gap-1.5">
           <Label>Voice</Label>
           <VoicePicker
+            disabled={disabled || replaced}
             voices={voices}
             value={draft.voice}
             onChange={(voice) => onChange(character.name, { voice })}
@@ -141,17 +143,58 @@ function CharacterRow({ character, report, drafts, voices, disabled, onChange }:
 interface CastReviewPanelProps {
   job: JobDetail;
   report: CastReport | null | undefined;
+  /** True once the cast has been asked for at least once, so "no report" means missing. */
+  settled: boolean;
+}
+
+/** The cast report of a job waiting for review could not be found: say so and offer the
+ * only way out, instead of a placeholder that never goes away. */
+function MissingCast({ job }: { job: JobDetail }) {
+  const queryClient = useQueryClient();
+  const [canceling, setCanceling] = useState(false);
+
+  async function handleCancel() {
+    setCanceling(true);
+    const { error } = await cancelJob(job.id);
+    setCanceling(false);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    toast.success("Job canceled.");
+    queryClient.invalidateQueries({ queryKey: ["job", job.id] });
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>We could not load the detected cast</CardTitle>
+        <CardDescription>
+          This job is waiting for you to check the cast, but the list of characters is not
+          available any more. Cancel the job and create it again to start over.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button variant="destructive" onClick={handleCancel} disabled={canceling}>
+          {canceling ? "Canceling…" : "Cancel job"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
 }
 
 /** The pause between "we found the cast" and "we make the audio": the user checks who
  * speaks, fixes what is wrong, and starts the render. */
-export function CastReviewPanel({ job, report }: CastReviewPanelProps) {
+export function CastReviewPanel({ job, report, settled }: CastReviewPanelProps) {
   const queryClient = useQueryClient();
   const { data: voices } = useVoices();
   const [drafts, setDrafts] = useState<DraftMap>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const view = reviewCastState(report, settled);
+  if (view === "missing") return <MissingCast job={job} />;
   if (!report || !voices) {
     return (
       <div className="flex flex-col gap-3">
@@ -162,8 +205,10 @@ export function CastReviewPanel({ job, report }: CastReviewPanelProps) {
   }
 
   const changes = changeCount(report, drafts);
+  const limitProblem = overrideLimitProblem(report, drafts, job.config);
   const deadline = formatDeadline(job.cast_review_expires_at);
   const unsure = report.characters.filter((c) => c.gender === null).length;
+  const omitted = report.omitted_characters ?? 0;
 
   async function handleStart() {
     if (!report) return;
@@ -209,6 +254,13 @@ export function CastReviewPanel({ job, report }: CastReviewPanelProps) {
           ))}
         </ul>
 
+        {omitted > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {omitted} more {omitted === 1 ? "character is" : "characters are"} not listed (very
+            quiet, or with a name too long to edit). They keep the voice we chose.
+          </p>
+        )}
+        {limitProblem && <p className="text-sm text-destructive">{limitProblem}</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -217,7 +269,7 @@ export function CastReviewPanel({ job, report }: CastReviewPanelProps) {
               ? `Waiting for you. If you do not start rendering by ${deadline}, this job is canceled and nothing is rendered.`
               : "Waiting for you. A job that is never confirmed is canceled after a while."}
           </p>
-          <Button onClick={handleStart} disabled={submitting}>
+          <Button onClick={handleStart} disabled={submitting || limitProblem !== null}>
             {submitting
               ? "Starting…"
               : changes > 0

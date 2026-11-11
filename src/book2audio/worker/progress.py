@@ -13,6 +13,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable
 
+from sqlalchemy import update
+
 from book2audio.attribution import CACHE_FILENAME as ATTRIBUTION_CACHE_FILENAME
 from book2audio.cast_report import cast_report_object_key
 from book2audio.cast_review import AWAITING_CAST_REVIEW
@@ -110,13 +112,19 @@ def build_cast_review_pause(
         upload_file(report_path, cast_report_object_key(job_id))
         _upload_state_json(work_dir, object_prefix)
         with SessionLocal() as session:
-            job = session.get(Job, job_id)
-            if job is not None and job.status == "running":
-                now = datetime.now(timezone.utc)
-                job.status = AWAITING_CAST_REVIEW
-                job.cast_review_requested_at = now
-                job.last_heartbeat_at = now
-                session.commit()
+            now = datetime.now(timezone.utc)
+            # One conditional UPDATE: a cancel that lands between a read and a write
+            # would otherwise be overwritten by "awaiting review".
+            session.execute(
+                update(Job)
+                .where(Job.id == job_id, Job.status == "running")
+                .values(
+                    status=AWAITING_CAST_REVIEW,
+                    cast_review_requested_at=now,
+                    last_heartbeat_at=now,
+                )
+            )
+            session.commit()
         raise CastReviewRequested(str(job_id))
 
     return pause_for_review

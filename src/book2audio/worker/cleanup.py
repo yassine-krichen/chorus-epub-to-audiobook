@@ -15,8 +15,10 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
+from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
+from book2audio.review_window import expire_if_lapsed
 from book2audio.storage.r2 import delete_objects, list_objects
 
 _DEFAULT_GRACE_PERIOD_DAYS = 7
@@ -25,6 +27,10 @@ _DEFAULT_GRACE_PERIOD_DAYS = 7
 def main() -> int:
     grace_period = timedelta(days=_grace_period_days())
     swept = 0
+
+    # First cancel reviews nobody confirmed, so their stored files enter the normal
+    # sweep after the grace period even if no one ever opened the job again.
+    print(f"Cleanup expired {_expire_overdue_reviews()} overdue cast review(s)")
 
     with SessionLocal() as session:
         candidate_ids = session.scalars(
@@ -40,6 +46,21 @@ def main() -> int:
 
     print(f"Cleanup swept {swept} job(s)")
     return 0
+
+
+def _expire_overdue_reviews() -> int:
+    """Cancel every job whose cast review window is over; returns how many were."""
+    with SessionLocal() as session:
+        waiting_ids = session.scalars(
+            select(Job.id).where(Job.status == AWAITING_CAST_REVIEW)
+        ).all()
+    expired = 0
+    for job_id in waiting_ids:
+        with SessionLocal() as session:
+            job = session.get(Job, job_id)
+            if job is not None and expire_if_lapsed(session, job):
+                expired += 1
+    return expired
 
 
 def _grace_period_days() -> int:

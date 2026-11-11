@@ -49,6 +49,19 @@ export function summarizeCast(report: CastReport): CastSummary {
 }
 
 /**
+ * What the review card can show. The worker stores the report before it parks the job, so a
+ * job waiting for review whose report has been asked for and is still missing is broken
+ * (lost or unreadable), and the user needs a way out instead of an endless placeholder.
+ */
+export function reviewCastState(
+  report: CastReport | null | undefined,
+  settled: boolean
+): "loading" | "missing" | "ready" {
+  if (report) return "ready";
+  return settled ? "missing" : "loading";
+}
+
+/**
  * Whether to keep asking for the cast report. It is hidden until the worker has written
  * it, and it never changes mid-render, with one exception: a job resumed after the cast
  * review rewrites it with the user's fixes before its first chapter is done, so a report

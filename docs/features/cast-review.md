@@ -130,6 +130,24 @@ Each entry holds a `gender` (`m` or `f`) and/or a `voice`, or `merge_into`, or
 Rollback: `alembic downgrade 0004`. Jobs waiting for review at that moment are marked failed
 first, because the older code does not know the status.
 
+## Limits and races
+
+- The review lists at most 100 characters (the busiest, characters we are unsure about
+  first) and only names up to 80 characters. Others keep their voice but cannot be edited,
+  and the card says how many are not listed. The report, the API and the card use the same
+  limits, so a large cast can never produce a card that the server refuses.
+- A job can hold 100 gender fixes and 100 voice choices. If the wizard already set some, the
+  card tells you before you press the button when the review would go over.
+- Cancel, confirm, worker success, worker failure, the pause and the expiry are all
+  conditional database updates, so none of them can overwrite another's result. A cancel
+  that lands just after a confirmation also stops the worker the confirmation started.
+- If the worker cannot be started after you confirm, the job goes back to waiting with its
+  earlier settings, not the ones you just sent.
+- The cleanup job also cancels reviews that ran out of time even if nobody opened the job
+  again, so their stored files are cleaned up after the grace period.
+- A job waiting for review whose cast report has gone shows an error and a Cancel button, not
+  an endless placeholder.
+
 ## Honest limits
 
 - A merge is permanent for this job. To undo it, create the job again.

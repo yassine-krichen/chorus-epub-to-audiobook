@@ -24,6 +24,7 @@ from book2audio.api.jobs.uploads import (
     MAX_UPLOAD_KEY_LENGTH,
     validate_upload_filename,
 )
+from book2audio.cast_report import CAST_MAX_CHARACTERS, CAST_NAME_MAX_LENGTH
 from book2audio.cast_review import validate_character_aliases
 from book2audio.tts.voices import (
     CHARACTER_VOICE_POOL,
@@ -291,7 +292,7 @@ class CastEvidence(BaseModel):
 class CastCharacter(BaseModel):
     """One character who speaks, as the worker's cast report describes them."""
 
-    name: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=CAST_NAME_MAX_LENGTH)
     lines: int = Field(ge=0)
     # None = not sure enough: the narrator voice reads this character.
     gender: Literal["m", "f"] | None
@@ -312,10 +313,10 @@ class CastReviewEdit(BaseModel):
     character entirely, so they cannot be combined with a gender or a voice.
     """
 
-    name: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=CAST_NAME_MAX_LENGTH)
     gender: Literal["m", "f"] | None = None
     voice: str | None = None
-    merge_into: str | None = Field(default=None, min_length=1, max_length=200)
+    merge_into: str | None = Field(default=None, min_length=1, max_length=CAST_NAME_MAX_LENGTH)
     read_by_narrator: bool = False
 
     @field_validator("voice")
@@ -338,7 +339,7 @@ class CastReviewEdit(BaseModel):
 class CastReviewRequest(BaseModel):
     """The user's fixes to the detected cast. An empty list confirms it as it is."""
 
-    characters: list[CastReviewEdit] = Field(default_factory=list, max_length=500)
+    characters: list[CastReviewEdit] = Field(default_factory=list, max_length=CAST_MAX_CHARACTERS)
 
     @model_validator(mode="after")
     def _one_edit_per_character(self) -> "CastReviewRequest":
@@ -358,4 +359,7 @@ class CastReport(BaseModel):
     voice_mode: Literal["cast", "narrator_only"]
     narrator_voice: str = Field(max_length=40)
     confidence_threshold: float = Field(ge=0, le=1)
-    characters: list[CastCharacter] = Field(max_length=500)
+    characters: list[CastCharacter] = Field(max_length=CAST_MAX_CHARACTERS)
+    # Characters the worker left out because the review cannot list them (a name over
+    # the limit, or beyond the busiest ones). They still have a voice, but cannot be fixed.
+    omitted_characters: int = Field(default=0, ge=0)

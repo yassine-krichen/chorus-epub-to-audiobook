@@ -33,7 +33,7 @@ def _jobs_engine():
         conn.execute(
             sa.text(
                 "CREATE TABLE jobs (id INTEGER PRIMARY KEY, status VARCHAR NOT NULL, "
-                "error_message TEXT)"
+                "error_message TEXT, finished_at TIMESTAMP)"
             )
         )
         conn.execute(sa.text("INSERT INTO jobs (id, status) VALUES (1, 'awaiting_cast_review')"))
@@ -80,6 +80,9 @@ def test_downgrade_fails_jobs_that_were_waiting_for_review_and_leaves_others_alo
         assert rows == {1: "failed", 2: "running"}
         message = conn.execute(sa.text("SELECT error_message FROM jobs WHERE id = 1")).scalar_one()
         assert "rolled back" in message
+        finished = dict(conn.execute(sa.text("SELECT id, finished_at FROM jobs")).all())
+        assert finished[1] is not None  # so the cleanup sweep can pick the job up
+        assert finished[2] is None
 
 
 def test_upgrading_again_after_a_downgrade_works():

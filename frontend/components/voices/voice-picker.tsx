@@ -24,6 +24,7 @@ interface VoicePickerProps {
   /** Text of the option that maps to `null`. */
   noPreferenceLabel?: string;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 /** Select wrapper for choosing a voice id from the curated `/voices` pool,
@@ -35,6 +36,7 @@ export function VoicePicker({
   allowNoPreference = false,
   noPreferenceLabel = "No preference",
   placeholder = "Select a voice",
+  disabled = false,
 }: VoicePickerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [brokenSamples, setBrokenSamples] = useState<Set<string>>(new Set());
@@ -51,6 +53,7 @@ export function VoicePicker({
 
   return (
     <Select
+      disabled={disabled}
       value={value ?? NO_PREFERENCE}
       onValueChange={(next) => onChange(next === NO_PREFERENCE ? null : next)}
     >

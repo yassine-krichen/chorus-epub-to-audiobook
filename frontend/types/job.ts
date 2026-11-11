@@ -206,4 +206,7 @@ export interface CastReport {
   narrator_voice: string;
   confidence_threshold: number;
   characters: CastCharacter[];
+  /** Characters the review cannot list (a name over 80 characters, or beyond the busiest
+   * 100). They keep their voice but cannot be fixed on the website. */
+  omitted_characters?: number;
 }

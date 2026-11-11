@@ -19,7 +19,11 @@ interface JobDetailPageProps {
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = use(params);
   const { data: job, isLoading } = useJob(id);
-  const { data: cast } = useJobCast(id, job?.status, job?.chapters.length ?? 0);
+  const { data: cast, isFetched: castFetched } = useJobCast(
+    id,
+    job?.status,
+    job?.chapters.length ?? 0
+  );
 
   if (isLoading || !job) {
     return (
@@ -41,7 +45,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
         <JobErrorPanel title="Job canceled" message={job.error_message} />
       )}
 
-      {awaitingReview && <CastReviewPanel job={job} report={cast} />}
+      {awaitingReview && <CastReviewPanel job={job} report={cast} settled={castFetched} />}
 
       {!awaitingReview && cast && (
         <div className="flex flex-col gap-3">

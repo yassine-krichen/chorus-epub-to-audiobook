@@ -1,4 +1,4 @@
-import type { CastReport, CastReviewEdit, CastReviewRequest } from "@/types/job";
+import type { CastReport, CastReviewEdit, CastReviewRequest, JobConfig } from "@/types/job";
 
 /** What the user decided to do with one detected character. */
 export type TreatAs =
@@ -88,6 +88,40 @@ export function buildReviewRequest(report: CastReport, drafts: DraftMap): CastRe
     }
   }
   return { characters };
+}
+
+/** The server keeps at most this many gender overrides and voice overrides per job. */
+export const MAX_OVERRIDES = 100;
+
+/**
+ * A message when applying the drafts would push the job past the server's limit on gender
+ * or voice overrides (the wizard may already have set some), so the user is told before
+ * pressing the button instead of getting a refusal. Null when everything fits.
+ */
+export function overrideLimitProblem(
+  report: CastReport,
+  drafts: DraftMap,
+  existing: Pick<JobConfig, "gender_overrides" | "voice_overrides">
+): string | null {
+  const genders = new Set(Object.keys(existing.gender_overrides ?? {}));
+  const voices = new Set(Object.keys(existing.voice_overrides ?? {}));
+  for (const edit of buildReviewRequest(report, drafts).characters) {
+    if (edit.merge_into !== undefined || edit.read_by_narrator) {
+      // A merged or narrator-read character drops its own overrides.
+      genders.delete(edit.name);
+      voices.delete(edit.name);
+      continue;
+    }
+    if (edit.gender !== undefined) genders.add(edit.name);
+    if (edit.voice !== undefined) voices.add(edit.name);
+  }
+  if (genders.size > MAX_OVERRIDES) {
+    return `A job can hold at most ${MAX_OVERRIDES} gender fixes (${genders.size} would be set). Undo some.`;
+  }
+  if (voices.size > MAX_OVERRIDES) {
+    return `A job can hold at most ${MAX_OVERRIDES} voice choices (${voices.size} would be set). Undo some.`;
+  }
+  return null;
 }
 
 export function changeCount(report: CastReport, drafts: DraftMap): number {

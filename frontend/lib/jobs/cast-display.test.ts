@@ -4,6 +4,7 @@ import {
   evidenceSummary,
   genderLabel,
   isReadByNarrator,
+  reviewCastState,
   shouldPollCast,
   summarizeCast,
 } from "@/lib/jobs/cast-display";
@@ -80,6 +81,21 @@ describe("summarizeCast", () => {
     ]);
 
     expect(summarizeCast(cast)).toEqual({ speakers: 3, notSure: 1, readByNarrator: 2 });
+  });
+});
+
+describe("reviewCastState", () => {
+  it("is ready once the report is there", () => {
+    expect(reviewCastState(report([character()]), true)).toBe("ready");
+    expect(reviewCastState(report([character()]), false)).toBe("ready");
+  });
+
+  it("is loading until the first answer has come back", () => {
+    expect(reviewCastState(undefined, false)).toBe("loading");
+  });
+
+  it("is missing when the answer came back empty, so the user is not left waiting forever", () => {
+    expect(reviewCastState(null, true)).toBe("missing");
   });
 });
 

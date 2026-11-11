@@ -7,6 +7,7 @@ import {
   draftFor,
   formatDeadline,
   mergeTargets,
+  overrideLimitProblem,
   treatAsToValue,
   updateDraft,
   valueToTreatAs,
@@ -128,6 +129,68 @@ describe("buildReviewRequest", () => {
     expect(buildReviewRequest(report, drafts)).toEqual({
       characters: [{ name: "Echo", read_by_narrator: true }],
     });
+  });
+});
+
+describe("overrideLimitProblem", () => {
+  function manyOverrides(count: number): Record<string, "m"> {
+    return Object.fromEntries(Array.from({ length: count }, (_, i) => [`Old ${i}`, "m" as const]));
+  }
+
+  it("is fine when the job has room", () => {
+    const drafts = updateDraft({}, "Echo", { gender: "f" });
+
+    expect(
+      overrideLimitProblem(report, drafts, { gender_overrides: {}, voice_overrides: {} })
+    ).toBeNull();
+  });
+
+  it("warns when the wizard's gender fixes plus the review's would pass the limit", () => {
+    const drafts = updateDraft({}, "Echo", { gender: "f" });
+
+    const problem = overrideLimitProblem(report, drafts, {
+      gender_overrides: manyOverrides(100),
+      voice_overrides: {},
+    });
+
+    expect(problem).toContain("at most 100 gender fixes");
+  });
+
+  it("does not count a character that already had a gender fix twice", () => {
+    const drafts = updateDraft({}, "Echo", { gender: "f" });
+
+    expect(
+      overrideLimitProblem(report, drafts, {
+        gender_overrides: { ...manyOverrides(99), Echo: "m" },
+        voice_overrides: {},
+      })
+    ).toBeNull();
+  });
+
+  it("frees the room of a character that is merged away", () => {
+    const drafts = updateDraft(updateDraft({}, "Echo", { gender: "f" }), "Rain", {
+      treatAs: { kind: "merge", into: "Sunny" },
+    });
+
+    expect(
+      overrideLimitProblem(report, drafts, {
+        gender_overrides: { ...manyOverrides(99), Rain: "m" },
+        voice_overrides: {},
+      })
+    ).toBeNull();
+  });
+
+  it("warns about voice choices too", () => {
+    const drafts = updateDraft({}, "Echo", { voice: "af_sky" });
+
+    const problem = overrideLimitProblem(report, drafts, {
+      gender_overrides: {},
+      voice_overrides: Object.fromEntries(
+        Array.from({ length: 100 }, (_, i) => [`Old ${i}`, "am_adam"])
+      ),
+    });
+
+    expect(problem).toContain("voice choices");
   });
 });
 
