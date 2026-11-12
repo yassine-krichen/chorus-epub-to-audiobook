@@ -90,7 +90,7 @@ stateDiagram-v2
     JobRefused --> [*]
     Available --> Deleted: you delete the voice
     Unavailable --> Deleted: you delete the voice
-    state "Deleted: the recording is removed from storage first, then the voice. Cached prompts on the worker are removed within ten minutes" as Deleted
+    state "Deleted: the recording is removed from storage first, then the voice. The worker removes its cached copy within about a minute" as Deleted
     Deleted --> [*]
 ```
 
@@ -108,7 +108,19 @@ stateDiagram-v2
 
 ## Defaults and limits
 
-- Up to **5** cloned voices per person, **10** uploads or saves per hour.
+- Up to **5** cloned voices per person (checked under a database lock, so two saves at the same
+  moment cannot both take the last place). **20** upload or save calls per hour: one attempt
+  takes two, so ten attempts.
+- An upload is bound to the size and type the page declares: the storage link is signed for that
+  exact `Content-Length` and `Content-Type`, so it cannot be used to write anything bigger. The
+  server also refuses to read more than 6 MB of it. (The same now applies to book uploads, up
+  to 50 MB.)
+- A job that needs a cloned voice waits at most **30 minutes** for a capable worker
+  (`CLONE_CLAIM_TIMEOUT_MINUTES`, 1 to 1440). After that it fails with a message that says to
+  start the worker and try again, instead of waiting for ever. If you delete the voice a
+  waiting job named, the job no longer needs the engine and any worker takes it; the deleted
+  voice is read by a built-in one, and the cast report says so.
+- Recording links shown on the page last 15 minutes.
 - Recording: 10 to 30 seconds (the UI asks for 20 to 30), 16 kHz or better, not clipped, loud
   enough, a quiet room. The server applies the same checks to the upload; the browser's check is
   only for your convenience.
@@ -125,8 +137,8 @@ stateDiagram-v2
 ## How to try it
 
 1. Apply the migration: `alembic upgrade head` (adds `cloned_voices`, `worker_heartbeats`,
-   `jobs.requires_clone`). Rollback: `alembic downgrade 0005` (unfinished jobs that need a
-   cloned voice are failed first).
+   `jobs.requires_clone`). Rollback: `alembic downgrade 0005` (refuses while cloned voices exist;
+   delete them first, then unfinished jobs that need a cloned voice are failed).
 2. Set up the local worker (below), start the API with `WORKER_MODE=local`, the frontend, and
    the daemon: `python -m book2audio.worker.local_daemon`. The daemon prints
    `capabilities: clone:qwen3` when the engine works, or why cloning is off.
@@ -146,13 +158,20 @@ You need Windows or Linux with an NVIDIA GPU with about 4 GB free, 3 GB free RAM
    ```bash
    uv venv --python 3.11 C:/tools/b2a-clone-venv
    uv pip install --python C:/tools/b2a-clone-venv/Scripts/python.exe \
-     -r scripts/clone-engine/requirements.lock.txt \
+     -r scripts/clone-engine/requirements.lock.txt --override scripts/clone-engine/overrides.txt \
      --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
    ```
 
    (About 4 GB download. On Linux the interpreter is `bin/python`. Python 3.11 is the version
    this was run and measured on. The pins also resolve on 3.12, but that was not run, and the
    engine's Python version is independent of the project's.)
+
+   `overrides.txt` raises `accelerate` to 1.15.0, because the version `qwen-tts-hf` pins
+   (1.12.0) has a published vulnerability (PYSEC-2026-3804, sharded checkpoint loading; the
+   weights here are one pinned, trusted file). That combination resolves, but it was **not
+   installed or run**: the measured environment used 1.12.0. If the engine will not load after a
+   fresh install, remove the override and pin `accelerate==1.12.0`. `pillow` stays at 12.3.0:
+   `gradio` (pulled in by `qwen-tts-hf`, unused by the worker) caps it below 13.
 
 2. **The weights (about 2.4 GB)**, with curl, into a folder of your choice. Plain Python
    downloads can fail behind antivirus that inspects HTTPS; curl works.
@@ -233,8 +252,23 @@ treated as not capable.
 - It needs a 4 GB NVIDIA GPU, a local worker and the setup above. There is no CPU mode.
 - The recorder was tested for its logic (quality checks, WAV encoding) and built; the
   microphone flow itself needs a real browser and microphone.
-- Cached prompts of a voice you delete disappear from the worker within ten minutes, not
-  instantly. Temporary upload copies that were never saved sit in `voice-uploads/` until a
-  storage lifecycle rule removes them (a one-day expiry on that prefix is recommended).
+- **What is kept, and for how long.** Deleting a voice removes its recording from storage at
+  once. The worker's cached computed copy (a safetensors file) is removed within about a
+  minute, the next time the worker's heartbeat runs, so the worker must be running for that
+  to happen. A worker killed in the middle of a job can leave a temporary folder holding the
+  recording; the daemon deletes those older than an hour when it starts. A recording that was
+  uploaded but never saved sits in `voice-uploads/` for at most a day: the cleanup job
+  (`python -m book2audio.worker.cleanup`) deletes it, and
+  `scripts/storage/set_voice_upload_lifecycle.py` (not run by anything; dry run by default,
+  `--apply` to set) adds a storage rule that does the same. The consent wording says this, and
+  its version changed (`2026-11-v2`) so people agree to the new text.
+- **Fallback reasons are fixed sentences** (ran out of memory, stopped, not installed, timed
+  out, the recording could not be used, the voice no longer exists). What the engine actually
+  said stays in the worker's log. The cast report keeps at most 20 notes.
+- **Not verified on real R2.** The signed upload size was tested on a local MinIO (a longer,
+  shorter or differently typed upload was refused with 403; an unsigned link accepted any
+  size). R2 checks signed headers the same way, but that was not tested here.
+- **Downgrade.** `alembic downgrade 0005` now refuses while any cloned voice exists, and says
+  to delete them first, so no recording is left in storage with nothing that knows its owner.
 - Browsers record in webm or mp4; the page converts to WAV before uploading, so the server
   needs no audio converter. A browser that cannot decode its own recording shows an error.
