@@ -144,13 +144,15 @@ You need Windows or Linux with an NVIDIA GPU with about 4 GB free, 3 GB free RAM
    does not touch it: it needs CUDA PyTorch and a pinned `transformers`.
 
    ```bash
-   uv venv --python 3.12 C:/tools/b2a-clone-venv
+   uv venv --python 3.11 C:/tools/b2a-clone-venv
    uv pip install --python C:/tools/b2a-clone-venv/Scripts/python.exe \
      -r scripts/clone-engine/requirements.lock.txt \
      --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
    ```
 
-   (About 4 GB download. On Linux the interpreter is `bin/python`.)
+   (About 4 GB download. On Linux the interpreter is `bin/python`. Python 3.11 is the version
+   this was run and measured on. The pins also resolve on 3.12, but that was not run, and the
+   engine's Python version is independent of the project's.)
 
 2. **The weights (about 2.4 GB)**, with curl, into a folder of your choice. Plain Python
    downloads can fail behind antivirus that inspects HTTPS; curl works.

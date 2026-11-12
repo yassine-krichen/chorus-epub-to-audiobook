@@ -1,7 +1,7 @@
 # Pinned environment for the voice-cloning engine (see docs/features/voice-cloning.md).
 # Verified on Windows with an NVIDIA RTX 3050 (4 GB) and the CUDA 12.8 PyTorch wheels.
 # Install:
-#   uv venv --python 3.12 <dir>
+#   uv venv --python 3.11 <dir>
 #   uv pip install --python <dir>/Scripts/python.exe -r requirements.lock.txt --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match
 # transformers must stay at 5.15.1: 5.22 breaks faster-qwen3-tts.
 accelerate==1.12.0
