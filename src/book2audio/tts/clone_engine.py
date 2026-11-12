@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -159,6 +160,28 @@ def probe_clone_capability() -> CloneCapability:
     return CloneCapability(True, device=str(reply.get("device", ""))[:80] or None)
 
 
+_WORKDIR_PREFIX = "b2a-clone-"
+
+
+def remove_stale_workdirs(max_age_s: float = 3600, root: str | None = None) -> int:
+    """Delete clone-engine temp folders left behind by a worker that was killed; returns how many.
+
+    They hold reference recordings (personal audio), so they must not linger. Only folders older
+    than ``max_age_s`` go: a running job's folder is never that old at the moment a daemon starts.
+    """
+    base = Path(root or tempfile.gettempdir())
+    cutoff = time.time() - max_age_s
+    removed = 0
+    for entry in base.glob(f"{_WORKDIR_PREFIX}*"):
+        try:
+            if entry.is_dir() and entry.stat().st_mtime < cutoff:
+                shutil.rmtree(entry, ignore_errors=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
 def prune_prompt_cache(keep_sha256: set[str], cache_dir: Path | None = None) -> int:
     """Delete cached voice prompts whose reference clip no longer exists; returns how many."""
     directory = cache_dir or prompt_cache_dir()
@@ -185,7 +208,7 @@ class QwenCloneEngine:
     def __init__(self, python: str, weights_dir: str) -> None:
         self._python = python
         self._weights = weights_dir
-        self._workdir = Path(tempfile.mkdtemp(prefix="b2a-clone-"))
+        self._workdir = Path(tempfile.mkdtemp(prefix=_WORKDIR_PREFIX))
         (self._workdir / "refs").mkdir()
         (self._workdir / "out").mkdir()
         self._process: subprocess.Popen[str] | None = None

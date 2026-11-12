@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 
 from book2audio.cast_review import AWAITING_CAST_REVIEW
+from book2audio.clone_claim_window import fail_if_unclaimed
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
 from book2audio.review_window import expire_if_lapsed
@@ -38,6 +39,7 @@ def main() -> int:
     # sweep after the grace period even if no one ever opened the job again.
     print(f"Cleanup expired {_expire_overdue_reviews()} overdue cast review(s)")
     print(f"Cleanup removed {sweep_stale_voice_uploads()} abandoned voice upload(s)")
+    print(f"Cleanup failed {_fail_unclaimed_clone_jobs()} voice-cloning job(s) no worker picked up")
 
     with SessionLocal() as session:
         candidate_ids = session.scalars(
@@ -73,6 +75,21 @@ def sweep_stale_voice_uploads(now: datetime | None = None) -> int:
         print(f"Cleanup could not sweep voice uploads: {error}")
         return 0
     return len(stale)
+
+
+def _fail_unclaimed_clone_jobs() -> int:
+    """Fail every queued voice-cloning job that has waited too long for a capable worker."""
+    with SessionLocal() as session:
+        queued_ids = session.scalars(
+            select(Job.id).where(Job.status == "queued", Job.requires_clone.is_(True))
+        ).all()
+    failed = 0
+    for job_id in queued_ids:
+        with SessionLocal() as session:
+            job = session.get(Job, job_id)
+            if job is not None and fail_if_unclaimed(session, job):
+                failed += 1
+    return failed
 
 
 def _expire_overdue_reviews() -> int:

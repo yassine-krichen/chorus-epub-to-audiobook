@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Callable, Literal
 
 from rich.console import Console
+from rich.markup import escape
 from sqlalchemy import select
 
 from book2audio.attribution import require_llm_attribution_configured
@@ -169,7 +170,9 @@ def _load_clone_references(
             logger.warning("clone.reference_unreadable", extra={"voice_id": str(row.id)}, exc_info=True)
             digest = None
         if digest != row.ref_sha256:
-            console.print(f"[yellow]The recording for cloned voice {row.name!r} is unusable.[/yellow]")
+            console.print(
+                f"[yellow]The recording for cloned voice {escape(repr(row.name))} is unusable.[/yellow]"
+            )
             continue
         references[clone_voice_id(row.id)] = CloneReference(
             voice_id=clone_voice_id(row.id),

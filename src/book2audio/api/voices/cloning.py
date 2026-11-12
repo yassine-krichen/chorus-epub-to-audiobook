@@ -23,7 +23,8 @@ from book2audio.api.voices.reference_audio import (
     ReferenceAudioError,
     analyze_reference_upload,
 )
-from book2audio.db.models import ClonedVoice
+from book2audio.cast_review import AWAITING_CAST_REVIEW
+from book2audio.db.models import ClonedVoice, Job, User
 from book2audio.db.worker_heartbeat import online_capabilities
 from book2audio.storage.r2 import StorageReadError, delete_objects, read_object, upload_bytes
 from book2audio.tts.clone_engine import CLONE_CAPABILITY
@@ -33,11 +34,12 @@ logger = logging.getLogger(__name__)
 
 MAX_CLONES_PER_USER = 5
 # Bump when the consent text changes: enrolments record the version the user agreed to.
-CONSENT_VERSION = "2026-11-v1"
+CONSENT_VERSION = "2026-11-v2"
 CONSENT_TEXT = (
     "This is my own voice, and I am recording it myself. I will only use it to make "
     "audiobooks for my own use, and I will not clone anyone else's voice. I understand I can "
-    "delete my voice and its recording at any time."
+    "delete my voice at any time: the recording is removed from storage at once, and the copy "
+    "my local worker keeps for speed within about a minute."
 )
 
 # What the user reads aloud. The text is stored with the voice: the engine needs it to line
@@ -78,6 +80,11 @@ def staging_key(user_id: uuid.UUID, voice_id: uuid.UUID) -> str:
 def reference_key(user_id: uuid.UUID, voice_id: uuid.UUID) -> str:
     """Where a validated recording lives: private to its owner."""
     return f"voice-refs/{user_id}/{voice_id}.wav"
+
+
+def _lock_user(user_id: uuid.UUID):
+    """``SELECT ... FOR UPDATE`` on the user's row (a no-op on SQLite, which the tests use)."""
+    return select(User.id).where(User.id == user_id).with_for_update()
 
 
 def clean_voice_name(name: str) -> str:
@@ -121,6 +128,9 @@ def create_cloned_voice(
     if script is None:
         raise HTTPException(422, "Unknown reading script.")
     clean_name = clean_voice_name(name)
+    # Two saves at the same moment must not both see room for the last voice: the count below is
+    # taken while holding the user's row, so the second waits for the first to commit.
+    db.execute(_lock_user(user_id))
     count = db.scalar(
         select(func.count()).select_from(ClonedVoice).where(ClonedVoice.user_id == user_id)
     )
@@ -204,7 +214,29 @@ def delete_cloned_voice(db: Session, user_id: uuid.UUID, voice_id: uuid.UUID) ->
         ) from None
     db.delete(voice)
     db.commit()
+    _release_jobs_without_clone_voices(db, user_id)
     return True
+
+
+def _release_jobs_without_clone_voices(db: Session, user_id: uuid.UUID) -> None:
+    """Let any worker take a waiting job whose cloned voices are all gone.
+
+    Such a job would otherwise wait for a clone-capable worker it no longer needs. A worker
+    without the engine reads the missing voice in Kokoro and says so in the cast report.
+    """
+    waiting = db.scalars(
+        select(Job).where(
+            Job.user_id == user_id,
+            Job.requires_clone.is_(True),
+            Job.status.in_(("queued", AWAITING_CAST_REVIEW)),
+        )
+    )
+    for job in waiting:
+        named = clone_voice_ids_in_config(job.config)
+        remaining = db.scalars(select(ClonedVoice.id).where(ClonedVoice.id.in_(named))).all() if named else []
+        if not remaining:
+            job.requires_clone = False
+    db.commit()
 
 
 def _discard(key: str) -> None:

@@ -29,6 +29,8 @@ def create_app() -> FastAPI:
     jobs_service.hosted_llm_attribution_enabled()
     # And for how long a job waits for its cast review.
     jobs_service.cast_review_timeout()
+    # And for how long a voice-cloning job waits for a capable worker.
+    jobs_service.clone_claim_timeout()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

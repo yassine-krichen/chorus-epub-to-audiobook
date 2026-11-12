@@ -64,6 +64,16 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # The recordings live in object storage, not in the database: dropping the table would
+    # orphan personal audio there with nothing left that knows its owner. Voices are deleted
+    # through the app (My voices), which removes each recording first.
+    remaining = op.get_bind().execute(sa.text("SELECT COUNT(*) FROM cloned_voices")).scalar()
+    if remaining:
+        raise RuntimeError(
+            f"Refusing to downgrade: {remaining} cloned voice(s) still exist. Delete them first "
+            "(My voices in the app, or DELETE /voices/clones/<id>) so their recordings are "
+            "removed from storage, then run the downgrade again."
+        )
     # Older code would claim these jobs and fail on the voice id it does not know, so they
     # are failed first with a clear reason (finished_at too: the cleanup sweep needs it).
     op.execute(

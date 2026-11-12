@@ -15,7 +15,6 @@ import shutil
 import socket
 import tempfile
 import threading
-import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -29,15 +28,18 @@ from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import ClonedVoice, Job
 from book2audio.db.session import SessionLocal
 from book2audio.db.worker_heartbeat import record_heartbeat
-from book2audio.tts.clone_engine import CLONE_CAPABILITY, probe_clone_capability, prune_prompt_cache
+from book2audio.tts.clone_engine import (
+    CLONE_CAPABILITY,
+    probe_clone_capability,
+    prune_prompt_cache,
+    remove_stale_workdirs,
+)
 from book2audio.worker.render import render_job
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_POLL_INTERVAL_SECONDS = 5
 _HEARTBEAT_INTERVAL_SECONDS = 20
-# Cached voice prompts of deleted voices are removed this often (and at start).
-_PROMPT_PRUNE_INTERVAL_SECONDS = 600
 
 
 class JobCanceled(Exception):
@@ -55,6 +57,8 @@ def main() -> None:
     poll_interval = float(
         os.environ.get("LOCAL_WORKER_POLL_INTERVAL_SECONDS", _DEFAULT_POLL_INTERVAL_SECONDS)
     )
+    # Reference recordings a killed worker left in the temp folder are personal audio.
+    remove_stale_workdirs()
     capabilities = _detect_capabilities()
     print(
         f"book2audio local worker started, polling every {poll_interval:g}s... "
@@ -91,18 +95,17 @@ def _heartbeat_loop(worker_id: str, capabilities: list[str]) -> None:
     """Tell the API this worker is alive and what it can do, for as long as it runs.
 
     A thread, not part of the poll loop: a render can keep the loop busy for hours, and the
-    API must still see the worker as online (and its cloned voices as usable).
+    API must still see the worker as online (and its cloned voices as usable). Each beat also
+    drops cached voice prompts of deleted voices, so a deleted voice leaves nothing on this
+    machine within about a heartbeat.
     """
     stop = threading.Event()
-    last_prune = 0.0
 
     while not stop.is_set():
         try:
             with SessionLocal() as session:
                 record_heartbeat(session, worker_id, capabilities)
-            if time.monotonic() - last_prune >= _PROMPT_PRUNE_INTERVAL_SECONDS:
-                _prune_cached_prompts()
-                last_prune = time.monotonic()
+            _prune_cached_prompts()
         except Exception:  # noqa: BLE001 - a missed beat must never stop the next one
             logger.warning("worker.heartbeat_failed", exc_info=True)
         stop.wait(_HEARTBEAT_INTERVAL_SECONDS)

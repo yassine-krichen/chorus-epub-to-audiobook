@@ -163,8 +163,10 @@ export default function VoicesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this voice?</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{pendingDelete?.name}&rdquo; and its recording are removed for good. Jobs that
-              are still waiting to use it will be read by a built-in voice instead.
+              &ldquo;{pendingDelete?.name}&rdquo; is removed for good. Its recording is deleted from
+              storage at once. Your local worker keeps a computed copy for speed, and removes it
+              within about a minute. Jobs still waiting to use this voice are read by a built-in
+              voice instead.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

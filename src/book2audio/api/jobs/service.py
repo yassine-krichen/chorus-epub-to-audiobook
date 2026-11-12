@@ -42,6 +42,10 @@ from book2audio.api.voices.cloning import clone_voice_ids_in_config, require_usa
 from book2audio.cast_report import cast_report_object_key
 from book2audio import review_window
 from book2audio.cast_review import AWAITING_CAST_REVIEW
+from book2audio.clone_claim_window import (  # noqa: F401 - clone_claim_timeout is a startup check
+    clone_claim_timeout,
+    fail_if_unclaimed,
+)
 from book2audio.review_window import cast_review_timeout  # noqa: F401 - startup check
 from book2audio.db.models import Job
 from book2audio.models import NARRATOR
@@ -393,6 +397,11 @@ def cast_review_expires_at(job: Job) -> datetime | None:
 
 
 def _reconcile_if_stale(db: Session, job: Job) -> None:
+    if job.status == "queued" and job.requires_clone:
+        # Nothing capable picked it up in time: say so instead of waiting for ever.
+        if fail_if_unclaimed(db, job):
+            db.refresh(job)
+        return
     if job.status == AWAITING_CAST_REVIEW:
         review_window.expire_if_lapsed(db, job)
         return
