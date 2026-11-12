@@ -10,7 +10,8 @@ import pytest
 from book2audio import clone_claim_window as window
 from book2audio.api.main import create_app
 from book2audio.api.voices import cloning
-from book2audio.db.models import ClonedVoice, Job, User
+from book2audio.db.models import ClonedVoice, Job, User, WorkerHeartbeat
+from book2audio.tts.clone_engine import CLONE_CAPABILITY
 from book2audio.tts.voices import clone_voice_id
 from book2audio.worker import cleanup as cleanup_module
 
@@ -215,3 +216,76 @@ def test_a_freed_job_is_claimed_by_a_worker_without_the_engine(db_session, no_st
 
     claimed = local_daemon._claim_next_job(db_session)
     assert claimed is not None and claimed.id == job.id
+
+
+# --- a busy worker is not a missing worker -------------------------------------------------------
+
+
+def _heartbeat(db_session, *, minutes_ago, capabilities=(CLONE_CAPABILITY,), worker_id="w"):
+    db_session.add(
+        WorkerHeartbeat(
+            worker_id=worker_id,
+            capabilities=list(capabilities),
+            last_seen_at=datetime.now(timezone.utc) - timedelta(minutes=minutes_ago),
+        )
+    )
+    db_session.commit()
+
+
+def test_a_job_behind_a_busy_capable_worker_is_never_failed_however_long_it_waits(db_session):
+    # The daemon renders one job at a time and a book takes hours: 50 hours of waiting is fine.
+    _heartbeat(db_session, minutes_ago=0)
+    job = _job(db_session, _user(db_session), age_minutes=3000)
+
+    assert window.fail_if_unclaimed(db_session, job) is False
+    db_session.refresh(job)
+    assert job.status == "queued"
+
+
+def test_a_job_fails_once_the_capable_worker_has_been_gone_longer_than_the_wait(db_session):
+    _heartbeat(db_session, minutes_ago=45)
+    job = _job(db_session, _user(db_session), age_minutes=3000)
+
+    assert window.fail_if_unclaimed(db_session, job) is True
+    db_session.refresh(job)
+    assert job.status == "failed"
+    assert job.error_message == window.UNCLAIMED_MESSAGE
+
+
+def test_a_worker_that_went_offline_briefly_does_not_cost_the_job_its_place(db_session):
+    _heartbeat(db_session, minutes_ago=10)  # gone for ten minutes, wait is thirty
+    job = _job(db_session, _user(db_session), age_minutes=3000)
+
+    assert window.fail_if_unclaimed(db_session, job) is False
+
+
+def test_the_wait_restarts_when_the_worker_comes_back_and_drops_out_again(db_session):
+    job = _job(db_session, _user(db_session), age_minutes=3000)
+    _heartbeat(db_session, minutes_ago=5)  # it was back five minutes ago
+
+    assert window.fail_if_unclaimed(db_session, job) is False
+
+
+def test_a_worker_without_the_clone_engine_does_not_keep_a_clone_job_alive(db_session):
+    _heartbeat(db_session, minutes_ago=0, capabilities=(), worker_id="plain")
+    job = _job(db_session, _user(db_session), age_minutes=45)
+
+    assert window.fail_if_unclaimed(db_session, job) is True
+
+
+def test_a_worker_never_seen_leaves_the_wait_to_count_from_the_job(db_session):
+    fresh = _job(db_session, _user(db_session), age_minutes=10)
+    stale = _job(db_session, _user(db_session), age_minutes=45)
+
+    assert window.fail_if_unclaimed(db_session, fresh) is False
+    assert window.fail_if_unclaimed(db_session, stale) is True
+
+
+def test_the_cleanup_sweep_leaves_jobs_alone_while_a_capable_worker_is_online(db_session, monkeypatch):
+    monkeypatch.setattr(cleanup_module, "sweep_stale_voice_uploads", lambda: 0)
+    _heartbeat(db_session, minutes_ago=0)
+    job = _job(db_session, _user(db_session), age_minutes=3000)
+
+    assert cleanup_module._fail_unclaimed_clone_jobs() == 0
+    db_session.refresh(job)
+    assert job.status == "queued"

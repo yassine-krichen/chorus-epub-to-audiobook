@@ -1,8 +1,10 @@
 """How long a job that needs a cloned voice waits for a capable worker, and what happens then.
 
 A job that names a cloned voice (``requires_clone``) is only claimed by a local worker that has
-the clone engine. If none comes, the job would sit queued for ever with no word to the user, so
-after a while it fails with a message that says what to do. Shared by the API (which fails an
+the clone engine. If no such worker is around, the job would sit queued for ever with no word to
+the user, so once none has been seen for a while it fails with a message that says what to do.
+While a capable worker is online the job is never failed, however long it waits: the worker
+renders one job at a time and a book takes hours. Shared by the API (which fails an
 overdue job when it is read) and the cleanup sweeper (which fails the ones nobody read), both
 through :func:`fail_if_unclaimed`, a conditional update: a worker that claims the job at the same
 moment wins.
@@ -17,6 +19,8 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from book2audio.db.models import Job
+from book2audio.db.worker_heartbeat import last_seen_with_capability, online_capabilities
+from book2audio.tts.clone_engine import CLONE_CAPABILITY
 
 _DEFAULT_TIMEOUT_MINUTES = 30
 _MAX_TIMEOUT_MINUTES = 24 * 60
@@ -60,7 +64,16 @@ def fail_if_unclaimed(db: Session, job: Job) -> bool:
     if job.status != "queued" or not job.requires_clone:
         return False
     now = datetime.now(timezone.utc)
-    if now - _waiting_since(job) < clone_claim_timeout():
+    if CLONE_CAPABILITY in online_capabilities(db):
+        # A capable worker is there. It renders one job at a time and a book takes hours, so a
+        # long wait behind a busy worker is normal and not a reason to fail the job.
+        return False
+    # No capable worker right now: the wait that counts is the time since one was last seen, or
+    # since the job started waiting, whichever is later. A worker that goes offline briefly and
+    # comes back therefore never costs a job its place.
+    last_capable = last_seen_with_capability(db, CLONE_CAPABILITY)
+    waiting_since = max(_waiting_since(job), last_capable or _waiting_since(job))
+    if now - waiting_since < clone_claim_timeout():
         return False
     # Conditional on still being queued: a worker that claimed it first keeps it.
     result = db.execute(

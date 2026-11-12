@@ -115,9 +115,12 @@ stateDiagram-v2
   exact `Content-Length` and `Content-Type`, so it cannot be used to write anything bigger. The
   server also refuses to read more than 6 MB of it. (The same now applies to book uploads, up
   to 50 MB.)
-- A job that needs a cloned voice waits at most **30 minutes** for a capable worker
-  (`CLONE_CLAIM_TIMEOUT_MINUTES`, 1 to 1440). After that it fails with a message that says to
-  start the worker and try again, instead of waiting for ever. If you delete the voice a
+- A job that needs a cloned voice fails when **no** capable worker has been seen for **30
+  minutes** (`CLONE_CLAIM_TIMEOUT_MINUTES`, 1 to 1440; the clock runs from the job or from the
+  last time a capable worker was seen, whichever is later). It fails with a message that says
+  to start the worker and try again, instead of waiting for ever. While a capable worker is
+  online the job is never failed, however long it waits behind a long render: the worker does
+  one job at a time, and a worker that drops out briefly and comes back costs nothing. If you delete the voice a
   waiting job named, the job no longer needs the engine and any worker takes it; the deleted
   voice is read by a built-in one, and the cast report says so.
 - Recording links shown on the page last 15 minutes.
@@ -146,6 +149,14 @@ stateDiagram-v2
    about 20 seconds of the daemon starting.
 4. New job: pick your voice as the narrator, create the job. Stop the daemon and reload: the
    voice is greyed out again.
+
+## Deploying
+
+Deploy the **frontend first, then the API**. The book upload link is now signed for the
+file's exact size, so the API requires a `size` with `POST /jobs/upload-url`; the new
+frontend sends it, and an API that does not know the field ignores it. The other order breaks
+book uploads for everyone still running the old frontend. The same goes for the voice upload
+(`POST /voices/clones/upload-url`), which is new. Then run `alembic upgrade head`.
 
 ## Setting up the local worker (once)
 
@@ -256,7 +267,8 @@ treated as not capable.
   once. The worker's cached computed copy (a safetensors file) is removed within about a
   minute, the next time the worker's heartbeat runs, so the worker must be running for that
   to happen. A worker killed in the middle of a job can leave a temporary folder holding the
-  recording; the daemon deletes those older than an hour when it starts. A recording that was
+  recording; the daemon deletes those older than an hour when it starts (the folder name holds
+  the owning process's id, and a folder whose process is still running is left alone). A recording that was
   uploaded but never saved sits in `voice-uploads/` for at most a day: the cleanup job
   (`python -m book2audio.worker.cleanup`) deletes it, and
   `scripts/storage/set_voice_upload_lifecycle.py` (not run by anything; dry run by default,

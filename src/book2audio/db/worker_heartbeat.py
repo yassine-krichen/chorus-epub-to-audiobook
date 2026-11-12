@@ -30,6 +30,18 @@ def record_heartbeat(session: Session, worker_id: str, capabilities: list[str]) 
     session.commit()
 
 
+def last_seen_with_capability(session: Session, capability: str) -> datetime | None:
+    """When a worker offering ``capability`` was last heard from, however long ago; else ``None``."""
+    latest: datetime | None = None
+    for row in session.scalars(select(WorkerHeartbeat)):
+        if capability not in (str(c) for c in row.capabilities):
+            continue
+        seen = row.last_seen_at if row.last_seen_at.tzinfo else row.last_seen_at.replace(tzinfo=timezone.utc)
+        if latest is None or seen > latest:
+            latest = seen
+    return latest
+
+
 def online_capabilities(session: Session) -> set[str]:
     """Every capability offered by a worker seen within the last :data:`HEARTBEAT_TTL`."""
     cutoff = datetime.now(timezone.utc) - HEARTBEAT_TTL

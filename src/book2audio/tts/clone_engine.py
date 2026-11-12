@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import queue
+import re
 import shutil
 import subprocess
 import tempfile
@@ -161,22 +162,53 @@ def probe_clone_capability() -> CloneCapability:
 
 
 _WORKDIR_PREFIX = "b2a-clone-"
+# The owner's process id is part of the name: ``b2a-clone-<pid>-<random>``.
+_WORKDIR_OWNER = re.compile(r"b2a-clone-(\d+)-")
+
+
+def _process_alive(pid: int) -> bool:
+    """Whether a process with this id exists. Never signals the process: on Windows
+    ``os.kill`` would terminate it, so Windows asks the kernel directly."""
+    if os.name == "nt":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            return bool(kernel32.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # it exists, it just belongs to someone else
+    return True
 
 
 def remove_stale_workdirs(max_age_s: float = 3600, root: str | None = None) -> int:
     """Delete clone-engine temp folders left behind by a worker that was killed; returns how many.
 
-    They hold reference recordings (personal audio), so they must not linger. Only folders older
-    than ``max_age_s`` go: a running job's folder is never that old at the moment a daemon starts.
+    They hold reference recordings (personal audio), so they must not linger. A folder goes only
+    when it is older than ``max_age_s`` *and* the process whose id is in its name is gone, so
+    another daemon running on the same machine never loses the folder of a job in progress.
     """
     base = Path(root or tempfile.gettempdir())
     cutoff = time.time() - max_age_s
     removed = 0
     for entry in base.glob(f"{_WORKDIR_PREFIX}*"):
         try:
-            if entry.is_dir() and entry.stat().st_mtime < cutoff:
-                shutil.rmtree(entry, ignore_errors=True)
-                removed += 1
+            if not entry.is_dir() or entry.stat().st_mtime >= cutoff:
+                continue
+            owner = _WORKDIR_OWNER.match(entry.name)
+            if owner and _process_alive(int(owner.group(1))):
+                continue
+            shutil.rmtree(entry, ignore_errors=True)
+            removed += 1
         except OSError:
             continue
     return removed
@@ -208,7 +240,7 @@ class QwenCloneEngine:
     def __init__(self, python: str, weights_dir: str) -> None:
         self._python = python
         self._weights = weights_dir
-        self._workdir = Path(tempfile.mkdtemp(prefix=_WORKDIR_PREFIX))
+        self._workdir = Path(tempfile.mkdtemp(prefix=f"{_WORKDIR_PREFIX}{os.getpid()}-"))
         (self._workdir / "refs").mkdir()
         (self._workdir / "out").mkdir()
         self._process: subprocess.Popen[str] | None = None

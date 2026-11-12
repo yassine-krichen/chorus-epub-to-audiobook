@@ -57,6 +57,40 @@ def test_stale_clone_temp_folders_are_removed_and_recent_or_foreign_ones_are_kep
     assert recent.exists() and foreign.exists() and a_file.exists()
 
 
+def _dead_pid() -> int:
+    import subprocess
+    import sys
+
+    process = subprocess.Popen([sys.executable, "-c", "pass"])
+    process.wait()
+    return process.pid
+
+
+def test_an_old_folder_of_a_process_that_is_still_running_is_never_removed(tmp_path):
+    # Another daemon on the same machine, in the middle of a long job.
+    running = tmp_path / f"b2a-clone-{os.getpid()}-abc123"
+    running.mkdir()
+    _old(running, 7200)
+    gone = tmp_path / f"b2a-clone-{_dead_pid()}-def456"
+    gone.mkdir()
+    _old(gone, 7200)
+
+    removed = remove_stale_workdirs(root=str(tmp_path))
+
+    assert removed == 1
+    assert running.exists() and not gone.exists()
+
+
+def test_a_new_engine_names_its_folder_after_its_process(tmp_path):
+    from book2audio.tts.clone_engine import QwenCloneEngine
+
+    engine = QwenCloneEngine("python", str(tmp_path))
+    try:
+        assert engine._workdir.name.startswith(f"b2a-clone-{os.getpid()}-")
+    finally:
+        engine.close()
+
+
 def test_the_daemon_clears_stale_temp_folders_when_it_starts(monkeypatch):
     calls = []
     monkeypatch.setattr(local_daemon, "remove_stale_workdirs", lambda: calls.append("swept"))
