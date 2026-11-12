@@ -1,0 +1,2 @@
+# Applied with: uv pip install ... --override overrides.txt (see requirements.lock.txt)
+accelerate==1.15.0
