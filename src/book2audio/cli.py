@@ -185,8 +185,8 @@ def _build_parser() -> argparse.ArgumentParser:
         default=150,
         metavar="N",
         help=(
-            "Max LLM windows (one request each) per book; later windows keep heuristic "
-            "labels. A transient failure may be retried once, outside this count (default: 150)"
+            "Max LLM windows sent per book; later windows keep heuristic "
+            "labels. Retries and model rotation add HTTP requests outside this count (default: 150)"
         ),
     )
     return parser

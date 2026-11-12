@@ -241,15 +241,17 @@ def test_the_cache_is_invalidated_when_the_window_text_changes(monkeypatch, tmp_
     assert post.call_count == 2
 
 
-def test_the_cache_is_invalidated_when_the_model_changes(monkeypatch, tmp_path):
+def test_the_cache_is_shared_across_models_so_a_rotated_run_can_resume(monkeypatch, tmp_path):
+    # Which chain model answered a window depends on rate limits at the time, so
+    # the cache key must not include it (see LLMAttributor._cache_key).
     cache_path = str(tmp_path / "attribution-cache.json")
     post = _install(monkeypatch, _echo_post("Nephis"))
     _attributor("hybrid", cache=AttributionCache(cache_path)).attribute([_alternation_chapter()])
 
-    monkeypatch.setenv("FREELLMAPI_MODEL", "another-model")
+    monkeypatch.setenv("FREELLMAPI_MODEL", "another-model,third-model")
     _attributor("hybrid", cache=AttributionCache(cache_path)).attribute([_alternation_chapter()])
 
-    assert post.call_count == 2
+    assert post.call_count == 1
 
 
 def test_the_cache_file_is_written_atomically_through_a_unique_temp_file(monkeypatch, tmp_path):
@@ -330,7 +332,7 @@ def test_an_http_error_falls_back_to_the_heuristic(monkeypatch):
     assert chapter.segments[4].speaker == "Sunny"
     assert attributor.report.windows_failed == 1
     assert attributor.report.calls == 1
-    assert post.call_count == 2  # one retry inside the client
+    assert post.call_count == 1  # a 429 without Retry-After is not retried
 
 
 def test_malformed_json_falls_back_to_the_heuristic(monkeypatch):
@@ -417,6 +419,27 @@ def test_a_pronoun_is_not_accepted_as_a_new_name(monkeypatch):
     _attributor("hybrid").attribute([chapter])
 
     assert chapter.segments[4].speaker == "Sunny"
+
+
+def test_the_unnamed_label_gives_the_line_to_the_narrator_not_a_character(monkeypatch):
+    _install(monkeypatch, _echo_post("Unnamed"))
+    chapter = _alternation_chapter()
+
+    _attributor("hybrid").attribute([chapter])
+
+    assert chapter.segments[4].speaker == NARRATOR
+
+
+def test_a_line_spoken_by_a_described_person_is_not_sent_to_the_model(monkeypatch):
+    post = _install(monkeypatch, _echo_post("Sunny"))
+    chapter = _chapter(
+        [_dlg("Hello."), _nar("said Tom."), _nar("The old guard grunted."), _dlg("Papers.")]
+    )
+
+    _attributor("hybrid").attribute([chapter])
+
+    post.assert_not_called()
+    assert chapter.segments[3].speaker == NARRATOR
 
 
 def test_out_of_window_ids_are_ignored(monkeypatch):
@@ -537,12 +560,6 @@ def test_the_request_uses_temperature_zero_the_configured_model_and_a_token_cap(
     assert "response_format" not in kwargs["json"]
     assert kwargs["headers"] == {"Authorization": f"Bearer {API_KEY}"}
     assert kwargs["timeout"] == 120.0
-
-
-def test_the_model_defaults_to_auto_when_unset(monkeypatch):
-    monkeypatch.delenv("FREELLMAPI_MODEL")
-
-    assert LLMClient().model == "auto"
 
 
 def test_the_prompt_lists_known_characters_and_marks_attributed_lines(monkeypatch):
@@ -705,6 +722,17 @@ def test_the_report_summary_is_a_single_line(monkeypatch):
     assert "1 call(s)" in summary and "budget exhausted: no" in summary
 
 
+def test_the_report_counts_http_requests_apart_from_windows(monkeypatch):
+    _install(monkeypatch, _echo_post("Nephis"))
+    attributor = _attributor("hybrid")
+    attributor.attribute([_alternation_chapter()])
+
+    report = attributor.report
+
+    assert report.calls == 1 and report.requests == 1 and report.rate_limited == 0
+    assert "1 request(s), 0 rate limited" in report.summary()
+
+
 # --- client ------------------------------------------------------------------
 
 
@@ -855,8 +883,8 @@ def test_client_errors_are_not_retried(monkeypatch, _no_backoff_sleep, status):
     assert _no_backoff_sleep == []
 
 
-@pytest.mark.parametrize("status", [429, 500, 502, 503])
-def test_rate_limits_and_server_errors_are_retried_once_with_a_backoff(
+@pytest.mark.parametrize("status", [500, 502, 503])
+def test_server_errors_are_retried_once_with_a_backoff(
     monkeypatch, _no_backoff_sleep, status
 ):
     post = _install(
@@ -936,7 +964,7 @@ class _ExplodingClient:
     temperature = 0.0
     max_tokens = 10
 
-    def complete_json(self, system, user):
+    def complete_json(self, system, user, validate=None):
         raise RuntimeError("boom with " + API_KEY)
 
 
@@ -1177,3 +1205,26 @@ def test_a_reply_missing_the_title_period_canonicalizes_to_the_known_cast_name(m
     _attributor("hybrid").attribute([chapter])
 
     assert chapter.segments[4].speaker == "Mrs. Schofield"
+
+
+def test_an_alias_the_model_makes_a_speaker_again_is_no_longer_recorded_as_folded(monkeypatch):
+    # Offline, "Cassia" folds into "Cassie" (they speak in different scenes). The model
+    # then labels a line in Cassie's scene "Cassia", so the two share a scene and stay
+    # two characters; the stale fold must not stay in ``aliases``.
+    chapter = _chapter(
+        [
+            _dlg("Hello."), _nar("said Cassia."),
+            _break(),
+            _dlg("Hi."), _nar("said Cassie."),
+            _nar("Nobody had heard of Cassia in years."),
+            _dlg("Who is there?"),
+            _dlg("Nobody."),
+            _dlg("Really?"),
+        ]
+    )
+    _install(monkeypatch, _echo_post("Cassia"))
+    attributor = _attributor("hybrid")
+
+    attributor.attribute([chapter])
+
+    assert "Cassia" not in attributor.aliases

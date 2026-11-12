@@ -121,11 +121,22 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _pinned_model(cli_model: str | None) -> str:
-    model = (cli_model or os.environ.get("FREELLMAPI_MODEL") or "").strip()
+    model = (
+        cli_model
+        or os.environ.get("FREELLMAPI_MODEL_ATTRIBUTION")
+        or os.environ.get("FREELLMAPI_MODEL")
+        or ""
+    ).strip()
     if not model or model.lower() == "auto":
         raise ValueError(
             "refusing to evaluate with model 'auto' (or none): set FREELLMAPI_MODEL (or --model) "
             "to one concrete model so the result is attributable"
+        )
+    if "," in model:
+        # A chain answers each window with whichever model was free, so the
+        # numbers could not be attributed to one model.
+        raise ValueError(
+            "refusing to evaluate a model list: pin one model so the result is attributable"
         )
     require_llm_attribution_configured()
     return model

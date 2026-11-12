@@ -51,7 +51,7 @@ python evals/attribution/run_eval.py --split dev
 FREELLMAPI_MODEL=<one concrete model> python evals/attribution/run_eval.py --split test
 ```
 
-Run from the repo root with the project's virtualenv (`.venv/Scripts/python.exe` on Windows). LLM modes need `FREELLMAPI_BASE_URL`, `FREELLMAPI_API_KEY` and a concrete `FREELLMAPI_MODEL` (or `--model`). The model `auto` is refused because the router may switch models between calls; the pinned model is recorded in the results file.
+Run from the repo root with the project's virtualenv (`.venv/Scripts/python.exe` on Windows). LLM modes need `FREELLMAPI_BASE_URL`, `FREELLMAPI_API_KEY` and a concrete `FREELLMAPI_MODEL` (or `--model`). The model `auto` and comma-separated model lists are refused because the router (or the chain) may switch models between calls; the pinned model is recorded in the results file.
 
 ## What it reports
 

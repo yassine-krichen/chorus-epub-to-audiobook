@@ -162,7 +162,6 @@ class EnhancedThumbnails:
 
     def _brief_key(self, chapter: Chapter) -> str:
         return brief_cache_key(
-            model=self._client.model,
             book_title=self._book_title,
             chapter=chapter,
             cast=self._cast,
@@ -206,4 +205,5 @@ def build_enhanced_thumbnails(work_dir: str, book_title: str) -> EnhancedThumbna
     except RuntimeError as exc:
         logger.warning("Enhanced thumbnails unavailable, using the template prompt: %s", exc)
         return None
-    return EnhancedThumbnails(LLMClient(timeout=BRIEF_TIMEOUT_SECONDS), work_dir, book_title)
+    client = LLMClient(task="light", timeout=BRIEF_TIMEOUT_SECONDS)
+    return EnhancedThumbnails(client, work_dir, book_title)

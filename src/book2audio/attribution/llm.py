@@ -5,14 +5,15 @@ consecutive segments, the model is asked who speaks each target dialogue line:
 
 * ``llm`` mode targets every dialogue line.
 * ``hybrid`` mode targets only the lines the heuristic had to guess (pronoun,
-  alternation or fallback tiers); lines with an explicit name in the text keep
-  their heuristic label and cost no tokens.
+  alternation or fallback tiers); lines with explicit evidence in the text (a
+  name, an unnamed speaker, a scare quote, a continuation) keep their heuristic
+  label and cost no tokens.
 
 The model is never trusted blindly. Replies are validated line by line and
 anything missing or invalid keeps the heuristic label, so a bad reply, an
 outage or an exhausted budget degrades to the heuristic result instead of
-failing the render. Responses are cached on disk (keyed by prompt, model and
-window text) so re-running a book costs nothing.
+failing the render. Responses are cached on disk (keyed by prompt and window
+text, not by model: see ``_cache_key``) so re-running a book costs nothing.
 """
 
 from __future__ import annotations
@@ -25,8 +26,9 @@ import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
-from book2audio.attribution.gender import GenderVerdict
+from book2audio.attribution.gender import GenderVerdict, llm_verdict
 from book2audio.attribution.heuristic import _STOPWORDS, HeuristicAttributor
+from book2audio.attribution.judges import AliasJudge, GenderJudge, JudgeReport
 from book2audio.attribution.llm_client import LLMClient, LLMError
 from book2audio.models import NARRATOR, Chapter, SegmentKind
 
@@ -53,11 +55,16 @@ SYSTEM_PROMPT = (
     "- For a character not in the list, use a name that appears capitalized in "
     "the passage. Never invent names.\n"
     '- Use "Narrator" only if the quoted text is not actually spoken by a character.\n'
+    '- Use "Unnamed" when the speaker is a person the passage never names, only '
+    'describes (the old guard, a broad-shouldered man). Never give such a line to a '
+    "named character just because they are nearby.\n"
     "- If you cannot tell who speaks a line, leave its id out.\n"
     "- Only label ids from the 'Label dialogue ids' list.\n"
     'Reply with JSON only, no prose: {"labels":[{"id":3,"speaker":"Alice"}]}'
 )
 
+# The model's word for "a speaker the text never names"; the narrator voices the line.
+UNNAMED_LABEL = "unnamed"
 _NAME_PUNCTUATION = frozenset(" .'’-")
 MAX_NAME_LENGTH = 40
 
@@ -76,7 +83,11 @@ class AttributionReport:
     windows_skipped: int = 0  # dialogue windows with no target line (hybrid)
     windows_failed: int = 0
     windows_unprocessed: int = 0  # not attempted: budget exhausted or breaker open
+    # ``calls`` counts windows sent (what the budget caps); ``requests`` counts the
+    # HTTP requests behind them, which retries and model rotation can multiply.
     calls: int = 0
+    requests: int = 0
+    rate_limited: int = 0  # of those requests, answered 429
     cache_hits: int = 0
     lines_targeted: int = 0
     lines_changed: int = 0
@@ -86,7 +97,8 @@ class AttributionReport:
 
     def summary(self) -> str:
         return (
-            f"LLM attribution ({self.mode}): {self.calls} call(s), "
+            f"LLM attribution ({self.mode}): {self.calls} call(s) "
+            f"({self.requests} request(s), {self.rate_limited} rate limited), "
             f"{self.cache_hits} cache hit(s), {self.windows} window(s) "
             f"({self.windows_skipped} skipped, {self.windows_failed} failed, "
             f"{self.windows_unprocessed} unprocessed), {self.lines_targeted} line(s) "
@@ -170,6 +182,7 @@ class LLMAttributor:
         only_chapters: frozenset[int] | None = None,
         on_progress: Callable[[], None] | None = None,
         gender_overrides: Mapping[str, str] | None = None,
+        judge_client: LLMClient | None = None,
     ) -> None:
         if mode not in ("llm", "hybrid"):
             raise ValueError(f"LLMAttributor mode must be 'llm' or 'hybrid', got {mode!r}")
@@ -185,6 +198,10 @@ class LLMAttributor:
         self._on_progress = on_progress
         self._heuristic = HeuristicAttributor(gender_overrides)
         self.report = AttributionReport(mode=mode)
+        # The alias and gender judges (see judges.py) run once per book when a
+        # client is given; without one the attributor behaves as before.
+        self._judge_client = judge_client
+        self.judge_report = JudgeReport()
 
     @property
     def genders(self) -> dict[str, str]:
@@ -213,6 +230,7 @@ class LLMAttributor:
     def attribute(self, chapters: list[Chapter]) -> list[str]:
         self._heuristic.attribute(chapters)
         self.report = report = AttributionReport(mode=self.mode)
+        requests_before, limited_before = self._client_counters()
         known = self._known_names(chapters)
 
         # Snapshot before any change: prompts and the changed-lines count must
@@ -254,6 +272,10 @@ class LLMAttributor:
         # Fold nicknames the model may have introduced ("Neph" -> "Nephis"),
         # exactly as the heuristic does for its own names.
         self._heuristic.merge_aliases(self._speaker_names(chapters), chapters)
+        # The model may label a line with a spelling the offline pass had folded
+        # away (Cassia -> Cassie). If the merge is now refused (both speak in one
+        # scene) the name is a speaker again, so the old fold no longer holds.
+        self._heuristic.drop_aliases_still_speaking(self._speaker_names(chapters))
 
         report.lines_changed = sum(
             1
@@ -261,11 +283,86 @@ class LLMAttributor:
             for i, seg in enumerate(c.segments)
             if seg.kind == SegmentKind.DIALOGUE and seg.speaker != before[(c.index, i)]
         )
+        requests_after, limited_after = self._client_counters()
+        report.requests = requests_after - requests_before
+        report.rate_limited = limited_after - limited_before
         self._finish_warnings(report)
 
         names = self._speaker_names(chapters)
         self._heuristic.infer_genders(names, chapters)
+        if self._judge_client is not None:
+            names = self._run_judges(names, chapters)
         return names
+
+    def _run_judges(self, names: list[str], chapters: list[Chapter]) -> list[str]:
+        """Merge aliases the model can prove, then ask about genders still unresolved."""
+        heuristic = self._heuristic
+        self.judge_report = report = JudgeReport()
+        try:
+            aliases = AliasJudge(self._judge_client, self._cache, report).find(
+                names, chapters, heuristic.verdicts
+            )
+            if aliases:
+                heuristic.fold_aliases([(f.alias, f.name) for f in aliases], chapters)
+                report.aliases_added = len(aliases)
+                names = self._speaker_names(chapters)
+                heuristic.infer_genders(names, chapters)
+            self._judge_genders(names, chapters)
+        except Exception as exc:  # noqa: BLE001 - a judge bug must never fail a render
+            report.warnings.append(f"AI character check stopped ({type(exc).__name__})")
+        return names
+
+    def _judge_genders(self, names: list[str], chapters: list[Chapter]) -> None:
+        heuristic = self._heuristic
+        report = self.judge_report
+        speaking = self._speaking_in_scope(chapters)
+        # Busiest characters first: the judge only looks at the first few, and a
+        # character with many lines matters most to the cast.
+        lines = self._dialogue_lines(chapters)
+        unresolved = sorted(
+            (n for n in names if n in speaking and heuristic.verdicts[n].gender is None),
+            key=lambda n: (-lines.get(n, 0), n),
+        )
+        spellings = {
+            name: [name, *(alias for alias, target in heuristic.aliases.items() if target == name)]
+            for name in unresolved
+        }
+        for finding in GenderJudge(self._judge_client, self._cache, report).find(
+            unresolved, chapters, spellings
+        ):
+            previous = heuristic.verdicts[finding.name]
+            if _contradicts_evidence(previous, finding.gender):
+                report.reject("gender", finding.name, "the text's own pronouns say the opposite")
+                continue
+            heuristic.verdicts[finding.name] = llm_verdict(
+                previous, finding.gender, finding.quote, finding.chapter_index
+            )
+            heuristic.genders[finding.name] = finding.gender
+            report.genders_added += 1
+
+    @staticmethod
+    def _dialogue_lines(chapters: list[Chapter]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for chapter in chapters:
+            for seg in chapter.segments:
+                if seg.kind == SegmentKind.DIALOGUE and seg.speaker:
+                    counts[seg.speaker] = counts.get(seg.speaker, 0) + 1
+        return counts
+
+    def _speaking_in_scope(self, chapters: list[Chapter]) -> set[str]:
+        """Characters with dialogue in the chapters being rendered (all, if unrestricted)."""
+        return {
+            seg.speaker
+            for c in chapters
+            if self._only_chapters is None or c.index in self._only_chapters
+            for seg in c.segments
+            if seg.kind == SegmentKind.DIALOGUE and seg.speaker and seg.speaker != NARRATOR
+        }
+
+    def _client_counters(self) -> tuple[int, int]:
+        # Duck-typed clients (test doubles, custom transports) may not count.
+        client = self._client
+        return (getattr(client, "requests", 0), getattr(client, "rate_limited", 0))
 
     def _attribute_window(self, window: _Window, before: dict, known: list[str]) -> str:
         """Label one window. Returns ``cached``, ``answered``, ``failed`` or ``unprocessed``.
@@ -294,7 +391,11 @@ class LLMAttributor:
 
         report.calls += 1
         try:
-            labels = _extract_labels(self._client.complete_json(SYSTEM_PROMPT, user_prompt))
+            # The shape check runs inside the client so a model that replies with
+            # the wrong structure hands the window to the next model in the chain.
+            labels = _extract_labels(
+                self._client.complete_json(SYSTEM_PROMPT, user_prompt, validate=_extract_labels)
+            )
         except LLMError:
             report.windows_failed += 1
             return "failed"
@@ -363,6 +464,8 @@ class LLMAttributor:
     def _status(self, window: _Window, position: int, heuristic_speakers: dict) -> str:
         """Annotation for a dialogue line the model is not asked to label."""
         tier = self._heuristic.tiers.get((window.chapter.index, position))
+        if self.mode == "hybrid" and tier == "unnamed":
+            return "spoken by a person the text does not name"
         if self.mode == "hybrid" and tier not in UNSURE_TIERS:
             # Only explicit, name-in-text labels are shown; guesses would
             # just feed the heuristic's mistakes back to the model.
@@ -379,12 +482,18 @@ class LLMAttributor:
         )
 
     def _cache_key(self, user_prompt: str) -> str:
-        """Everything that shapes the request: instructions, model, sampling, prompt."""
+        """Everything that shapes the request: instructions, sampling, prompt.
+
+        The model is deliberately not part of the key. Which model of the chain
+        answers a window depends on which ones were rate limited at the time, so
+        keying on it would make a resumed run (the usual way past a daily cap)
+        re-ask every window another model already answered. The cost: after
+        switching to a better model, delete the cache file to re-attribute.
+        """
         client = self._client
         blob = json.dumps(
             [
                 prompt_fingerprint(),
-                client.model if client else "",
                 client.temperature if client else 0.0,
                 client.max_tokens if client else 0,
                 user_prompt,
@@ -527,7 +636,7 @@ def _resolve_speaker(
     if not name:
         return None
     lowered = name.lower()
-    if lowered == NARRATOR.lower():
+    if lowered == NARRATOR.lower() or lowered == UNNAMED_LABEL:
         return NARRATOR
     if _lookup_key(name) in known_lookup:
         return known_lookup[_lookup_key(name)]
@@ -546,6 +655,19 @@ def _resolve_speaker(
         return None
     accepted_new[lowered] = name
     return name
+
+
+# Evidence that already leans this strongly the other way outweighs one sentence.
+_CONTRADICTION_MIN_WEIGHT = 4.0
+_CONTRADICTION_MIN_SHARE = 0.7
+
+
+def _contradicts_evidence(previous: GenderVerdict, gender: str) -> bool:
+    """True when the text's own pronouns clearly say the opposite of the model."""
+    own = previous.male_weight if gender == "m" else previous.female_weight
+    other = previous.female_weight if gender == "m" else previous.male_weight
+    total = own + other
+    return total >= _CONTRADICTION_MIN_WEIGHT and other / total >= _CONTRADICTION_MIN_SHARE
 
 
 def _lookup_key(name: str) -> str:

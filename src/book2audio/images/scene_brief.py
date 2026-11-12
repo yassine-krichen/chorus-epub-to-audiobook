@@ -188,17 +188,19 @@ def _name_needles(name: str | None) -> list[str]:
 
 def brief_cache_key(
     *,
-    model: str,
     book_title: str,
     chapter: Chapter,
     cast: Sequence[CastMember],
     sheet_entry: AppearanceEntry | None,
 ) -> str:
-    """Fingerprint of everything the model is shown, including its name."""
+    """Fingerprint of everything the model is shown.
+
+    Not the model's name: which model of the chain answers depends on rate limits, so
+    a resumed job must not treat the same input as new (see llm_client).
+    """
     main = cast[0].name if cast else None
     parts = [
         BRIEF_VERSION,
-        model,
         clean_book_title(book_title),
         str(chapter.number),
         chapter.title,
@@ -229,17 +231,30 @@ def request_scene_brief(
     cast: Sequence[CastMember],
     sheet_entry: AppearanceEntry | None,
 ) -> SceneBrief:
-    """Ask the model for this chapter's scene brief: exactly one chat call.
+    """Ask the model for this chapter's scene brief.
 
-    Raises :class:`SceneBriefError` for any failure (transport, rate limit, bad
-    JSON, an unusable brief); the caller falls back to the template prompt.
+    One logical request: the client may rotate through its model chain, and a
+    reply that parses but yields no usable brief counts as that model failing, so
+    the next model gets a try. Raises :class:`SceneBriefError` for any failure
+    (transport, rate limit, bad JSON, an unusable brief on every model); the
+    caller falls back to the template prompt.
     """
     user = _user_prompt(book_title, chapter, cast, sheet_entry)
+    chapter_text = chapter_full_text(chapter)
+
+    def usable(reply: object) -> SceneBrief:
+        try:
+            return parse_scene_brief(reply, cast=cast, chapter_text=chapter_text)
+        except SceneBriefError as exc:
+            raise LLMError(str(exc)) from exc
+
     try:
-        reply = client.complete_json(_SYSTEM_PROMPT, user)
+        reply = client.complete_json(_SYSTEM_PROMPT, user, validate=usable)
     except LLMError as exc:
         raise SceneBriefError(f"scene brief request failed: {exc}") from exc
-    return parse_scene_brief(reply, cast=cast, chapter_text=chapter_full_text(chapter))
+    # The client already ran the same parse; it is cheap and keeps this function
+    # independent of whether the validator's result is returned.
+    return parse_scene_brief(reply, cast=cast, chapter_text=chapter_text)
 
 
 def _user_prompt(

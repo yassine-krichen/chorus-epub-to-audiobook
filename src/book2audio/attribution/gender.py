@@ -16,6 +16,11 @@ Layers, all read from narration only (never from inside a quote):
 * **L2 titles and roles** - ``Mrs. X``, ``Lady X``, ``his sister X``,
   ``X, the girl``. ``Master`` is deliberately not gendered ("Master Jet" can be a
   woman). One such cue outweighs a handful of conflicting pronouns.
+* **L4 LLM judge** - only for characters L1 and L2 left unresolved, and only in
+  the AI modes (see ``judges.py``). The model must quote a sentence of the book
+  that names the character and shows the gender; the quote is checked against the
+  text, so an invented sentence is dropped. Confidence is fixed just above the
+  threshold, which keeps the character flagged for review in the cast report.
 * **Overrides** - the user's word always wins, with confidence 1.0.
 
 Pronouns are credited by proximity to a name in the text, never by who a
@@ -65,6 +70,11 @@ TITLE = "title"
 KINSHIP = "kinship"
 APPOSITIVE = "appositive"
 OVERRIDE = "override"
+LLM = "llm"
+
+# What an LLM verdict is worth: enough to pick a voice, not enough to skip review
+# (the cast report flags anything under 0.8).
+LLM_CONFIDENCE = 0.7
 
 _GENDERS = frozenset("mf")
 
@@ -238,6 +248,28 @@ class _Tally:
             female_weight=self.female,
             layer_counts=tuple(sorted(self.counts.items())),
         )
+
+
+def llm_verdict(
+    previous: GenderVerdict, gender: str, quote: str, chapter_index: int
+) -> GenderVerdict:
+    """``previous`` with the LLM judge's verdict on top, its quote kept as evidence.
+
+    The earlier evidence stays visible (and the weights it carried) so the cast
+    report shows what the text said before the model was asked.
+    """
+    evidence = GenderEvidence(LLM, gender, STRONG_WEIGHT, _snippet(quote), chapter_index)
+    counts = dict(previous.layer_counts)
+    counts[LLM] = counts.get(LLM, 0) + 1
+    return GenderVerdict(
+        name=previous.name,
+        gender=gender,
+        confidence=LLM_CONFIDENCE,
+        evidence=(evidence, *previous.evidence),
+        male_weight=previous.male_weight + (STRONG_WEIGHT if gender == "m" else 0.0),
+        female_weight=previous.female_weight + (STRONG_WEIGHT if gender == "f" else 0.0),
+        layer_counts=tuple(sorted(counts.items())),
+    )
 
 
 def _forced_verdict(name: str, gender: str) -> GenderVerdict:
