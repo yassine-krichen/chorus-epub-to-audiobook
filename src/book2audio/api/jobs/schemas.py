@@ -27,14 +27,14 @@ from book2audio.api.jobs.uploads import (
 from book2audio.cast_report import CAST_MAX_CHARACTERS, CAST_NAME_MAX_LENGTH
 from book2audio.cast_review import validate_character_aliases
 from book2audio.tts.voices import (
-    CHARACTER_VOICE_POOL,
-    DEFAULT_NARRATOR_VOICE,
     FEMALE_VOICES,
+    KOKORO_VOICES,
     MALE_VOICES,
+    is_known_voice,
 )
 
-# Every voice a client may pick, the narrator's included.
-_KNOWN_VOICES = frozenset(CHARACTER_VOICE_POOL) | {DEFAULT_NARRATOR_VOICE}
+# Longest voice id a client may send or see: a cloned voice is ``clone:`` plus a 36-char uuid.
+VOICE_ID_MAX_LENGTH = 64
 
 
 class UploadUrlRequest(BaseModel):
@@ -59,7 +59,7 @@ class JobConfig(BaseModel):
     implementation detail the worker builds from this payload.
     """
 
-    narrator_voice: str | None = None
+    narrator_voice: str | None = Field(default=None, max_length=VOICE_ID_MAX_LENGTH)
     voice_overrides: dict[str, str] = Field(default_factory=dict)
     male_voice: str | None = None
     female_voice: str | None = None
@@ -100,8 +100,17 @@ class JobConfig(BaseModel):
                 raise ValueError(
                     f"voice override names must be 1 to {GENDER_OVERRIDE_MAX_NAME_LENGTH} characters"
                 )
-            if voice not in _KNOWN_VOICES:
+            if not is_known_voice(voice):
                 raise ValueError(f"Unknown voice {voice!r} for {name!r}")
+        return value
+
+    @field_validator("narrator_voice")
+    @classmethod
+    def _validate_narrator_voice(cls, value: str | None) -> str | None:
+        # Whether a cloned voice exists and is the user's own is checked by the service,
+        # which has the database; here only the shape.
+        if value is not None and not is_known_voice(value):
+            raise ValueError(f"Unknown narrator_voice {value!r}")
         return value
 
     @field_validator("character_aliases")
@@ -298,7 +307,7 @@ class CastCharacter(BaseModel):
     gender: Literal["m", "f"] | None
     confidence: float = Field(ge=0, le=1)
     needs_review: bool
-    voice: str = Field(max_length=40)
+    voice: str = Field(max_length=VOICE_ID_MAX_LENGTH)
     voice_source: Literal["override", "gender", "narrator"]
     sample_line: str = Field(max_length=300)
     layer_counts: dict[str, int] = Field(default_factory=dict)
@@ -322,8 +331,8 @@ class CastReviewEdit(BaseModel):
     @field_validator("voice")
     @classmethod
     def _validate_voice(cls, value: str | None) -> str | None:
-        if value is not None and value not in _KNOWN_VOICES:
-            raise ValueError(f"Unknown voice {value!r}. Known: {', '.join(sorted(_KNOWN_VOICES))}")
+        if value is not None and not is_known_voice(value):
+            raise ValueError(f"Unknown voice {value!r}. Known: {', '.join(sorted(KOKORO_VOICES))}")
         return value
 
     @model_validator(mode="after")
@@ -357,7 +366,7 @@ class CastReport(BaseModel):
     """
 
     voice_mode: Literal["cast", "narrator_only"]
-    narrator_voice: str = Field(max_length=40)
+    narrator_voice: str = Field(max_length=VOICE_ID_MAX_LENGTH)
     confidence_threshold: float = Field(ge=0, le=1)
     characters: list[CastCharacter] = Field(max_length=CAST_MAX_CHARACTERS)
     # Characters the worker left out because the review cannot list them (a name over

@@ -20,17 +20,15 @@ from book2audio.attribution.base import ATTRIBUTOR_MODES, VOICE_MODES
 from book2audio.attribution.gender import validate_gender_overrides
 from book2audio.cast_review import validate_character_aliases
 from book2audio.tts.voices import (
-    CHARACTER_VOICE_POOL,
     DEFAULT_NARRATOR_VOICE,
     FEMALE_VOICES,
+    KOKORO_VOICES,
     MALE_VOICES,
+    is_known_voice,
 )
 
 if TYPE_CHECKING:
     from book2audio.epub.numbering import Numbered
-
-# Every voice the engine can use, for validating overrides up front.
-_KNOWN_VOICES = frozenset(CHARACTER_VOICE_POOL) | {DEFAULT_NARRATOR_VOICE}
 
 
 @dataclass
@@ -127,10 +125,12 @@ class Config:
 
         if not os.path.isfile(self.epub_path):
             raise ValueError(f"EPUB not found: {self.epub_path}")
-        if self.narrator_voice not in _KNOWN_VOICES:
+        # A cloned voice (``clone:<uuid>``) is also fine: whether it exists, and whose it is,
+        # is the API's and the worker's business, not the config's.
+        if not is_known_voice(self.narrator_voice):
             raise ValueError(
                 f"Unknown narrator voice {self.narrator_voice!r}. "
-                f"Known: {', '.join(sorted(_KNOWN_VOICES))}"
+                f"Known: {', '.join(sorted(KOKORO_VOICES))}"
             )
         if self.male_voice is not None and self.male_voice not in MALE_VOICES:
             raise ValueError(

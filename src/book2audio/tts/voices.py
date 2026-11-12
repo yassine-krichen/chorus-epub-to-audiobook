@@ -17,6 +17,8 @@ Voice rules (wrong-gender voices confuse listeners, so a guess is never made):
 
 from __future__ import annotations
 
+import re
+import uuid
 from dataclasses import dataclass, field
 
 from book2audio.models import NARRATOR
@@ -48,6 +50,35 @@ CHARACTER_VOICE_POOL = (
 # the pool so a character guessed male gets a male voice, and vice versa.
 MALE_VOICES = tuple(v for v in CHARACTER_VOICE_POOL if v[1] == "m")
 FEMALE_VOICES = tuple(v for v in CHARACTER_VOICE_POOL if v[1] == "f")
+
+
+# A cloned voice is named ``clone:<uuid>`` wherever a Kokoro voice id is accepted (narrator
+# voice, per-character overrides). The uuid is the id of the user's ``cloned_voices`` row.
+CLONE_VOICE_PREFIX = "clone:"
+_CLONE_VOICE = re.compile(
+    r"clone:(?P<id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+)
+
+KOKORO_VOICES = frozenset(CHARACTER_VOICE_POOL) | {DEFAULT_NARRATOR_VOICE}
+
+
+def clone_voice_id(voice_uuid: uuid.UUID) -> str:
+    return f"{CLONE_VOICE_PREFIX}{voice_uuid}"
+
+
+def parse_clone_voice(voice: str) -> uuid.UUID | None:
+    """The cloned voice's uuid when ``voice`` is a well-formed ``clone:<uuid>`` id, else ``None``."""
+    match = _CLONE_VOICE.fullmatch(voice)
+    return uuid.UUID(match.group("id")) if match else None
+
+
+def is_clone_voice(voice: str) -> bool:
+    return parse_clone_voice(voice) is not None
+
+
+def is_known_voice(voice: str) -> bool:
+    """A Kokoro voice we ship, or a well-formed clone id (whose owner is checked elsewhere)."""
+    return voice in KOKORO_VOICES or is_clone_voice(voice)
 
 
 @dataclass

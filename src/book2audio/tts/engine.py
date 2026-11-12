@@ -9,6 +9,7 @@ should create one engine and reuse it for the whole book.
 from __future__ import annotations
 
 import re
+from typing import Protocol
 
 import numpy as np
 
@@ -22,6 +23,28 @@ _SENTENCE = re.compile(r"[^.!?…]+[.!?…]*\s*")
 # Soft cap on characters per synthesis call. Well under Kokoro's token limit so
 # phoneme expansion never overflows, while still giving natural prosody.
 _MAX_CHARS = 350
+
+
+class TtsEngine(Protocol):
+    """What the pipeline needs from a speech engine: text and a voice id in, 24 kHz mono out."""
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> np.ndarray: ...
+
+
+def chunk_text(text: str, max_chars: int = _MAX_CHARS) -> list[str]:
+    """Split ``text`` on sentence boundaries into pieces of at most about ``max_chars``."""
+    sentences = _SENTENCE.findall(text) or [text]
+    chunks: list[str] = []
+    current = ""
+    for sentence in sentences:
+        if current and len(current) + len(sentence) > max_chars:
+            chunks.append(current.strip())
+            current = sentence
+        else:
+            current += sentence
+    if current.strip():
+        chunks.append(current.strip())
+    return chunks
 
 
 class KokoroEngine:
@@ -49,15 +72,4 @@ class KokoroEngine:
 
     @staticmethod
     def _chunk(text: str) -> list[str]:
-        sentences = _SENTENCE.findall(text) or [text]
-        chunks: list[str] = []
-        current = ""
-        for sentence in sentences:
-            if current and len(current) + len(sentence) > _MAX_CHARS:
-                chunks.append(current.strip())
-                current = sentence
-            else:
-                current += sentence
-        if current.strip():
-            chunks.append(current.strip())
-        return chunks
+        return chunk_text(text)
