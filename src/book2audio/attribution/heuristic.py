@@ -113,6 +113,9 @@ _STOPWORDS = {
 
 
 _VOWELS = frozenset("aeiouy")
+# "Cat" is the start of "Caterpillar" and a character of its own; a nickname that
+# short is not safe to fold. "Neph" for "Nephis" is the shortest we trust.
+MIN_NICKNAME_LENGTH = 4
 
 
 def _speaker_stats(chapters: list[Chapter]) -> tuple[dict[str, int], dict[str, set[int]]]:
@@ -195,11 +198,14 @@ def epithet_shapes(epithet: str, name: str) -> re.Pattern[str]:
     ``Tom, Aunt Polly and Sid`` are lists of people.
     """
     e, n = re.escape(epithet), re.escape(name)
+    # "Epithet Name" ("Changing Star Nephis") only means anything for a multi-word
+    # epithet; two single words side by side are just two words.
+    adjacent = rf"|(?<!\w){e}\s+{n}(?!\w)" if " " in epithet else ""
     return re.compile(
         rf"(?<!\w){n},\s+the\s+{e}(?!\w)"
         rf"|(?<!\w)[Tt]he\s+{e},\s+{n}(?!\w)"
-        rf"|(?<!\w){e}\s+{n}(?!\w)"
-        rf"|(?<!\w){n},?\s+(?:also\s+)?(?:known|called|named|titled|dubbed)\s+as\s+(?:the\s+)?{e}(?!\w)"
+        + adjacent
+        + rf"|(?<!\w){n},?\s+(?:also\s+)?(?:known|called|named|titled|dubbed)\s+as\s+(?:the\s+)?{e}(?!\w)"
     )
 
 
@@ -373,11 +379,13 @@ class HeuristicAttributor:
         """
         canonical: dict[str, str] = {}
         for short in names:
-            if " " in short or len(short) < 3:
+            if " " in short or len(short) < MIN_NICKNAME_LENGTH:
                 continue
             for full in names:
                 if full != short and " " not in full and len(full) > len(short):
-                    if full.lower().startswith(short.lower()):
+                    if full.lower().startswith(short.lower()) and not _gender_conflict(
+                        [short, full], chapters
+                    ):
                         canonical[short] = full
                         break
 
@@ -420,6 +428,11 @@ class HeuristicAttributor:
                 if seg.speaker in canonical:
                     seg.speaker = canonical[seg.speaker]
         return [n for n in names if n not in canonical]
+
+    def drop_aliases_still_speaking(self, speakers: list[str]) -> None:
+        """Forget folds whose alias is a speaker again, so ``aliases`` matches the labels."""
+        for alias in [a for a in self.aliases if a in speakers]:
+            del self.aliases[alias]
 
     def fold_aliases(self, pairs: list[tuple[str, str]], chapters: list[Chapter]) -> None:
         """Fold ``(alias, name)`` pairs found by another source (the AI alias judge).

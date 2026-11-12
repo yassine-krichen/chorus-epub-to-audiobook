@@ -195,7 +195,8 @@ class LLMClient:
             except _ModelFailure as failure:
                 self._cool(model, failure)
                 failures.append(f"{model}: {failure}")
-                forbidden += failure.forbidden
+                # "In a row": any other kind of failure in between starts the count over.
+                forbidden = forbidden + 1 if failure.forbidden else 0
                 if forbidden >= MAX_FORBIDDEN_MODELS:
                     # Two different models both refusing us is the key, not the models.
                     raise LLMError(

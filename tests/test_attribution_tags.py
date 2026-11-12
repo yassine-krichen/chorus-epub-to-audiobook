@@ -425,3 +425,14 @@ def test_spelling_variants_named_together_are_two_people():
     )
 
     assert attributor.aliases == {} and sorted(names) == ["Cassia", "Cassie"]
+
+
+def test_a_prefix_nickname_of_the_opposite_gender_is_not_folded():
+    attributor, names, _ = _attribute(
+        '"Hi," said Neph.',
+        '"Hello," said Nephis.',
+        *['Neph raised his hand. He smiled and his eyes were bright.'] * 5,
+        *['Nephis raised her hand. She smiled and her eyes were bright.'] * 5,
+    )
+
+    assert attributor.aliases == {} and sorted(names) == ["Neph", "Nephis"]

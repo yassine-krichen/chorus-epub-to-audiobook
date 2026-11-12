@@ -272,6 +272,10 @@ class LLMAttributor:
         # Fold nicknames the model may have introduced ("Neph" -> "Nephis"),
         # exactly as the heuristic does for its own names.
         self._heuristic.merge_aliases(self._speaker_names(chapters), chapters)
+        # The model may label a line with a spelling the offline pass had folded
+        # away (Cassia -> Cassie). If the merge is now refused (both speak in one
+        # scene) the name is a speaker again, so the old fold no longer holds.
+        self._heuristic.drop_aliases_still_speaking(self._speaker_names(chapters))
 
         report.lines_changed = sum(
             1
@@ -312,9 +316,13 @@ class LLMAttributor:
         heuristic = self._heuristic
         report = self.judge_report
         speaking = self._speaking_in_scope(chapters)
-        unresolved = [
-            n for n in names if n in speaking and heuristic.verdicts[n].gender is None
-        ]
+        # Busiest characters first: the judge only looks at the first few, and a
+        # character with many lines matters most to the cast.
+        lines = self._dialogue_lines(chapters)
+        unresolved = sorted(
+            (n for n in names if n in speaking and heuristic.verdicts[n].gender is None),
+            key=lambda n: (-lines.get(n, 0), n),
+        )
         spellings = {
             name: [name, *(alias for alias, target in heuristic.aliases.items() if target == name)]
             for name in unresolved
@@ -324,13 +332,22 @@ class LLMAttributor:
         ):
             previous = heuristic.verdicts[finding.name]
             if _contradicts_evidence(previous, finding.gender):
-                report.rejected += 1
+                report.reject("gender", finding.name, "the text's own pronouns say the opposite")
                 continue
             heuristic.verdicts[finding.name] = llm_verdict(
                 previous, finding.gender, finding.quote, finding.chapter_index
             )
             heuristic.genders[finding.name] = finding.gender
             report.genders_added += 1
+
+    @staticmethod
+    def _dialogue_lines(chapters: list[Chapter]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for chapter in chapters:
+            for seg in chapter.segments:
+                if seg.kind == SegmentKind.DIALOGUE and seg.speaker:
+                    counts[seg.speaker] = counts.get(seg.speaker, 0) + 1
+        return counts
 
     def _speaking_in_scope(self, chapters: list[Chapter]) -> set[str]:
         """Characters with dialogue in the chapters being rendered (all, if unrestricted)."""

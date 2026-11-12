@@ -469,3 +469,97 @@ def test_an_alias_quote_may_span_sentences():
     )
 
     assert len(found) == 1
+
+
+# --- reasons, ordering, clauses -----------------------------------------------------------
+
+
+def test_every_dropped_answer_is_recorded_with_the_name_and_the_reason():
+    found, report, _ = _find_genders(_gender_reply(quote="Rin looked tired. She was a queen."))
+
+    assert found == []
+    assert report.reasons == ["gender Rin: quote is not in the book"]
+
+
+def test_a_dropped_answer_is_logged_without_book_text(caplog):
+    with caplog.at_level("INFO", logger="book2audio.attribution.judges"):
+        _find_genders(_gender_reply(quote="Rin looked tired. She was a queen."))
+
+    assert "Rin" in caplog.text and "not in the book" in caplog.text
+    assert "queen" not in caplog.text
+
+
+def test_the_reasons_cover_the_guards_that_fire():
+    reasons = []
+    for quote, gender in (
+        ("She lowered her head and her hands shook.", "f"),  # does not name Rin
+        ("Pat waited by the door.", "f"),  # not Rin's sentence, no gender word
+        ("Rin looked tired. She lowered her head and her hands shook.", "m"),  # contradicts
+    ):
+        _, report, _ = _find_genders(_gender_reply(gender=gender, quote=quote))
+        reasons += report.reasons
+
+    assert reasons == [
+        "gender Rin: quote does not name the character",
+        "gender Rin: quote does not name the character",
+        "gender Rin: quote's gender words contradict the verdict",
+    ]
+
+
+def test_an_unknown_verdict_is_recorded_as_such():
+    _, report, _ = _find_genders({"verdicts": [{"name": "Rin", "gender": "unknown", "quote": ""}]})
+
+    assert report.reasons == ["gender Rin: the model could not tell"]
+
+
+def test_a_single_clause_of_a_mixed_sentence_can_be_the_quote():
+    book = _chapters("Pat waited by the door while she watched and he sighed.")
+    clause = "Pat waited by the door while she watched"
+    client = FakeClient(_gender_reply(name="Pat", gender="f", quote=clause))
+
+    found = GenderJudge(client, None, JudgeReport()).find(["Pat"], book)
+
+    assert [(f.name, f.gender) for f in found] == [("Pat", "f")]
+
+
+def test_sentences_with_one_genders_words_come_before_mixed_ones():
+    book = _chapters(
+        "Pat knew that he and she had met.",
+        "Pat nodded.",
+        "Pat said her name was Pat.",
+    )
+
+    client = FakeClient({"verdicts": []})
+    GenderJudge(client, None, JudgeReport()).find(["Pat"], book)
+
+    shown = client.calls[0][1].splitlines()[2:]
+    assert shown == [
+        "  - Pat said her name was Pat.",
+        "  - Pat nodded.",
+        "  - Pat knew that he and she had met.",
+    ]
+
+
+def test_the_busiest_unresolved_characters_are_judged_when_there_are_too_many():
+    from book2audio.attribution import judges
+
+    # Twelve quiet characters first in reading order, then one with many lines.
+    quiet = [f'"Hi," said Quiet{i}. Quiet{i} sat down.' for i in range(judges.MAX_JUDGED_CHARACTERS)]
+    loud = ['"Hello," said Busy.', 'Busy sat.'] * 4
+    chapter = Chapter(index=1, title="Ch", segments=segment_paragraphs([*quiet, *loud]))
+    judge = FakeClient({"same": []}, {"verdicts": []})
+    attributor = LLMAttributor("hybrid", None, AttributionCache(None), judge_client=judge)
+
+    attributor.attribute([chapter])
+
+    gender_prompt = judge.calls[-1][1]
+    assert "Busy:" in gender_prompt
+
+
+def test_the_adjacent_epithet_shape_needs_a_multi_word_epithet():
+    book = _chapters("Fox Mara walked in.")
+    reply = _alias_reply(alias="Fox", name="Mara", evidence="Fox Mara walked in.")
+
+    found = AliasJudge(FakeClient(reply), None, JudgeReport()).find(["Mara", "Fox"], book, {})
+
+    assert found == []

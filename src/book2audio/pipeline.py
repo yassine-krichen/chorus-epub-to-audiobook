@@ -199,6 +199,8 @@ class Pipeline:
                 self.console.print(f"[yellow]Warning:[/yellow] {warning}")
             if judges.calls or judges.cache_hits:
                 self.console.print(f"[dim]{judges.summary()}[/dim]")
+                for reason in judges.reasons:
+                    self.console.print(f"[dim]  dropped: {escape(reason)}[/dim]")
 
     @staticmethod
     def _order_by_frequency(characters: list[str], book: Book) -> list[str]:

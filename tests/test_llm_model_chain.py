@@ -574,3 +574,14 @@ def test_a_single_model_in_the_environment_still_drives_attribution(monkeypatch)
     attributor.attribute([_scenes(2)])
 
     assert asked == ["only-model", "only-model"]
+
+
+def test_the_403_count_starts_over_after_a_different_failure(monkeypatch):
+    asked = _gateway(
+        monkeypatch,
+        {"a": _error(403), "b": _error(400), "c": _error(403), "d": _ok()},
+    )
+
+    LLMClient(model="a,b,c,d").complete_json("sys", "user")
+
+    assert asked == ["a", "b", "c", "d"]

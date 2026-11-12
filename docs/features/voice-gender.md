@@ -150,7 +150,7 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
 | Old: characters with the right gender | 3 of 4 (Rain wrongly male) | 2 of 5 (Nephis and Changing Star wrongly male) |
 | New, offline: characters with the right gender, among those it decided | 3 of 3 | 3 of 3 |
 | New, offline: characters left to the narrator | 0 | 1 (Changing Star, 12 lines) |
-| New, AI speaker detection on: characters with the right gender | 4 of 4 | 4 of 5 (the AI gender check resolved Changing Star and Cassia as female; Cassie, 27 lines, stays unresolved and is read by the narrator, see the spelling limit below) |
+| New, AI speaker detection on: characters with the right gender | 4 of 4 | 5 of 5 (the AI gender check resolved Changing Star, Cassia and Cassie as female; Cassia and Cassie stay two characters, see the spelling limit below) |
 | New, offline, whole book as evidence: characters with the right gender | 3 of 3 | 3 of 3 (Changing Star is folded into Nephis) |
 | Old: lines in a wrong-gender voice, counting the speaker the app chose | 23 of 157 | 63 of 209 |
 | New: the same count, any mode | 0 of 157 | 0 of 209 |
@@ -190,9 +190,10 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
   merged, and two names that take turns in one conversation (Ellen and Allen) stay two
   people. The price is recall: with AI speaker detection on, the AI also labels lines with
   both spellings of Cassie inside one scene, so in the chapter 36 to 43 test Cassia and
-  Cassie stay two characters (Cassie ends unresolved there), and in the whole book they
-  share a scene in chapter 44 as well. Precision wins: a wrong merge gives two people one
-  voice, an unresolved gender gives a narrator-read character. The rule still merges two different characters with names like Julie and Julia
+  Cassie stay two characters (each resolved female by the AI gender check), and in the
+  whole book they share a scene in chapter 44 as well. Precision wins: a wrong merge
+  gives two people one voice. A nickname must be at least 4 letters ("Neph" for "Nephis"
+  yes, "Cat" for "Caterpillar" no) and never of opposite gender evidence. The rule still merges two different characters with names like Julie and Julia
   when they are in separate scenes and never named together, and then they share one voice
   and one gender. There is no flag to undo a merge yet. The cast report shows only the
   merged name.
@@ -212,6 +213,10 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
   the 0.8 review line, so the cast report marks the character with `?`), keeps its quote
   as evidence, and is dropped when the quote is not in the book, does not name the
   character, has words of both genders, or the text's own pronouns say the opposite.
+  It asks about the busiest unresolved characters first (at most 12), shows the model
+  sentences with one gender's words before mixed ones, and lets it quote a single clause.
+  Every dropped answer is logged (name and reason only) and listed in the run summary's
+  judge report.
 - **The hosted worker writes `cast_report.json` but does not upload it.** On the website
   the report is not visible yet. It is only in the worker's scratch folder.
 

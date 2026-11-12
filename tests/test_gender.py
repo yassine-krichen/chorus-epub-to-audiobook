@@ -368,7 +368,7 @@ def test_a_chain_of_variants_leaves_no_orphaned_speaker_labels():
 
 
 def test_prefix_nickname_chains_also_end_at_the_final_name():
-    chapters = [_tagged("Nep", 1), _tagged("Neph", 2), _tagged("Nephis", 3, lines=3)]
+    chapters = [_tagged("Neph", 1), _tagged("Nephi", 2), _tagged("Nephis", 3, lines=3)]
     attributor = HeuristicAttributor()
 
     names = attributor.attribute(chapters)
@@ -469,3 +469,13 @@ def test_an_override_for_an_alias_is_matched_case_insensitively():
     )
 
     assert verdict.gender == "f" and verdict.confidence == 1.0
+
+
+def test_a_three_letter_prefix_is_not_a_nickname():
+    # "Cat" starts "Caterpillar" and is a character of its own.
+    chapters = [_tagged("Cat", 1), _tagged("Caterpillar", 2)]
+    attributor = HeuristicAttributor()
+
+    names = attributor.attribute(chapters)
+
+    assert attributor.aliases == {} and sorted(names) == ["Cat", "Caterpillar"]

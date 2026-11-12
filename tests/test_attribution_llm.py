@@ -1205,3 +1205,26 @@ def test_a_reply_missing_the_title_period_canonicalizes_to_the_known_cast_name(m
     _attributor("hybrid").attribute([chapter])
 
     assert chapter.segments[4].speaker == "Mrs. Schofield"
+
+
+def test_an_alias_the_model_makes_a_speaker_again_is_no_longer_recorded_as_folded(monkeypatch):
+    # Offline, "Cassia" folds into "Cassie" (they speak in different scenes). The model
+    # then labels a line in Cassie's scene "Cassia", so the two share a scene and stay
+    # two characters; the stale fold must not stay in ``aliases``.
+    chapter = _chapter(
+        [
+            _dlg("Hello."), _nar("said Cassia."),
+            _break(),
+            _dlg("Hi."), _nar("said Cassie."),
+            _nar("Nobody had heard of Cassia in years."),
+            _dlg("Who is there?"),
+            _dlg("Nobody."),
+            _dlg("Really?"),
+        ]
+    )
+    _install(monkeypatch, _echo_post("Cassia"))
+    attributor = _attributor("hybrid")
+
+    attributor.attribute([chapter])
+
+    assert "Cassia" not in attributor.aliases
