@@ -27,6 +27,17 @@ def test_a_good_recording_is_accepted_and_normalized_to_mono_16_bit_wav():
     assert len(analysis.sha256) == 64
 
 
+def test_a_continuous_reading_with_hardly_any_pauses_is_not_mistaken_for_noise():
+    # The quietest 50 ms frames of a fluent reading are soft syllables, not silence: the
+    # noise rule must not treat them as a noisy room.
+    sample_rate = 24000
+    t = np.arange(15 * sample_rate) / sample_rate
+    envelope = 0.01 + 0.29 * (0.5 + 0.5 * np.sin(2 * np.pi * 3 * t))
+    fluent = (envelope * np.sin(2 * np.pi * 180 * t)).astype(np.float32)
+
+    assert quality_problems(fluent, sample_rate) == []
+
+
 def test_a_stereo_recording_is_mixed_down_to_mono():
     mono = speech_like(15)
     analysis = analyze_reference_upload(wav_bytes(np.stack([mono, mono], axis=1)))

@@ -12,8 +12,8 @@ export const MIN_SAMPLE_RATE = 16_000;
 export const CLIPPING_LEVEL = 0.999;
 export const MAX_CLIPPED_FRACTION = 0.005;
 export const MIN_SPEECH_DB = -35;
-export const MAX_NOISE_FLOOR_DB = -40;
-export const MIN_SNR_DB = 15;
+export const MAX_NOISE_FLOOR_DB = -32;
+export const MIN_SNR_DB = 12;
 const FRAME_SECONDS = 0.05;
 
 export type CheckId = "length" | "quality" | "clipping" | "volume" | "noise";

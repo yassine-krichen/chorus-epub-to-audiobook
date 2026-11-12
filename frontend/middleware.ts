@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 // A present-but-expired or forged cookie value still passes this check.
 // The actual enforcement happens server-side in lib/server/backend-client.ts,
 // which sends the token to the FastAPI backend and lets it verify/refresh.
-const PROTECTED_PREFIXES = ["/dashboard", "/jobs", "/settings"];
+const PROTECTED_PREFIXES = ["/dashboard", "/jobs", "/settings", "/voices"];
 const ACCESS_COOKIE = "b2a_access";
 
 export function middleware(request: NextRequest): NextResponse {
@@ -28,5 +28,5 @@ export function middleware(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/jobs/:path*", "/settings/:path*"],
+  matcher: ["/dashboard/:path*", "/jobs/:path*", "/settings/:path*", "/voices/:path*"],
 };

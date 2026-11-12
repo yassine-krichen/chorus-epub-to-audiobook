@@ -76,6 +76,17 @@ describe("analyzeRecording", () => {
     expect(failedIds(quiet)).toEqual(["volume"]);
   });
 
+  it("does not mistake a fluent reading with hardly any pauses for noise", () => {
+    const sampleRate = 24_000;
+    const fluent = new Float32Array(15 * sampleRate).map((_, i) => {
+      const t = i / sampleRate;
+      const envelope = 0.01 + 0.29 * (0.5 + 0.5 * Math.sin(2 * Math.PI * 3 * t));
+      return envelope * Math.sin(2 * Math.PI * 180 * t);
+    });
+
+    expect(failedIds(fluent)).toEqual([]);
+  });
+
   it("rejects background noise", () => {
     expect(failedIds(speechLike(15, { noise: 0.05 }))).toEqual(["noise"]);
   });
