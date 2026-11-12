@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from book2audio.api.voices.reference_audio import MAX_UPLOAD_BYTES
+
 
 class VoiceInfo(BaseModel):
     id: str
@@ -45,6 +47,12 @@ class CloneOptions(BaseModel):
     max_duration_s: float
     min_sample_rate: int
     clone_worker_online: bool
+
+
+class CloneUploadUrlRequest(BaseModel):
+    # The exact size of the WAV the browser will upload: signed into the URL, so the storage
+    # service refuses any other length.
+    size: int = Field(ge=1_000, le=MAX_UPLOAD_BYTES)
 
 
 class CloneUploadUrlResponse(BaseModel):

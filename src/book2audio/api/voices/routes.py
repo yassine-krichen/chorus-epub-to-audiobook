@@ -25,6 +25,7 @@ from book2audio.api.voices.reference_audio import (
 from book2audio.api.voices.schemas import (
     CloneOptions,
     ClonedVoiceInfo,
+    CloneUploadUrlRequest,
     CloneUploadUrlResponse,
     CreateClonedVoiceRequest,
     ReadingScript,
@@ -48,6 +49,8 @@ router = APIRouter(tags=["voices"])
 # Frontend caches the voice list for 5 minutes, so presigned sample URLs need
 # to outlive that cache window comfortably.
 _SAMPLE_URL_EXPIRY_SECONDS = 3600
+# A link to someone's own recording is personal data: it lives only as long as a listen needs.
+_RECORDING_URL_EXPIRY_SECONDS = 900
 
 
 def _sample_url(voice_id: str) -> str | None:
@@ -88,7 +91,7 @@ def _clone_voice_info(voice: ClonedVoice, *, available: bool) -> VoiceInfo:
 def _recording_url(voice: ClonedVoice) -> str | None:
     """A short-lived link to the owner's own recording, so they can listen to it."""
     try:
-        return presign_get(voice.ref_object_key, expires=_SAMPLE_URL_EXPIRY_SECONDS)
+        return presign_get(voice.ref_object_key, expires=_RECORDING_URL_EXPIRY_SECONDS)
     except Exception:
         logger.warning("voice.recording_url_failed", extra={"voice_id": str(voice.id)}, exc_info=True)
         return None
@@ -140,12 +143,19 @@ def clone_options(
 
 @router.post("/voices/clones/upload-url", response_model=CloneUploadUrlResponse)
 def create_clone_upload_url(
+    payload: CloneUploadUrlRequest,
     current_user: User = Depends(get_current_user),
 ) -> CloneUploadUrlResponse:
     enforce_voice_enrolment_rate_limit(current_user.id)
     voice_id = uuid.uuid4()
-    # Short-lived: the file is validated and copied by the server once it is enrolled.
-    url = presign_put(cloning.staging_key(current_user.id, voice_id), expires=300)
+    # Short-lived, and bound to the declared size and type: the storage service refuses a
+    # PUT with any other Content-Length or Content-Type, so a signed URL cannot fill storage.
+    url = presign_put(
+        cloning.staging_key(current_user.id, voice_id),
+        expires=300,
+        content_length=payload.size,
+        content_type="audio/wav",
+    )
     return CloneUploadUrlResponse(voice_id=voice_id, upload_url=url)
 
 

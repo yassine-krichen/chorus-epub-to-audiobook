@@ -31,7 +31,7 @@ from book2audio.storage.r2 import StorageReadError, download_capped
 
 logger = logging.getLogger(__name__)
 
-# The wizard's own upload cap (see routes.MAX_UPLOAD_BYTES); storage does not enforce it.
+# The wizard's own upload cap (see uploads.MAX_EPUB_UPLOAD_BYTES), signed into the upload URL.
 MAX_INSPECT_BYTES = 50 * 1024 * 1024
 # An EPUB is a zip, so a small file can hold a huge one. Refuse before parsing.
 _MAX_ZIP_ENTRIES = 5_000

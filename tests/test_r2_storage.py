@@ -396,13 +396,24 @@ def test_object_size_returns_none_for_a_missing_object(fake_client):
     assert r2.object_size("jobs/1/cast_report.json") is None
 
 
-def test_read_object_returns_the_body_bytes(fake_client):
-    fake_client.head_object.return_value = {"ContentLength": 5}
-    fake_client.get_object.return_value = {"Body": MagicMock(read=lambda: b"hello")}
+class _Body:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+        self._pos = 0
+
+    def read(self, size: int) -> bytes:
+        chunk = self._data[self._pos : self._pos + size]
+        self._pos += len(chunk)
+        return chunk
+
+
+def test_read_object_returns_the_body_bytes_pinned_to_the_etag_it_measured(fake_client):
+    fake_client.head_object.return_value = {"ContentLength": 5, "ETag": '"abc"'}
+    fake_client.get_object.return_value = {"Body": _Body(b"hello")}
 
     assert r2.read_object("jobs/1/cast_report.json", max_bytes=100) == b"hello"
     fake_client.get_object.assert_called_once_with(
-        Bucket="test-bucket", Key="jobs/1/cast_report.json"
+        Bucket="test-bucket", Key="jobs/1/cast_report.json", IfMatch='"abc"'
     )
 
 
@@ -421,18 +432,45 @@ def test_read_object_refuses_an_object_over_the_limit_without_downloading_it(fak
     fake_client.get_object.assert_not_called()
 
 
+def test_read_object_stops_when_the_stream_is_bigger_than_the_head_said(fake_client):
+    # The object was replaced between the HEAD and the GET (or the HEAD lied): the cap still holds.
+    fake_client.head_object.return_value = {"ContentLength": 10}
+    fake_client.get_object.return_value = {"Body": _Body(b"x" * 5000)}
+
+    with pytest.raises(ValueError, match="more than the 100 byte limit"):
+        r2.read_object("voice-uploads/u/v.wav", max_bytes=100)
+
+
+def test_read_object_reports_a_cut_connection_as_a_storage_error(fake_client):
+    class _Broken:
+        def read(self, size):
+            raise ReadTimeoutError(endpoint_url="x")
+
+    fake_client.head_object.return_value = {"ContentLength": 5}
+    fake_client.get_object.return_value = {"Body": _Broken()}
+
+    with pytest.raises(r2.StorageReadError):
+        r2.read_object("k", max_bytes=100)
+
+
+def test_presign_put_can_sign_the_content_length_and_type_into_the_url(fake_client):
+    fake_client.generate_presigned_url.return_value = "https://signed"
+
+    r2.presign_put("voice-uploads/u/v.wav", expires=300, content_length=1234, content_type="audio/wav")
+
+    fake_client.generate_presigned_url.assert_called_once_with(
+        "put_object",
+        Params={
+            "Bucket": "test-bucket",
+            "Key": "voice-uploads/u/v.wav",
+            "ContentLength": 1234,
+            "ContentType": "audio/wav",
+        },
+        ExpiresIn=300,
+    )
+
+
 # --- download_capped: untrusted uploads, size enforced while streaming ---------------------
-
-
-class _Body:
-    def __init__(self, data: bytes) -> None:
-        self._data = data
-        self._pos = 0
-
-    def read(self, size: int) -> bytes:
-        chunk = self._data[self._pos : self._pos + size]
-        self._pos += len(chunk)
-        return chunk
 
 
 def test_download_capped_writes_the_object_and_pins_the_read_to_the_etag_it_measured(

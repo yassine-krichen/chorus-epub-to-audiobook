@@ -18,12 +18,16 @@ from book2audio.db.worker_heartbeat import record_heartbeat
 from book2audio.tts.clone_engine import CLONE_CAPABILITY
 
 
+UPLOAD = {"size": 320_000}
+
+
 class FakeStore:
     """An in-memory stand-in for object storage."""
 
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
         self.fail_deletes = False
+        self.signed: list[dict] = []
 
     def read_object(self, key, *, max_bytes):
         data = self.objects.get(key)
@@ -49,7 +53,12 @@ def store(monkeypatch):
     monkeypatch.setattr(cloning, "delete_objects", fake.delete_objects)
     monkeypatch.setattr(routes, "object_exists", lambda key: False)
     monkeypatch.setattr(routes, "presign_get", lambda key, expires=600, **kw: f"https://s/{key}")
-    monkeypatch.setattr(routes, "presign_put", lambda key, expires=600: f"https://put/{key}")
+
+    def presign_put(key, expires=600, **kwargs):
+        fake.signed.append({"key": key, "expires": expires, **kwargs})
+        return f"https://put/{key}"
+
+    monkeypatch.setattr(routes, "presign_put", presign_put)
     return fake
 
 
@@ -223,7 +232,7 @@ def test_enrolment_and_upload_urls_are_rate_limited(client, db_session, store, m
     monkeypatch.setattr(rate_limit._voice_enrolment_per_user_limiter, "max_attempts", 2)
 
     statuses = [
-        client.post("/voices/clones/upload-url", headers=headers).status_code for _ in range(3)
+        client.post("/voices/clones/upload-url", json=UPLOAD, headers=headers).status_code for _ in range(3)
     ]
 
     assert statuses == [200, 200, 429]
@@ -235,14 +244,14 @@ def test_the_upload_url_points_at_a_staging_key_under_the_users_own_prefix(
     headers = _auth(client)
     user_id = _user_id(db_session)
 
-    body = client.post("/voices/clones/upload-url", headers=headers).json()
+    body = client.post("/voices/clones/upload-url", json=UPLOAD, headers=headers).json()
 
     assert body["upload_url"] == f"https://put/voice-uploads/{user_id}/{body['voice_id']}.wav"
 
 
 def test_the_clone_endpoints_need_a_signed_in_user(client, store):
     assert client.get("/voices/clones").status_code == 401
-    assert client.post("/voices/clones/upload-url").status_code == 401
+    assert client.post("/voices/clones/upload-url", json=UPLOAD).status_code == 401
     assert client.get("/voices/clones/options").status_code == 401
     assert client.delete(f"/voices/clones/{uuid.uuid4()}").status_code == 401
 
@@ -402,3 +411,49 @@ def test_a_silent_recording_is_never_stored_even_with_valid_consent(client, db_s
 
     assert response.status_code == 422
     assert not any(key.startswith("voice-refs/") for key in store.objects)
+
+
+def test_the_upload_url_is_signed_for_the_declared_size_and_type(client, db_session, store):
+    headers = _auth(client)
+
+    client.post("/voices/clones/upload-url", json={"size": 320_000}, headers=headers)
+
+    [signed] = store.signed
+    assert signed["content_length"] == 320_000
+    assert signed["content_type"] == "audio/wav"
+    assert signed["expires"] == 300
+
+
+@pytest.mark.parametrize("body", [{}, {"size": 0}, {"size": 999}, {"size": 6 * 1024 * 1024 + 1}])
+def test_no_upload_url_is_signed_for_a_missing_or_oversized_upload(client, store, body):
+    headers = _auth(client)
+
+    response = client.post("/voices/clones/upload-url", json=body, headers=headers)
+
+    assert response.status_code == 422
+    assert store.signed == []
+
+
+def test_a_staged_object_that_is_too_large_is_refused_and_deleted(client, db_session, store):
+    headers = _auth(client)
+    user_id = _user_id(db_session)
+    voice_id = uuid.uuid4()
+    _stage(store, user_id, voice_id, bytes(1) * (6 * 1024 * 1024 + 1))
+
+    response = client.post("/voices/clones", json=_enrol_body(voice_id), headers=headers)
+
+    assert response.status_code == 422
+    assert cloning.staging_key(user_id, voice_id) not in store.objects
+
+
+def test_a_recording_link_lives_fifteen_minutes(client, db_session, store, monkeypatch):
+    headers = _auth(client)
+    _enrol(client, headers, db_session, store)
+    expiries = []
+    monkeypatch.setattr(
+        routes, "presign_get", lambda key, expires=600, **kw: expiries.append(expires) or "https://s/x"
+    )
+
+    client.get("/voices/clones", headers=headers)
+
+    assert expiries == [900]

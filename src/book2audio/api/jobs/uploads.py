@@ -14,6 +14,9 @@ import uuid
 from fastapi import HTTPException, status
 
 MAX_UPLOAD_KEY_LENGTH = 600
+# The largest EPUB the wizard accepts. The upload URL is signed for the exact size the client
+# declares (up to this), so storage refuses a PUT of any other length.
+MAX_EPUB_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_UPLOAD_FILENAME_LENGTH = 255
 
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"

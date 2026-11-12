@@ -32,20 +32,15 @@ from book2audio.storage.r2 import presign_put
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-# Enforced by the presigned PUT's implicit trust boundary: R2/S3 presigned PUT
-# URLs (query-string V4 signing) cannot carry a server-verified Content-Length
-# condition the way presigned POST policies can. The real cap must be enforced
-# by an R2 bucket-level max-object-size rule; this constant only documents the
-# intended limit for client-side guidance.
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024
-
 
 @router.post("/upload-url", response_model=UploadUrlResponse)
 def create_upload_url(
     payload: UploadUrlRequest, current_user: User = Depends(get_current_user)
 ) -> UploadUrlResponse:
     object_key = upload_key(current_user.id, payload.filename)
-    return UploadUrlResponse(upload_url=presign_put(object_key), object_key=object_key)
+    # Signed for the declared size: storage refuses a PUT with any other Content-Length.
+    url = presign_put(object_key, content_length=payload.size)
+    return UploadUrlResponse(upload_url=url, object_key=object_key)
 
 
 @router.post("/inspect", response_model=BookInspection)

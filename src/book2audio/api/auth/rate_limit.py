@@ -105,9 +105,10 @@ _inspect_per_user_limiter = SlidingWindowLimiter(
 
 
 # Enrolling a voice writes personal audio to storage and costs a decode, so it is limited
-# per signed-in user: ten uploads or enrolments an hour is plenty for re-recording.
+# per signed-in user. An attempt takes two calls (upload URL, then save), so 20 an hour
+# is ten attempts: plenty for re-recording.
 _voice_enrolment_per_user_limiter = SlidingWindowLimiter(
-    max_attempts=_int_env("VOICE_ENROLMENT_RATE_LIMIT_PER_USER", 10),
+    max_attempts=_int_env("VOICE_ENROLMENT_RATE_LIMIT_PER_USER", 20),
     window_seconds=_float_env("VOICE_ENROLMENT_RATE_LIMIT_WINDOW_SECONDS", 3600),
 )
 

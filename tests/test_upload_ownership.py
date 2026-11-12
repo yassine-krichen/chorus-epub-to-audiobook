@@ -124,10 +124,10 @@ def test_an_empty_key_is_a_422(client, account):
 
 
 def test_the_key_from_the_upload_url_endpoint_always_passes_the_guard(client, account, monkeypatch):
-    monkeypatch.setattr("book2audio.api.jobs.routes.presign_put", lambda key: f"https://r2/{key}")
+    monkeypatch.setattr("book2audio.api.jobs.routes.presign_put", lambda key, **kw: f"https://r2/{key}")
 
     response = client.post(
-        "/jobs/upload-url", json={"filename": "Shadow Slave (001-100).epub"}, headers=account["headers"]
+        "/jobs/upload-url", json={"filename": "Shadow Slave (001-100).epub", "size": 1000}, headers=account["headers"]
     )
 
     key = response.json()["object_key"]
@@ -144,7 +144,7 @@ def test_the_key_from_the_upload_url_endpoint_always_passes_the_guard(client, ac
 )
 def test_a_file_name_that_could_change_the_key_is_refused(client, account, filename):
     response = client.post(
-        "/jobs/upload-url", json={"filename": filename}, headers=account["headers"]
+        "/jobs/upload-url", json={"filename": filename, "size": 1000}, headers=account["headers"]
     )
 
     assert response.status_code == 422
@@ -191,3 +191,36 @@ def test_bad_voice_overrides_are_refused(overrides):
 
 def test_good_voice_overrides_are_kept():
     assert JobConfig(voice_overrides={"Kai": "am_adam"}).voice_overrides == {"Kai": "am_adam"}
+
+
+# --- the upload URL is bound to the declared size ---------------------------------------
+
+
+def test_the_upload_url_is_signed_for_the_declared_size(client, account, monkeypatch):
+    signed = {}
+
+    def fake_presign(key, **kwargs):
+        signed.update(kwargs)
+        return f"https://r2/{key}"
+
+    monkeypatch.setattr("book2audio.api.jobs.routes.presign_put", fake_presign)
+
+    response = client.post(
+        "/jobs/upload-url", json={"filename": "b.epub", "size": 12345}, headers=account["headers"]
+    )
+
+    assert response.status_code == 200
+    assert signed == {"content_length": 12345}
+
+
+@pytest.mark.parametrize("size", [None, 0, -5, 50 * 1024 * 1024 + 1])
+def test_an_upload_url_is_refused_without_a_sane_size(client, account, monkeypatch, size):
+    monkeypatch.setattr(
+        "book2audio.api.jobs.routes.presign_put",
+        lambda *a, **k: pytest.fail("a URL was signed"),
+    )
+    body = {"filename": "b.epub"} if size is None else {"filename": "b.epub", "size": size}
+
+    response = client.post("/jobs/upload-url", json=body, headers=account["headers"])
+
+    assert response.status_code == 422

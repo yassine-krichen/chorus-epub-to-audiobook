@@ -45,7 +45,7 @@ from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.review_window import cast_review_timeout  # noqa: F401 - startup check
 from book2audio.db.models import Job
 from book2audio.models import NARRATOR
-from book2audio.storage.r2 import presign_get, read_object
+from book2audio.storage.r2 import StorageReadError, presign_get, read_object
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +216,7 @@ def get_cast_report(job: Job) -> CastReport | None:
     except (ValueError, ValidationError):
         logger.warning("job.cast_report_invalid", extra={"job_id": str(job.id)})
         return None
-    except ClientError:
+    except (ClientError, StorageReadError):
         logger.warning("job.cast_report_unreadable", extra={"job_id": str(job.id)}, exc_info=True)
         return None
 

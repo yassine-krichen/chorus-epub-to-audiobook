@@ -4,8 +4,8 @@ import { useCallback, useState } from "react";
 
 import { requestUploadUrl } from "@/lib/api/jobs";
 
-// Matches the backend's documented (but not server-enforced, see
-// book2audio.api.jobs.routes.MAX_UPLOAD_BYTES) upload cap.
+// Matches the backend's upload cap (book2audio.api.jobs.uploads.MAX_EPUB_UPLOAD_BYTES), which
+// is signed into the upload URL together with the file's exact size.
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 export type UploadState = "idle" | "uploading" | "done" | "error";
@@ -45,7 +45,7 @@ export function useUploadEpub(): UploadResult {
     setProgress(0);
     setError(null);
 
-    const { data, error: urlError } = await requestUploadUrl(file.name);
+    const { data, error: urlError } = await requestUploadUrl(file.name, file.size);
     if (!data) {
       setState("error");
       setError(urlError ?? "Could not get an upload URL.");

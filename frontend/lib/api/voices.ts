@@ -19,8 +19,12 @@ export async function fetchClonedVoices() {
   return apiFetch<ClonedVoice[]>("/api/backend/voices/clones");
 }
 
-export async function requestCloneUploadUrl() {
-  return apiFetch<CloneUploadUrl>("/api/backend/voices/clones/upload-url", { method: "POST" });
+/** `size` is the exact byte length of the WAV that will be uploaded; it is signed into the URL. */
+export async function requestCloneUploadUrl(size: number) {
+  return apiFetch<CloneUploadUrl>("/api/backend/voices/clones/upload-url", {
+    method: "POST",
+    body: JSON.stringify({ size }),
+  });
 }
 
 export async function createClonedVoice(request: CreateClonedVoiceRequest) {

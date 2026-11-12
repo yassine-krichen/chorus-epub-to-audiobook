@@ -25,7 +25,7 @@ from book2audio.api.voices.reference_audio import (
 )
 from book2audio.db.models import ClonedVoice
 from book2audio.db.worker_heartbeat import online_capabilities
-from book2audio.storage.r2 import delete_objects, read_object, upload_bytes
+from book2audio.storage.r2 import StorageReadError, delete_objects, read_object, upload_bytes
 from book2audio.tts.clone_engine import CLONE_CAPABILITY
 from book2audio.tts.voices import clone_voice_ids
 
@@ -140,7 +140,7 @@ def create_cloned_voice(
         raise HTTPException(
             422, "The recording file is too large."
         ) from None
-    except (ClientError, BotoCoreError):
+    except (ClientError, BotoCoreError, StorageReadError):
         logger.warning("voice.staging_unreadable", extra={"voice_id": str(voice_id)}, exc_info=True)
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, "Could not read your recording. Try again."

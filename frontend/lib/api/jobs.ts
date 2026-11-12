@@ -33,10 +33,12 @@ export async function cancelJob(jobId: string) {
   return apiFetch<null>(`/api/backend/jobs/${jobId}`, { method: "DELETE" });
 }
 
-export async function requestUploadUrl(filename: string) {
+/** `size` is the exact byte length of the file that will be uploaded: it is signed into the
+ * URL, so storage refuses an upload of any other length. */
+export async function requestUploadUrl(filename: string, size: number) {
   return apiFetch<UploadUrlResponse>("/api/backend/jobs/upload-url", {
     method: "POST",
-    body: JSON.stringify({ filename }),
+    body: JSON.stringify({ filename, size }),
   });
 }
 

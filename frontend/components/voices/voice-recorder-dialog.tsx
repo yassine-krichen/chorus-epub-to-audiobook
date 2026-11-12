@@ -83,16 +83,18 @@ export function VoiceRecorderDialog({
     if (!recording || !script || gender === null) return;
     setSaving(true);
     setSaveError(null);
-    const { data: upload, error: urlError } = await requestCloneUploadUrl();
+    const wav = encodeWav(recording.samples, recording.sampleRate);
+    // The URL is signed for this exact size and type, so the upload must match both.
+    const { data: upload, error: urlError } = await requestCloneUploadUrl(wav.length);
     if (!upload) {
       setSaving(false);
       setSaveError(urlError ?? "Could not start the upload.");
       return;
     }
     try {
-      const wav = encodeWav(recording.samples, recording.sampleRate);
       const response = await fetch(upload.upload_url, {
         method: "PUT",
+        headers: { "Content-Type": "audio/wav" },
         body: new Blob([wav], { type: "audio/wav" }),
       });
       if (!response.ok) throw new Error(`Upload failed (${response.status})`);

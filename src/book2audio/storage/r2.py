@@ -63,12 +63,26 @@ def _client():
     )
 
 
-def presign_put(key: str, expires: int = 600) -> str:
-    return _client().generate_presigned_url(
-        "put_object",
-        Params={"Bucket": _bucket(), "Key": key},
-        ExpiresIn=expires,
-    )
+def presign_put(
+    key: str,
+    expires: int = 600,
+    *,
+    content_length: int | None = None,
+    content_type: str | None = None,
+) -> str:
+    """A presigned PUT URL for ``key``.
+
+    With ``content_length`` (and ``content_type``) the values are signed into the URL, so the
+    storage service refuses an upload whose ``Content-Length`` or ``Content-Type`` header
+    differs: the client has to send exactly what it declared, which bounds how much a signed
+    URL can write. Browsers send the right headers on their own for a ``Blob``/``File`` body.
+    """
+    params: dict[str, object] = {"Bucket": _bucket(), "Key": key}
+    if content_length is not None:
+        params["ContentLength"] = content_length
+    if content_type is not None:
+        params["ContentType"] = content_type
+    return _client().generate_presigned_url("put_object", Params=params, ExpiresIn=expires)
 
 
 def presign_get(key: str, expires: int = 600, *, download_filename: str | None = None) -> str:
@@ -118,21 +132,6 @@ def object_size(key: str) -> int | None:
     return int(head["ContentLength"])
 
 
-def read_object(key: str, *, max_bytes: int) -> bytes | None:
-    """The contents of ``key``, or ``None`` when it does not exist.
-
-    Raises ``ValueError`` when the object is larger than ``max_bytes``, so a
-    caller that parses small JSON never pulls a huge object into memory.
-    """
-    size = object_size(key)
-    if size is None:
-        return None
-    if size > max_bytes:
-        raise ValueError(f"{key!r} is {size} bytes, more than the {max_bytes} byte limit")
-    body = _client().get_object(Bucket=_bucket(), Key=key)["Body"]
-    return body.read()
-
-
 _DOWNLOAD_CHUNK_BYTES = 1024 * 1024
 
 
@@ -174,6 +173,41 @@ def download_capped(key: str, local_path: str, *, max_bytes: int) -> bool:
         _remove_partial(local_path)
         raise
     return True
+
+
+def read_object(key: str, *, max_bytes: int) -> bytes | None:
+    """The contents of ``key``, or ``None`` when it does not exist.
+
+    Never holds more than ``max_bytes`` in memory, whatever the object turns into: the size
+    check and the read are two requests, so the read is pinned to the ETag seen by the first
+    (an object replaced in between is refused, not read) and the byte count is enforced while
+    streaming as well. Raises ``ValueError`` over the cap.
+    """
+    client = _client()
+    try:
+        head = client.head_object(Bucket=_bucket(), Key=key)
+    except ClientError as exc:
+        if exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+            return None
+        raise
+    if int(head["ContentLength"]) > max_bytes:
+        raise ValueError(f"{key!r} is {head['ContentLength']} bytes, more than the {max_bytes} byte limit")
+
+    request = {"Bucket": _bucket(), "Key": key}
+    if head.get("ETag"):
+        request["IfMatch"] = head["ETag"]
+    body = client.get_object(**request)["Body"]
+    pieces: list[bytes] = []
+    read = 0
+    try:
+        for chunk in iter(lambda: body.read(_DOWNLOAD_CHUNK_BYTES), b""):
+            read += len(chunk)
+            if read > max_bytes:
+                raise ValueError(f"{key!r} is more than the {max_bytes} byte limit")
+            pieces.append(chunk)
+    except (BotoCoreError, ConnectionError) as exc:
+        raise StorageReadError(f"reading {key!r} was interrupted") from exc
+    return b"".join(pieces)
 
 
 class StorageReadError(RuntimeError):

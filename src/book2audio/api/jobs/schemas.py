@@ -20,6 +20,7 @@ from book2audio.attribution.gender import (
     validate_gender_overrides,
 )
 from book2audio.api.jobs.uploads import (
+    MAX_EPUB_UPLOAD_BYTES,
     MAX_UPLOAD_FILENAME_LENGTH,
     MAX_UPLOAD_KEY_LENGTH,
     validate_upload_filename,
@@ -39,6 +40,8 @@ VOICE_ID_MAX_LENGTH = 64
 
 class UploadUrlRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=MAX_UPLOAD_FILENAME_LENGTH)
+    # The exact size of the file the browser will PUT; signed into the URL.
+    size: int = Field(ge=1, le=MAX_EPUB_UPLOAD_BYTES)
 
     @field_validator("filename")
     @classmethod
