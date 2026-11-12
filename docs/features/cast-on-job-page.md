@@ -31,7 +31,7 @@ stateDiagram-v2
     state "Render the audio, chapter by chapter" as Rendering
 
     state "Job page asks the API for the cast every 5 seconds until it appears" as Polling
-    Queued --> Polling: page open, job queued: not asked yet
+    Queued --> Polling: page open, job queued - not asked yet
     Working --> Polling: page open while the job runs
     state fetchCheck <<choice>>
     Polling --> fetchCheck

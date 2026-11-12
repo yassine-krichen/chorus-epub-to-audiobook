@@ -27,7 +27,7 @@ stateDiagram-v2
 
     state anyoneCheck <<choice>>
     Detecting --> anyoneCheck
-    anyoneCheck --> Straight: nobody speaks, or the report cannot be read: nothing to review
+    anyoneCheck --> Straight: nobody speaks, or the report cannot be read - nothing to review
     state "Worker saves the cast report, state.json and the speaker labels to storage. Only after that does the job change status" as Saving
     anyoneCheck --> Saving: at least one character
 

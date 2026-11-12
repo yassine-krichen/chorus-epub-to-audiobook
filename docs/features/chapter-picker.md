@@ -40,7 +40,7 @@ stateDiagram-v2
     state "Start chosen, running to the end of the book. Buttons now say End here" as PickingEnd
     PickingEnd --> Ranged: you choose End here on that chapter or a later one
     state "Range chosen: start to end. Summary and highlighted rows show exactly what will render" as Ranged
-    PickingEnd --> PickingEnd: you choose Start here on an earlier chapter: the start moves
+    PickingEnd --> PickingEnd: you choose Start here on an earlier chapter - the start moves
     Ranged --> PickingEnd: you choose Start here on another chapter
     Ranged --> WholeBook: Whole book
     PickingEnd --> WholeBook: Whole book
