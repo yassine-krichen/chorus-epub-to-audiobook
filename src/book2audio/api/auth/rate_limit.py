@@ -104,6 +104,22 @@ _inspect_per_user_limiter = SlidingWindowLimiter(
 )
 
 
+# Enrolling a voice writes personal audio to storage and costs a decode, so it is limited
+# per signed-in user: ten uploads or enrolments an hour is plenty for re-recording.
+_voice_enrolment_per_user_limiter = SlidingWindowLimiter(
+    max_attempts=_int_env("VOICE_ENROLMENT_RATE_LIMIT_PER_USER", 10),
+    window_seconds=_float_env("VOICE_ENROLMENT_RATE_LIMIT_WINDOW_SECONDS", 3600),
+)
+
+
+def enforce_voice_enrolment_rate_limit(user_id: object) -> None:
+    if not _voice_enrolment_per_user_limiter.hit(str(user_id)):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many voice recordings in a short time. Try again later.",
+        )
+
+
 def enforce_inspect_rate_limit(user_id: object) -> None:
     if not _inspect_per_user_limiter.hit(str(user_id)):
         raise HTTPException(
@@ -144,3 +160,4 @@ def reset_all() -> None:
     _login_per_ip_limiter.reset()
     _refresh_per_ip_limiter.reset()
     _inspect_per_user_limiter.reset()
+    _voice_enrolment_per_user_limiter.reset()

@@ -38,6 +38,7 @@ from book2audio.assemble.filenames import (
     render_part_filenames,
 )
 from book2audio.api.jobs.uploads import require_owned_upload
+from book2audio.api.voices.cloning import clone_voice_ids_in_config, require_usable_clone_voices
 from book2audio.cast_report import cast_report_object_key
 from book2audio import review_window
 from book2audio.cast_review import AWAITING_CAST_REVIEW
@@ -114,11 +115,19 @@ def create_job(db: Session, user_id: uuid.UUID, payload: CreateJobRequest) -> Jo
             "Smarter thumbnails aren't available on this server yet. "
             'Turn off "Smarter thumbnails" and try again.',
         )
+    config = payload.config.model_dump()
+    clone_voices = clone_voice_ids_in_config(config)
+    # A cloned voice must be the user's own, and something must be able to speak it: checked
+    # here and again by the worker, so a job can never reach another user's recording.
+    require_usable_clone_voices(
+        db, user_id, clone_voices, local_worker=worker_mode() == "local"
+    )
     job = Job(
         user_id=user_id,
         title=payload.title,
         epub_object_key=payload.epub_object_key,
-        config=payload.config.model_dump(),
+        config=config,
+        requires_clone=bool(clone_voices),
         status="queued",
         chapters=[],
         parts=[],
@@ -281,8 +290,11 @@ def confirm_cast_review(
             "The detected cast is no longer available. Cancel this job and create it again.",
         )
     new_config = _config_with_review(job.config, report, payload)
-
+    # The review can pick a cloned voice for a character: same ownership check as at creation.
+    clone_voices = clone_voice_ids_in_config(new_config)
     local = worker_mode() == "local"
+    require_usable_clone_voices(db, user_id, clone_voices, local_worker=local)
+
     requested_at = job.cast_review_requested_at
     old_config = job.config
     # Only one confirmation can win: a second click, or the expiry, finds the status
@@ -292,6 +304,7 @@ def confirm_cast_review(
         .where(Job.id == job.id, Job.status == AWAITING_CAST_REVIEW)
         .values(
             config=new_config,
+            requires_clone=bool(clone_voices),
             status="queued" if local else "running",
             cast_review_requested_at=None,
             last_heartbeat_at=datetime.now(timezone.utc),
