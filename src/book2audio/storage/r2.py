@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import datetime
 
 import boto3
 from botocore.client import Config as BotoConfig
@@ -271,6 +272,23 @@ def list_objects(prefix: str) -> list[str]:
             break
         continuation_token = response.get("NextContinuationToken")
     return keys
+
+
+def list_object_ages(prefix: str) -> list[tuple[str, datetime]]:
+    """Every object under ``prefix`` as ``(key, last modified)``, paginating as needed."""
+    client = _client()
+    found: list[tuple[str, datetime]] = []
+    continuation_token: str | None = None
+    while True:
+        kwargs = {"Bucket": _bucket(), "Prefix": prefix}
+        if continuation_token is not None:
+            kwargs["ContinuationToken"] = continuation_token
+        response = client.list_objects_v2(**kwargs)
+        found.extend((obj["Key"], obj["LastModified"]) for obj in response.get("Contents", []))
+        if not response.get("IsTruncated"):
+            break
+        continuation_token = response.get("NextContinuationToken")
+    return found
 
 
 def delete_objects(keys: list[str]) -> None:

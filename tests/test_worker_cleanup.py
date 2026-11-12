@@ -12,8 +12,16 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
+import pytest
+
 from book2audio.db.models import Job, User
 from book2audio.worker import cleanup as cleanup_module
+
+
+@pytest.fixture(autouse=True)
+def _no_staged_voice_uploads(monkeypatch):
+    """The sweep also looks for abandoned voice uploads; by default there are none (no network)."""
+    monkeypatch.setattr(cleanup_module, "list_object_ages", MagicMock(return_value=[]))
 
 
 def _make_user(db_session) -> User:
@@ -245,3 +253,58 @@ def test_main_still_sweeps_a_job_with_a_full_success_response_after_a_prior_part
     delete_objects.assert_called_once()
     db_session.refresh(job)
     assert job.artifacts_swept_at is not None
+
+
+# --- abandoned voice uploads ---------------------------------------------------------------
+
+
+def _aged(key: str, age: timedelta, *, naive: bool = False):
+    modified = datetime.now(timezone.utc) - age
+    return key, modified.replace(tzinfo=None) if naive else modified
+
+
+def test_voice_uploads_older_than_a_day_are_deleted_and_newer_ones_kept(monkeypatch):
+    listed = MagicMock(
+        return_value=[
+            _aged("voice-uploads/u/old.wav", timedelta(days=2)),
+            _aged("voice-uploads/u/fresh.wav", timedelta(hours=3)),
+            _aged("voice-uploads/u/naive-old.wav", timedelta(days=3), naive=True),
+        ]
+    )
+    deleted = MagicMock()
+    monkeypatch.setattr(cleanup_module, "list_object_ages", listed)
+    monkeypatch.setattr(cleanup_module, "delete_objects", deleted)
+
+    removed = cleanup_module.sweep_stale_voice_uploads()
+
+    listed.assert_called_once_with("voice-uploads/")
+    deleted.assert_called_once_with(["voice-uploads/u/old.wav", "voice-uploads/u/naive-old.wav"])
+    assert removed == 2
+
+
+def test_the_voice_upload_sweep_covers_the_prefix_uploads_are_staged_under():
+    from book2audio.api.voices.cloning import staging_key
+
+    assert staging_key(uuid.uuid4(), uuid.uuid4()).startswith(cleanup_module.VOICE_UPLOAD_PREFIX)
+
+
+def test_a_failed_voice_upload_sweep_does_not_stop_the_job_sweep(db_session, monkeypatch):
+    list_objects, delete_objects = _patch_r2(monkeypatch, keys=["jobs/j/part-01.m4b"])
+    monkeypatch.setattr(
+        cleanup_module, "list_object_ages", MagicMock(side_effect=RuntimeError("storage down"))
+    )
+    job = _make_job(db_session, status="canceled")
+
+    assert cleanup_module.main() == 0
+
+    db_session.refresh(job)
+    assert job.artifacts_swept_at is not None
+
+
+def test_main_sweeps_voice_uploads_as_part_of_the_normal_run(monkeypatch):
+    sweep = MagicMock(return_value=0)
+    monkeypatch.setattr(cleanup_module, "sweep_stale_voice_uploads", sweep)
+
+    cleanup_module.main()
+
+    sweep.assert_called_once()

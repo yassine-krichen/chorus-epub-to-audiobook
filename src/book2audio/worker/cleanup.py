@@ -19,9 +19,15 @@ from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
 from book2audio.review_window import expire_if_lapsed
-from book2audio.storage.r2 import delete_objects, list_objects
+from book2audio.storage.r2 import delete_objects, list_object_ages, list_objects
 
 _DEFAULT_GRACE_PERIOD_DAYS = 7
+
+# Where the browser uploads a voice recording before the server has validated and copied it
+# (see api.voices.cloning.staging_key). A saved voice leaves nothing here; what stays is an
+# abandoned or refused upload, which is personal audio nobody asked us to keep.
+VOICE_UPLOAD_PREFIX = "voice-uploads/"
+_STALE_VOICE_UPLOAD_AGE = timedelta(days=1)
 
 
 def main() -> int:
@@ -31,6 +37,7 @@ def main() -> int:
     # First cancel reviews nobody confirmed, so their stored files enter the normal
     # sweep after the grace period even if no one ever opened the job again.
     print(f"Cleanup expired {_expire_overdue_reviews()} overdue cast review(s)")
+    print(f"Cleanup removed {sweep_stale_voice_uploads()} abandoned voice upload(s)")
 
     with SessionLocal() as session:
         candidate_ids = session.scalars(
@@ -46,6 +53,26 @@ def main() -> int:
 
     print(f"Cleanup swept {swept} job(s)")
     return 0
+
+
+def sweep_stale_voice_uploads(now: datetime | None = None) -> int:
+    """Delete staged voice uploads older than a day; returns how many were removed.
+
+    A failure here is reported and skipped: it must not stop the job sweep that follows.
+    """
+    cutoff = (now or datetime.now(timezone.utc)) - _STALE_VOICE_UPLOAD_AGE
+    try:
+        stale = [
+            key
+            for key, modified in list_object_ages(VOICE_UPLOAD_PREFIX)
+            if (modified if modified.tzinfo else modified.replace(tzinfo=timezone.utc)) < cutoff
+        ]
+        if stale:
+            delete_objects(stale)
+    except Exception as error:  # noqa: BLE001 - one failed sweep must not stop the others
+        print(f"Cleanup could not sweep voice uploads: {error}")
+        return 0
+    return len(stale)
 
 
 def _expire_overdue_reviews() -> int:

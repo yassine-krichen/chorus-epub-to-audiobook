@@ -562,3 +562,21 @@ def test_download_capped_does_not_hide_a_failed_etag_check(fake_client, tmp_path
 
     with pytest.raises(ClientError):
         r2.download_capped("uploads/u/x.epub", str(tmp_path / "b"), max_bytes=100)
+
+
+def test_list_object_ages_pages_through_the_listing_and_returns_last_modified(fake_client):
+    from datetime import datetime, timezone
+
+    first = datetime(2026, 11, 1, tzinfo=timezone.utc)
+    second = datetime(2026, 11, 2, tzinfo=timezone.utc)
+    fake_client.list_objects_v2.side_effect = [
+        {"Contents": [{"Key": "voice-uploads/a", "LastModified": first}], "IsTruncated": True,
+         "NextContinuationToken": "t"},
+        {"Contents": [{"Key": "voice-uploads/b", "LastModified": second}], "IsTruncated": False},
+    ]
+
+    assert r2.list_object_ages("voice-uploads/") == [
+        ("voice-uploads/a", first),
+        ("voice-uploads/b", second),
+    ]
+    assert fake_client.list_objects_v2.call_args_list[1].kwargs["ContinuationToken"] == "t"
