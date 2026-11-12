@@ -12,7 +12,7 @@ import re
 
 import boto3
 from botocore.client import Config as BotoConfig
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
 # Characters that could break out of the quoted filename="..." parameter or
 # inject extra header/response content (CRLF etc). Callers (e.g.
@@ -166,10 +166,25 @@ def download_capped(key: str, local_path: str, *, max_bytes: int) -> bool:
                 if written > max_bytes:
                     raise ValueError(f"{key!r} is larger than the {max_bytes} byte limit")
                 out.write(chunk)
+    except (BotoCoreError, ConnectionError) as exc:
+        # A timeout or a cut connection mid-stream (ReadTimeoutError, IncompleteReadError...).
+        _remove_partial(local_path)
+        raise StorageReadError(f"reading {key!r} was interrupted") from exc
     except ValueError:
-        os.remove(local_path)
+        _remove_partial(local_path)
         raise
     return True
+
+
+class StorageReadError(RuntimeError):
+    """A download from storage broke off before it finished."""
+
+
+def _remove_partial(path: str) -> None:
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
 
 
 def _content_disposition(filename: str) -> str:

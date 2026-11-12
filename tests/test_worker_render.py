@@ -515,15 +515,19 @@ def test_render_job_publishes_the_cast_report_through_the_pipeline_hook(
     _mock_common_deps(monkeypatch)
     uploads = []
     monkeypatch.setattr(
-        worker_progress_module, "upload_file", lambda path, key: uploads.append((path, key))
+        worker_progress_module,
+        "upload_bytes",
+        lambda data, key, content_type=None: uploads.append(key),
     )
+    report = tmp_path / "cast_report.json"
+    report.write_text('{"voice_mode": "cast", "characters": []}', encoding="utf-8")
 
     class _ReportingPipeline(_FakePipeline):
         def run(self) -> None:
-            self.on_cast_report("scratch/cast_report.json")
+            self.on_cast_report(str(report))
 
     monkeypatch.setattr(render_module, "Pipeline", _ReportingPipeline)
 
     render_module.render_job(job.id, job.epub_object_key, {}, Console(), str(tmp_path))
 
-    assert uploads == [("scratch/cast_report.json", f"jobs/{job.id}/cast_report.json")]
+    assert uploads == [f"jobs/{job.id}/cast_report.json"]

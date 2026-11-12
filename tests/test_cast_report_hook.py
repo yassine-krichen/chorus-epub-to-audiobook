@@ -68,20 +68,31 @@ def test_the_pipeline_runs_without_a_cast_report_hook(tmp_path, stubbed_pipeline
     Pipeline(_config(tmp_path)).run()  # must not raise
 
 
-def test_the_uploader_stores_the_report_under_the_job_prefix(monkeypatch):
+def _report_file(tmp_path) -> str:
+    path = tmp_path / "cast_report.json"
+    path.write_text(json.dumps({"voice_mode": "cast", "characters": []}), encoding="utf-8")
+    return str(path)
+
+
+def test_the_uploader_stores_the_report_under_the_job_prefix(monkeypatch, tmp_path):
     upload = MagicMock()
-    monkeypatch.setattr(progress_module, "upload_file", upload)
+    monkeypatch.setattr(progress_module, "upload_bytes", upload)
     job_id = uuid.uuid4()
 
-    progress_module.build_cast_report_uploader(job_id)("/scratch/cast_report.json")
+    progress_module.build_cast_report_uploader(job_id)(_report_file(tmp_path))
 
-    upload.assert_called_once_with("/scratch/cast_report.json", f"jobs/{job_id}/cast_report.json")
+    data, key = upload.call_args.args
+    assert key == f"jobs/{job_id}/cast_report.json"
+    assert json.loads(data)["voice_mode"] == "cast"
+    assert upload.call_args.kwargs == {"content_type": "application/json"}
 
 
-def test_a_failed_report_upload_is_logged_and_does_not_stop_the_render(monkeypatch, caplog):
-    monkeypatch.setattr(progress_module, "upload_file", MagicMock(side_effect=OSError("r2 down")))
+def test_a_failed_report_upload_is_logged_and_does_not_stop_the_render(
+    monkeypatch, caplog, tmp_path
+):
+    monkeypatch.setattr(progress_module, "upload_bytes", MagicMock(side_effect=OSError("r2 down")))
 
     with caplog.at_level(logging.WARNING):
-        progress_module.build_cast_report_uploader(uuid.uuid4())("/scratch/cast_report.json")
+        progress_module.build_cast_report_uploader(uuid.uuid4())(_report_file(tmp_path))
 
     assert "could not upload the cast report" in caplog.text

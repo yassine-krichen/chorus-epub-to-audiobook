@@ -53,6 +53,7 @@ def _report(tmp_path, characters) -> str:
 def test_pausing_parks_the_job_and_stops_the_pipeline(db_session, monkeypatch, tmp_path):
     job = _make_job(db_session)
     monkeypatch.setattr(progress_module, "upload_file", MagicMock())
+    monkeypatch.setattr(progress_module, "upload_bytes", MagicMock())
     pause = build_cast_review_pause(job.id, str(tmp_path), f"jobs/{job.id}")
 
     with pytest.raises(CastReviewRequested):
@@ -78,6 +79,9 @@ def test_everything_the_resume_needs_is_uploaded_before_the_status_changes(
 
     uploaded: list[str] = []
     monkeypatch.setattr(progress_module, "upload_file", upload)
+    monkeypatch.setattr(
+        progress_module, "upload_bytes", lambda data, key, content_type=None: upload(None, key)
+    )
     pause = build_cast_review_pause(job.id, str(tmp_path), f"jobs/{job.id}")
 
     with pytest.raises(CastReviewRequested):
@@ -92,6 +96,7 @@ def test_everything_the_resume_needs_is_uploaded_before_the_status_changes(
 def test_a_failed_upload_fails_the_job_instead_of_parking_it(db_session, monkeypatch, tmp_path):
     job = _make_job(db_session)
     monkeypatch.setattr(progress_module, "upload_file", MagicMock(side_effect=OSError("r2 down")))
+    monkeypatch.setattr(progress_module, "upload_bytes", MagicMock(side_effect=OSError("r2 down")))
     pause = build_cast_review_pause(job.id, str(tmp_path), f"jobs/{job.id}")
 
     with pytest.raises(OSError):
@@ -106,6 +111,7 @@ def test_a_job_canceled_meanwhile_keeps_its_status_but_still_stops(
 ):
     job = _make_job(db_session, status="canceled")
     monkeypatch.setattr(progress_module, "upload_file", MagicMock())
+    monkeypatch.setattr(progress_module, "upload_bytes", MagicMock())
     pause = build_cast_review_pause(job.id, str(tmp_path), f"jobs/{job.id}")
 
     with pytest.raises(CastReviewRequested):
@@ -143,6 +149,7 @@ def render_env(db_session, monkeypatch, tmp_path):
     monkeypatch.setattr(render_module, "build_progress_hooks", lambda *a, **k: (MagicMock(), MagicMock()))
     monkeypatch.setattr(render_module, "Pipeline", _ReportingPipeline)
     monkeypatch.setattr(progress_module, "upload_file", MagicMock())
+    monkeypatch.setattr(progress_module, "upload_bytes", MagicMock())
     _ReportingPipeline.rendered = False
     _ReportingPipeline.report_path = _report(tmp_path, [{"name": "Sunny"}])
     return _make_job(db_session)

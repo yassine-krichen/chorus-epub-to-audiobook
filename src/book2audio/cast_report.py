@@ -128,26 +128,10 @@ def _shorten(text: str) -> str:
     return text[: _SAMPLE_LINE_CHARS - 3] + "..."
 
 
-def reviewable_entries(entries: list[CastEntry]) -> tuple[list[CastEntry], int]:
-    """The entries the website can list and fix, and how many were left out.
-
-    The review changes characters by name and is bounded (names up to
-    ``CAST_NAME_MAX_LENGTH``, ``CAST_MAX_CHARACTERS`` rows), so a character with a longer
-    name, or one past the busiest ones, is not listed. Entries arrive review-first then
-    busiest-first, so what is dropped is the quietest tail. Those characters still get
-    their voice; they just cannot be edited.
-    """
-    listed = [e for e in entries if len(e.name) <= CAST_NAME_MAX_LENGTH]
-    kept = listed[:CAST_MAX_CHARACTERS]
-    return kept, len(entries) - len(kept)
-
-
 def cast_report_to_dict(
     entries: list[CastEntry], *, voice_mode: str, narrator_voice: str
 ) -> dict[str, object]:
-    entries, omitted = reviewable_entries(entries)
     return {
-        "omitted_characters": omitted,
         "voice_mode": voice_mode,
         "narrator_voice": narrator_voice,
         "provider": VOICE_PROVIDER,
@@ -171,6 +155,29 @@ def cast_report_to_dict(
             for e in entries
         ],
     }
+
+
+def trim_report_for_review(payload: Mapping[str, object]) -> dict[str, object]:
+    """The report as the website can list and fix it, with how many characters were left out.
+
+    The hosted review changes characters by name and is bounded (names up to
+    ``CAST_NAME_MAX_LENGTH``, ``CAST_MAX_CHARACTERS`` rows), so a character with a longer
+    name, or one past the busiest ones, is not listed. Characters arrive review-first then
+    busiest-first, so what is dropped is the quietest tail; they still get their voice,
+    they just cannot be edited. Only the uploaded copy is trimmed: the local
+    ``cast_report.json`` keeps every character.
+    """
+    characters = list(payload.get("characters", []))  # type: ignore[call-overload]
+    listed = [c for c in characters if len(str(c.get("name", ""))) <= CAST_NAME_MAX_LENGTH]
+    kept = listed[:CAST_MAX_CHARACTERS]
+    return {**payload, "characters": kept, "omitted_characters": len(characters) - len(kept)}
+
+
+def read_review_report(report_path: str) -> bytes:
+    """The trimmed JSON bytes of the cast report at ``report_path``, ready to upload."""
+    with open(report_path, encoding="utf-8") as report_file:
+        trimmed = trim_report_for_review(json.load(report_file))
+    return json.dumps(trimmed, ensure_ascii=False).encode("utf-8")
 
 
 def write_cast_report(

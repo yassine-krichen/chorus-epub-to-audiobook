@@ -16,7 +16,7 @@ from typing import Callable
 from sqlalchemy import update
 
 from book2audio.attribution import CACHE_FILENAME as ATTRIBUTION_CACHE_FILENAME
-from book2audio.cast_report import cast_report_object_key
+from book2audio.cast_report import cast_report_object_key, read_review_report
 from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.db.models import Job
 from book2audio.db.session import SessionLocal
@@ -76,6 +76,16 @@ def build_progress_hooks(
     return on_chapter_done, on_part_ready
 
 
+def _upload_cast_report(job_id: uuid.UUID, report_path: str) -> None:
+    # The copy that goes to storage is trimmed to what the website can list and fix; the
+    # worker's own cast_report.json keeps every character.
+    upload_bytes(
+        read_review_report(report_path),
+        cast_report_object_key(job_id),
+        content_type="application/json",
+    )
+
+
 def build_cast_report_uploader(job_id: uuid.UUID) -> Callable[[str], None]:
     """A closure that publishes ``cast_report.json`` so the job page can show the cast.
 
@@ -85,7 +95,7 @@ def build_cast_report_uploader(job_id: uuid.UUID) -> Callable[[str], None]:
 
     def upload_cast_report(report_path: str) -> None:
         try:
-            upload_file(report_path, cast_report_object_key(job_id))
+            _upload_cast_report(job_id, report_path)
         except Exception:  # noqa: BLE001 - the report is best-effort
             logger.warning("could not upload the cast report for job %s", job_id, exc_info=True)
 
@@ -109,7 +119,7 @@ def build_cast_review_pause(
     """
 
     def pause_for_review(report_path: str) -> None:
-        upload_file(report_path, cast_report_object_key(job_id))
+        _upload_cast_report(job_id, report_path)
         _upload_state_json(work_dir, object_prefix)
         with SessionLocal() as session:
             now = datetime.now(timezone.utc)

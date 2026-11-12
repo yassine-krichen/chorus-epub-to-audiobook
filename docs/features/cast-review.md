@@ -134,8 +134,10 @@ first, because the older code does not know the status.
 
 - The review lists at most 100 characters (the busiest, characters we are unsure about
   first) and only names up to 80 characters. Others keep their voice but cannot be edited,
-  and the card says how many are not listed. The report, the API and the card use the same
-  limits, so a large cast can never produce a card that the server refuses.
+  and the card says how many are not listed. Only the copy uploaded for the website is
+  trimmed; the worker's own `cast_report.json` (and the command line's) keeps every
+  character. The upload, the API and the card use the same limits, so a large cast can never
+  produce a card that the server refuses.
 - A job can hold 100 gender fixes and 100 voice choices. If the wizard already set some, the
   card tells you before you press the button when the review would go over.
 - Cancel, confirm, worker success, worker failure, the pause and the expiry are all

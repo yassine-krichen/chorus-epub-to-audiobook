@@ -20,7 +20,9 @@ from book2audio.cast_report import (
     CAST_NAME_MAX_LENGTH,
     CastEntry,
     cast_report_to_dict,
-    reviewable_entries,
+    read_review_report,
+    trim_report_for_review,
+    write_cast_report,
 )
 from book2audio.db.models import Job, User
 from book2audio.worker import cleanup as cleanup_module
@@ -301,40 +303,89 @@ def _entry(name: str, lines: int = 1, needs_review: bool = False) -> CastEntry:
     )
 
 
-def test_the_report_lists_at_most_the_busiest_characters_and_counts_the_rest():
-    entries = [_entry(f"Name {i}", lines=1000 - i) for i in range(CAST_MAX_CHARACTERS + 7)]
-
-    kept, omitted = reviewable_entries(entries)
-
-    assert [e.name for e in kept] == [f"Name {i}" for i in range(CAST_MAX_CHARACTERS)]
-    assert omitted == 7
+def _payload(entries):
+    return cast_report_to_dict(entries, voice_mode="cast", narrator_voice="am_michael")
 
 
-def test_a_name_the_review_cannot_address_is_left_out_of_the_report_and_counted():
-    entries = [_entry("Sunny"), _entry("x" * (CAST_NAME_MAX_LENGTH + 1))]
+def test_the_review_copy_lists_at_most_the_busiest_characters_and_counts_the_rest():
+    payload = _payload(
+        [_entry(f"Name {i}", lines=1000 - i) for i in range(CAST_MAX_CHARACTERS + 7)]
+    )
 
-    kept, omitted = reviewable_entries(entries)
+    trimmed = trim_report_for_review(payload)
 
-    assert [e.name for e in kept] == ["Sunny"]
-    assert omitted == 1
+    assert [c["name"] for c in trimmed["characters"]] == [
+        f"Name {i}" for i in range(CAST_MAX_CHARACTERS)
+    ]
+    assert trimmed["omitted_characters"] == 7
+
+
+def test_a_name_the_review_cannot_address_is_left_out_of_the_review_copy_and_counted():
+    payload = _payload([_entry("Sunny"), _entry("x" * (CAST_NAME_MAX_LENGTH + 1))])
+
+    trimmed = trim_report_for_review(payload)
+
+    assert [c["name"] for c in trimmed["characters"]] == ["Sunny"]
+    assert trimmed["omitted_characters"] == 1
 
 
 def test_a_report_within_the_limits_loses_nothing():
-    kept, omitted = reviewable_entries([_entry("Sunny"), _entry("Cassie")])
+    trimmed = trim_report_for_review(_payload([_entry("Sunny"), _entry("Cassie")]))
 
-    assert [e.name for e in kept] == ["Sunny", "Cassie"]
-    assert omitted == 0
+    assert [c["name"] for c in trimmed["characters"]] == ["Sunny", "Cassie"]
+    assert trimmed["omitted_characters"] == 0
 
 
-def test_the_written_report_always_validates_against_the_api_model_whatever_the_cast_size():
-    entries = [_entry(f"Name {i}", lines=500 - i) for i in range(250)]
+def test_the_local_cast_report_keeps_every_character(tmp_path):
+    entries = [_entry(f"Name {i}") for i in range(CAST_MAX_CHARACTERS + 25)]
     entries.append(_entry("y" * 300))
 
-    report = cast_report_to_dict(entries, voice_mode="cast", narrator_voice="am_michael")
+    path = write_cast_report(
+        str(tmp_path), entries, voice_mode="cast", narrator_voice="am_michael"
+    )
 
-    parsed = CastReport.model_validate(report)
+    saved = json.loads(open(path, encoding="utf-8").read())
+    assert len(saved["characters"]) == CAST_MAX_CHARACTERS + 26
+    assert "omitted_characters" not in saved
+
+
+def test_the_uploaded_copy_always_validates_against_the_api_model_whatever_the_cast_size(tmp_path):
+    entries = [_entry(f"Name {i}", lines=500 - i) for i in range(250)]
+    entries.append(_entry("y" * 300))
+    path = write_cast_report(
+        str(tmp_path), entries, voice_mode="cast", narrator_voice="am_michael"
+    )
+
+    parsed = CastReport.model_validate_json(read_review_report(path))
+
     assert len(parsed.characters) == CAST_MAX_CHARACTERS
     assert parsed.omitted_characters == 251 - CAST_MAX_CHARACTERS
+
+
+def test_uploading_the_report_sends_the_trimmed_copy_and_leaves_the_local_file_alone(
+    tmp_path, monkeypatch
+):
+    from book2audio.worker import progress as progress_module
+
+    entries = [_entry(f"Name {i}") for i in range(CAST_MAX_CHARACTERS + 5)]
+    path = write_cast_report(
+        str(tmp_path), entries, voice_mode="cast", narrator_voice="am_michael"
+    )
+    sent = {}
+    monkeypatch.setattr(
+        progress_module,
+        "upload_bytes",
+        lambda data, key, content_type=None: sent.update(data=data, key=key),
+    )
+    job_id = uuid.uuid4()
+
+    progress_module.build_cast_report_uploader(job_id)(path)
+
+    assert sent["key"] == f"jobs/{job_id}/cast_report.json"
+    assert len(json.loads(sent["data"])["characters"]) == CAST_MAX_CHARACTERS
+    assert len(json.loads(open(path, encoding="utf-8").read())["characters"]) == (
+        CAST_MAX_CHARACTERS + 5
+    )
 
 
 def test_the_review_request_takes_no_more_edits_than_the_report_can_list():

@@ -7,7 +7,12 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import (
+    ClientError,
+    IncompleteReadError,
+    ReadTimeoutError,
+    ResponseStreamingError,
+)
 
 from book2audio.storage import r2
 
@@ -470,6 +475,42 @@ def test_download_capped_stops_and_removes_the_file_when_the_stream_exceeds_the_
 
     with pytest.raises(ValueError):
         r2.download_capped("uploads/u/x.epub", str(target), max_bytes=100)
+
+    assert not target.exists()
+
+
+class _BrokenBody:
+    """Yields some bytes, then fails the way botocore does when a stream breaks off."""
+
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+        self._sent = False
+
+    def read(self, size: int) -> bytes:
+        if not self._sent:
+            self._sent = True
+            return b"partial"
+        raise self._error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ReadTimeoutError(endpoint_url="https://r2", error="timed out"),
+        IncompleteReadError(actual_bytes=7, expected_bytes=100),
+        ResponseStreamingError(error="connection broken"),
+        ConnectionResetError("reset"),
+    ],
+)
+def test_download_capped_cleans_up_and_reports_a_stream_that_breaks_off(
+    fake_client, tmp_path, error
+):
+    fake_client.head_object.return_value = {"ContentLength": 100, "ETag": '"abc"'}
+    fake_client.get_object.return_value = {"Body": _BrokenBody(error)}
+    target = tmp_path / "book.epub"
+
+    with pytest.raises(r2.StorageReadError):
+        r2.download_capped("uploads/u/x.epub", str(target), max_bytes=1000)
 
     assert not target.exists()
 

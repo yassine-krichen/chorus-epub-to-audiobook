@@ -27,7 +27,7 @@ from fastapi import HTTPException
 from book2audio.api.jobs.schemas import BookInspection, ChapterInfo
 from book2audio.api.jobs.uploads import require_owned_upload
 from book2audio.epub import parse_epub
-from book2audio.storage.r2 import download_capped
+from book2audio.storage.r2 import StorageReadError, download_capped
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,9 @@ def inspect_uploaded_epub(user_id: uuid.UUID, object_key: str) -> BookInspection
             found = download_capped(object_key, epub_path, max_bytes=MAX_INSPECT_BYTES)
         except ValueError:
             raise HTTPException(413, "The file is too large to read") from None
+        except StorageReadError:
+            logger.warning("inspect.download_interrupted", exc_info=True)
+            raise HTTPException(502, "Reading the upload failed. Try again.") from None
         except ClientError:
             # Includes the object being replaced while it was read (failed ETag check).
             logger.warning("inspect.download_failed", exc_info=True)

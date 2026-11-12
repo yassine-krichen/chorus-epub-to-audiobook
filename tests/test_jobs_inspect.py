@@ -245,6 +245,16 @@ def test_an_unexpected_parser_failure_is_a_422_not_a_500(tmp_path, monkeypatch, 
     assert "inspect.unusable_epub" in caplog.text
 
 
+def test_a_download_that_breaks_off_is_a_502_and_not_a_500(client, account, stored_epub):
+    from book2audio.storage.r2 import StorageReadError
+
+    stored_epub["error"] = StorageReadError("reading was interrupted")
+
+    response = _inspect(client, account, _own_key(account))
+
+    assert response.status_code == 502
+
+
 def test_an_upload_replaced_while_it_is_read_is_a_409(client, account, stored_epub):
     from botocore.exceptions import ClientError
 
