@@ -64,7 +64,12 @@ class _FakePipeline:
         on_attribution_progress=None,
         on_cast_ready=None,
         on_cast_report=None,
+        clone_voices=None,
+        clone_engine_factory=None,
     ):
+        self.clone_voices = clone_voices
+        self.clone_engine_factory = clone_engine_factory
+        self.clone_fallbacks = []
         self.config = config
         self.console = console
         self.on_chapter_done = on_chapter_done

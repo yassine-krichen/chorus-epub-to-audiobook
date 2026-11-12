@@ -368,6 +368,7 @@ class RoutingEngine:
     references: dict[str, CloneReference]
     clone: QwenCloneEngine | None = None
     fallbacks: dict[str, str] = field(default_factory=dict)
+    # Parts read by Kokoro because an engine that was expected to work failed.
     fallback_count: int = 0
     _clone_failed: bool = False
 
@@ -375,7 +376,8 @@ class RoutingEngine:
         if not is_clone_voice(voice):
             return self.kokoro.synthesize(text, voice, speed)
         reference = self.references.get(voice)
-        if reference is not None and self.clone is not None and not self._clone_failed:
+        usable = reference is not None and self.clone is not None
+        if usable and not self._clone_failed:
             try:
                 # The clone model has no speed control: ``speed`` does not apply to it.
                 return self.clone.synthesize_clone(text, reference)
@@ -385,7 +387,10 @@ class RoutingEngine:
                 logger.warning("clone.engine_failed", extra={"voice": voice}, exc_info=True)
         else:
             self._record_fallback(voice, self._why_unavailable(reference))
-        self.fallback_count += 1
+        if usable:
+            # Only a failure of an engine that was expected to work counts: a voice that was
+            # never going to be cloned (no clip, no engine) is known before the render starts.
+            self.fallback_count += 1
         return self.kokoro.synthesize(text, self.fallback_voice(voice), speed)
 
     def resolve_voice(self, voice: str) -> str:
@@ -397,7 +402,11 @@ class RoutingEngine:
 
     def fallback_voice(self, voice: str) -> str:
         reference = self.references.get(voice)
-        return _FALLBACK_VOICE[reference.gender if reference is not None else "m"]
+        return self.fallback_for_gender(reference.gender if reference is not None else "m")
+
+    @staticmethod
+    def fallback_for_gender(gender: str) -> str:
+        return _FALLBACK_VOICE["f" if gender == "f" else "m"]
 
     def close(self) -> None:
         if self.clone is not None:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from rich.console import Console
@@ -20,7 +20,7 @@ from rich.table import Table
 
 from book2audio.attribution.gender import GENDER_CONFIDENCE_THRESHOLD, GenderVerdict
 from book2audio.models import Chapter, SegmentKind
-from book2audio.tts.voices import VoiceCast
+from book2audio.tts.voices import VoiceCast, is_clone_voice
 
 CAST_REPORT_FILENAME = "cast_report.json"
 # What the website lists and lets the user fix; the API and the review UI use the same limits.
@@ -129,13 +129,19 @@ def _shorten(text: str) -> str:
 
 
 def cast_report_to_dict(
-    entries: list[CastEntry], *, voice_mode: str, narrator_voice: str
+    entries: list[CastEntry],
+    *,
+    voice_mode: str,
+    narrator_voice: str,
+    clone_fallbacks: Sequence[Mapping[str, str]] = (),
 ) -> dict[str, object]:
     return {
         "voice_mode": voice_mode,
         "narrator_voice": narrator_voice,
         "provider": VOICE_PROVIDER,
         "confidence_threshold": GENDER_CONFIDENCE_THRESHOLD,
+        # Cloned voices that Kokoro voices read instead, and why (see tts.clone_engine).
+        "clone_fallbacks": [dict(item) for item in clone_fallbacks],
         "characters": [
             {
                 "name": e.name,
@@ -150,11 +156,21 @@ def cast_report_to_dict(
                 "sample_line": e.sample_line,
                 "voice": e.voice,
                 "voice_source": e.voice_source,
-                "provider": VOICE_PROVIDER,
+                "provider": "clone" if is_clone_voice(e.voice) else VOICE_PROVIDER,
             }
             for e in entries
         ],
     }
+
+
+def record_clone_fallbacks(report_path: str, clone_fallbacks: Sequence[Mapping[str, str]]) -> None:
+    """Add cloned voices that had to be replaced during the render to the saved report."""
+    with open(report_path, encoding="utf-8") as report_file:
+        payload = json.load(report_file)
+    payload["clone_fallbacks"] = [dict(item) for item in clone_fallbacks]
+    with open(report_path, "w", encoding="utf-8") as report_file:
+        json.dump(payload, report_file, indent=2, ensure_ascii=False)
+        report_file.write("\n")
 
 
 def trim_report_for_review(payload: Mapping[str, object]) -> dict[str, object]:
@@ -181,10 +197,20 @@ def read_review_report(report_path: str) -> bytes:
 
 
 def write_cast_report(
-    work_dir: str, entries: list[CastEntry], *, voice_mode: str, narrator_voice: str
+    work_dir: str,
+    entries: list[CastEntry],
+    *,
+    voice_mode: str,
+    narrator_voice: str,
+    clone_fallbacks: Sequence[Mapping[str, str]] = (),
 ) -> str:
     path = os.path.join(work_dir, CAST_REPORT_FILENAME)
-    payload = cast_report_to_dict(entries, voice_mode=voice_mode, narrator_voice=narrator_voice)
+    payload = cast_report_to_dict(
+        entries,
+        voice_mode=voice_mode,
+        narrator_voice=narrator_voice,
+        clone_fallbacks=clone_fallbacks,
+    )
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
@@ -244,6 +270,8 @@ def _evidence_summary(entry: CastEntry) -> str:
 
 
 def _voice_summary(entry: CastEntry) -> str:
+    if is_clone_voice(entry.voice):
+        return "your cloned voice"
     if entry.voice_source == "narrator":
         return f"{entry.voice} (narrator)"
     if entry.voice_source == "override":

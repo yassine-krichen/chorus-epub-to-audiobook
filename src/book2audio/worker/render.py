@@ -8,25 +8,37 @@ the one place that logic lives so the two entrypoints can't drift apart.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
 from typing import Callable, Literal
 
 from rich.console import Console
+from sqlalchemy import select
 
 from book2audio.attribution import require_llm_attribution_configured
+from book2audio.cast_report import CAST_REPORT_FILENAME
 from book2audio.cast_review import AWAITING_CAST_REVIEW
 from book2audio.config import Config
-from book2audio.db.models import Job
+from book2audio.api.voices.reference_audio import MAX_UPLOAD_BYTES
+from book2audio.db.models import ClonedVoice, Job
 from book2audio.db.session import SessionLocal
 from book2audio.epub import parse_epub
 from book2audio.images.enhanced import build_enhanced_thumbnails
 from book2audio.images.freellmapi import require_freellmapi_configured
 from book2audio.models import Chapter
 from book2audio.pipeline import Pipeline
-from book2audio.storage.r2 import download_file
+from book2audio.storage.r2 import download_capped, download_file
+from book2audio.tts.clone_engine import (
+    CloneReference,
+    QwenCloneEngine,
+    load_clone_engine,
+    probe_clone_capability,
+)
+from book2audio.tts.voices import clone_voice_id, clone_voice_ids
 from book2audio.worker.progress import (
     JOB_RESUME_FILENAMES,
     CastReviewRequested,
@@ -35,6 +47,8 @@ from book2audio.worker.progress import (
     build_heartbeat,
     build_progress_hooks,
 )
+
+logger = logging.getLogger(__name__)
 
 RenderOutcome = Literal["finished", "awaiting_cast_review"]
 
@@ -81,6 +95,7 @@ def render_job(
             _base_on_chapter_done(chapter)
             after_chapter(chapter)
 
+    clone_voices = _load_clone_references(job_id, scratch_dir, config, console)
     pipeline = Pipeline(
         config,
         console,
@@ -89,12 +104,81 @@ def render_job(
         on_attribution_progress=build_heartbeat(job_id),
         on_cast_ready=enhanced.set_cast if enhanced is not None else None,
         on_cast_report=_cast_report_hook(job_id, config, scratch_dir, object_prefix),
+        clone_voices=clone_voices,
+        clone_engine_factory=_clone_engine_factory(console),
     )
     try:
         pipeline.run()
     except CastReviewRequested:
         return AWAITING_CAST_REVIEW
+    if pipeline.clone_fallbacks:
+        # The report was published before the render; cloning failed after that.
+        build_cast_report_uploader(job_id)(os.path.join(scratch_dir, CAST_REPORT_FILENAME))
     return "finished"
+
+
+def _clone_engine_factory(console: Console) -> Callable[[], QwenCloneEngine | None]:
+    """Starts the clone engine only on a machine that really has it (GPU, weights, libraries)."""
+
+    def factory() -> QwenCloneEngine | None:
+        capability = probe_clone_capability()
+        if not capability.available:
+            console.print(f"[yellow]Voice cloning is not available here: {capability.reason}[/yellow]")
+            return None
+        return load_clone_engine()
+
+    return factory
+
+
+def _load_clone_references(
+    job_id: uuid.UUID, scratch_dir: str, config: Config, console: Console
+) -> dict[str, CloneReference]:
+    """The reference clips of the cloned voices a job names, downloaded and verified.
+
+    Ownership is checked again here, against the job's own user: whatever the API let
+    through, a worker never reads a recording that does not belong to the job's owner. A voice
+    that is gone, foreign or damaged is simply left out, so Kokoro reads it instead.
+    """
+    wanted = clone_voice_ids([config.narrator_voice, *config.voice_overrides.values()])
+    if not wanted:
+        return {}
+    with SessionLocal() as session:
+        job = session.get(Job, job_id)
+        if job is None:
+            return {}
+        rows = list(
+            session.scalars(
+                select(ClonedVoice).where(
+                    ClonedVoice.user_id == job.user_id, ClonedVoice.id.in_(wanted)
+                )
+            )
+        )
+    references: dict[str, CloneReference] = {}
+    refs_dir = os.path.join(scratch_dir, "clone-refs")
+    os.makedirs(refs_dir, exist_ok=True)
+    for row in rows:
+        path = os.path.join(refs_dir, f"{row.id}.wav")
+        if not row.ref_object_key.startswith(f"voice-refs/{row.user_id}/"):
+            continue  # never read a key outside the owner's own prefix
+        try:
+            digest = None
+            if download_capped(row.ref_object_key, path, max_bytes=MAX_UPLOAD_BYTES):
+                with open(path, "rb") as clip:
+                    digest = hashlib.sha256(clip.read()).hexdigest()
+        except (OSError, ValueError, RuntimeError):
+            logger.warning("clone.reference_unreadable", extra={"voice_id": str(row.id)}, exc_info=True)
+            digest = None
+        if digest != row.ref_sha256:
+            console.print(f"[yellow]The recording for cloned voice {row.name!r} is unusable.[/yellow]")
+            continue
+        references[clone_voice_id(row.id)] = CloneReference(
+            voice_id=clone_voice_id(row.id),
+            wav_path=path,
+            ref_text=row.ref_text,
+            sha256=row.ref_sha256,
+            gender="f" if row.gender == "f" else "m",
+        )
+    return references
 
 
 def _cast_report_hook(

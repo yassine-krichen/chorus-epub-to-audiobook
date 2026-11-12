@@ -27,7 +27,7 @@ from book2audio.db.models import ClonedVoice
 from book2audio.db.worker_heartbeat import online_capabilities
 from book2audio.storage.r2 import delete_objects, read_object, upload_bytes
 from book2audio.tts.clone_engine import CLONE_CAPABILITY
-from book2audio.tts.voices import parse_clone_voice
+from book2audio.tts.voices import clone_voice_ids
 
 logger = logging.getLogger(__name__)
 
@@ -219,9 +219,9 @@ def _discard(key: str) -> None:
 
 def clone_voice_ids_in_config(config: dict) -> set[uuid.UUID]:
     """Every cloned voice a job's settings name (narrator and per-character voices)."""
-    voices = [config.get("narrator_voice"), *(config.get("voice_overrides") or {}).values()]
-    found = (parse_clone_voice(v) for v in voices if isinstance(v, str))
-    return {voice_id for voice_id in found if voice_id is not None}
+    return clone_voice_ids(
+        [config.get("narrator_voice"), *(config.get("voice_overrides") or {}).values()]
+    )
 
 
 def require_usable_clone_voices(

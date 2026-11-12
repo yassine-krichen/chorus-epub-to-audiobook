@@ -128,6 +128,7 @@ class _ReportingPipeline:
     """Calls the cast report hook like the real pipeline, then would render."""
 
     rendered = False
+    clone_fallbacks: list = []
 
     def __init__(self, config, console, on_cast_report=None, **_):
         self.on_cast_report = on_cast_report

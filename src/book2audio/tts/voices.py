@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from book2audio.models import NARRATOR
@@ -74,6 +75,12 @@ def parse_clone_voice(voice: str) -> uuid.UUID | None:
 
 def is_clone_voice(voice: str) -> bool:
     return parse_clone_voice(voice) is not None
+
+
+def clone_voice_ids(voices: Iterable[object]) -> set[uuid.UUID]:
+    """The cloned voices among ``voices`` (narrator, per-character overrides...), as uuids."""
+    found = (parse_clone_voice(v) for v in voices if isinstance(v, str))
+    return {voice_id for voice_id in found if voice_id is not None}
 
 
 def is_known_voice(voice: str) -> bool:

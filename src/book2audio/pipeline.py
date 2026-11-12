@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import os
+from collections.abc import Mapping
 from typing import Callable
 
 import numpy as np
@@ -34,6 +35,7 @@ from book2audio.attribution.gender import resolve_genders, resolved_genders
 from book2audio.cast_report import (
     build_cast_report,
     print_cast_report,
+    record_clone_fallbacks,
     write_cast_report,
 )
 from book2audio.cast_review import merge_characters
@@ -43,6 +45,13 @@ from book2audio.models import NARRATOR, Book, BookMetadata, Chapter, Segment, Se
 from book2audio.state import RenderState
 from book2audio.text import normalize_for_tts, segment_paragraphs, speech_params
 from book2audio.tts import KokoroEngine, VoiceCast
+from book2audio.tts.clone_engine import CloneReference, QwenCloneEngine, RoutingEngine
+from book2audio.tts.engine import TtsEngine
+from book2audio.tts.voices import is_clone_voice
+
+# Stored after a chapter's hash when Kokoro had to stand in for a cloned voice, so the
+# chapter is rendered again once cloning works.
+_CLONE_FALLBACK_MARK = "+clone-fallback"
 
 # Map EPUB language codes to Kokoro's expected language tags.
 _LANG_MAP = {"en": "en-us", "en-us": "en-us", "en-gb": "en-gb", "gb": "en-gb"}
@@ -97,6 +106,8 @@ class Pipeline:
         on_attribution_progress: Callable[[], None] | None = None,
         on_cast_ready: Callable[[list[str], dict[str, GenderVerdict]], None] | None = None,
         on_cast_report: Callable[[str], None] | None = None,
+        clone_voices: Mapping[str, CloneReference] | None = None,
+        clone_engine_factory: Callable[[], QwenCloneEngine | None] | None = None,
     ) -> None:
         self.config = config
         self.console = console or Console()
@@ -113,6 +124,14 @@ class Pipeline:
         # Handed the path of cast_report.json once it is written, before the
         # TTS model loads: hosted workers publish it so the job page can show the cast.
         self._on_cast_report = on_cast_report
+        # Cloned voices the job names, with their reference clips, and how to start the clone
+        # engine (None when this machine has none). Without an engine a cloned voice is read
+        # by a Kokoro voice of its gender, and the cast report says so.
+        self._clone_voices: dict[str, CloneReference] = dict(clone_voices or {})
+        self._clone_engine_factory = clone_engine_factory
+        self._clone_engine: QwenCloneEngine | None = None
+        self._router: RoutingEngine | None = None
+        self._report_path: str | None = None
         self._characters: list[str] = []
         self._genders: dict[str, str] = {}
         self._verdicts: dict[str, GenderVerdict] = {}
@@ -133,15 +152,24 @@ class Pipeline:
 
         selected = self._select_chapters(book)
         self._report_plan(book, selected, cast)
-        report_path = self.report_cast(selected, cast)
-        if self._on_cast_report is not None:
-            self._on_cast_report(report_path)
+        self._clone_engine = self._start_clone_engine(cast)
+        try:
+            report_path = self.report_cast(selected, cast)
+            if self._on_cast_report is not None:
+                self._on_cast_report(report_path)
 
-        engine = self._load_engine(book.metadata)
-        self._music_bed = generate_bed_for_preset(cfg.music_preset) if cfg.music else None
-        outputs = self._render_and_assemble(
-            selected, book.metadata, engine, cast, state, chapters_dir
-        )
+            engine = self._route_clone_voices(self._load_engine(book.metadata), cast)
+            self._music_bed = generate_bed_for_preset(cfg.music_preset) if cfg.music else None
+            outputs = self._render_and_assemble(
+                selected, book.metadata, engine, cast, state, chapters_dir
+            )
+        finally:
+            # The clone engine holds the GPU: release it as soon as the job is over.
+            if self._router is not None:
+                self._router.close()
+            elif self._clone_engine is not None:
+                self._clone_engine.close()
+        self._record_runtime_clone_fallbacks()
 
         self.console.print(f"[bold green]Done:[/bold green] {len(outputs)} file(s)")
         for path in outputs:
@@ -269,9 +297,20 @@ class Pipeline:
         entries = build_cast_report(self._characters, self._verdicts, selected, cast)
         mode, narrator = self.config.voice_mode, cast.narrator_voice
         print_cast_report(self.console, entries, voice_mode=mode, narrator_voice=narrator)
+        fallbacks = self._planned_clone_fallbacks(cast)
+        for item in fallbacks:
+            self.console.print(
+                f"[yellow]Warning:[/yellow] a cloned voice cannot be used ({escape(item['reason'])}); "
+                f"{escape(item['fallback_voice'])} reads instead."
+            )
         path = write_cast_report(
-            self.config.work_dir, entries, voice_mode=mode, narrator_voice=narrator
+            self.config.work_dir,
+            entries,
+            voice_mode=mode,
+            narrator_voice=narrator,
+            clone_fallbacks=fallbacks,
         )
+        self._report_path = path
         self.console.print(f"[dim]Cast report saved to {escape(path)}[/dim]")
         unmatched = self._unmatched_gender_overrides()
         if unmatched:
@@ -313,16 +352,77 @@ class Pipeline:
             )
         return chapters
 
+    def _used_clone_voices(self, cast: VoiceCast) -> list[str]:
+        """The cloned voices this job will speak with (narrator and characters), in order."""
+        return list(dict.fromkeys(v for v in cast.as_dict().values() if is_clone_voice(v)))
+
+    def _start_clone_engine(self, cast: VoiceCast) -> QwenCloneEngine | None:
+        if not self._used_clone_voices(cast) or self._clone_engine_factory is None:
+            return None
+        return self._clone_engine_factory()
+
+    def _planned_clone_fallbacks(self, cast: VoiceCast) -> list[dict[str, str]]:
+        """Cloned voices that cannot be spoken before the render even starts, and why."""
+        planned: list[dict[str, str]] = []
+        for voice in self._used_clone_voices(cast):
+            reference = self._clone_voices.get(voice)
+            if reference is None:
+                reason = "the voice no longer exists"
+            elif self._clone_engine is None:
+                reason = "this worker has no voice-cloning engine"
+            else:
+                continue
+            gender = reference.gender if reference is not None else "m"
+            planned.append(
+                {
+                    "voice": voice,
+                    "reason": reason,
+                    "fallback_voice": RoutingEngine.fallback_for_gender(gender),
+                }
+            )
+        return planned
+
+    def _record_runtime_clone_fallbacks(self) -> None:
+        """Note cloned voices that broke down during the render (out of memory, crash)."""
+        if self._router is None or not self._router.fallbacks or self._report_path is None:
+            return
+        self.console.print(
+            "[yellow]Warning:[/yellow] voice cloning failed during the render; Kokoro voices "
+            "read the cloned parts that followed. See the cast report."
+        )
+        record_clone_fallbacks(self._report_path, self.clone_fallbacks)
+
+    @property
+    def clone_fallbacks(self) -> list[dict[str, str]]:
+        """Every cloned voice replaced by a Kokoro voice in this run, with the reason."""
+        if self._router is None:
+            return []
+        return [
+            {
+                "voice": voice,
+                "reason": reason,
+                "fallback_voice": self._router.fallback_voice(voice),
+            }
+            for voice, reason in self._router.fallbacks.items()
+        ]
+
     def _load_engine(self, metadata: BookMetadata) -> KokoroEngine:
         lang = _LANG_MAP.get(metadata.language.lower(), "en-us")
         self.console.print(f"[dim]Loading Kokoro TTS ({lang})…[/dim]")
         return KokoroEngine(lang=lang)
 
+    def _route_clone_voices(self, kokoro: TtsEngine, cast: VoiceCast) -> TtsEngine:
+        """Kokoro alone, unless the job names a cloned voice: then route those voices."""
+        if not self._used_clone_voices(cast):
+            return kokoro
+        self._router = RoutingEngine(kokoro, self._clone_voices, self._clone_engine)
+        return self._router
+
     def _render_and_assemble(
         self,
         chapters: list[Chapter],
         metadata: BookMetadata,
-        engine: KokoroEngine,
+        engine: TtsEngine,
         cast: VoiceCast,
         state: RenderState,
         chapters_dir: str,
@@ -353,8 +453,12 @@ class Pipeline:
                         task, description=f"Ch {chapter.number}: {escape(chapter.title[:40])}"
                     )
                     if not state.is_done(chapter.index, wav_path, text_hash):
+                        fallbacks_before = self._router.fallback_count if self._router else 0
                         samples = self._render_chapter(chapter, engine, cast)
                         write_wav(wav_path, samples)
+                        if self._router is not None and self._router.fallback_count > fallbacks_before:
+                            # Kokoro read cloned parts: a later run with the engine up must redo it.
+                            text_hash += _CLONE_FALLBACK_MARK
                         state.mark_done(chapter.index, chapter.title, text_hash)
                         dirty = True
                         if self._on_chapter_done is not None:
@@ -483,13 +587,15 @@ class Pipeline:
                 parts.append(seg.kind.value)
                 continue
             voice = cast.voice_for(seg.speaker or "")
+            if self._router is not None:
+                voice = self._router.resolve_voice(voice)  # the voice that will really speak
             speed_mult, gain_mult = speech_params(seg.text) if cfg.expressive else (1.0, 1.0)
             parts.append(f"{seg.kind.value}|{voice}|{speed_mult}|{gain_mult}|{seg.text}")
         blob = "␟".join(parts).encode("utf-8")
         return hashlib.sha1(blob).hexdigest()
 
     def _render_chapter(
-        self, chapter: Chapter, engine: KokoroEngine, cast: VoiceCast
+        self, chapter: Chapter, engine: TtsEngine, cast: VoiceCast
     ) -> np.ndarray:
         cfg = self.config
         clips: list[tuple[np.ndarray, float]] = []

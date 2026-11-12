@@ -358,6 +358,14 @@ class CastReviewRequest(BaseModel):
         return self
 
 
+class CloneFallback(BaseModel):
+    """A cloned voice that a built-in voice reads instead, and why."""
+
+    voice: str = Field(max_length=VOICE_ID_MAX_LENGTH)
+    reason: str = Field(max_length=200)
+    fallback_voice: str = Field(max_length=VOICE_ID_MAX_LENGTH)
+
+
 class CastReport(BaseModel):
     """Who speaks in a job's selected chapters, with the voice each one gets.
 
@@ -372,3 +380,6 @@ class CastReport(BaseModel):
     # Characters the worker left out because the review cannot list them (a name over
     # the limit, or beyond the busiest ones). They still have a voice, but cannot be fixed.
     omitted_characters: int = Field(default=0, ge=0)
+    # Cloned voices that could not be used (no engine on the worker, the voice was deleted,
+    # the engine ran out of memory). Absent in reports written before voice cloning.
+    clone_fallbacks: list[CloneFallback] = Field(default_factory=list, max_length=20)
