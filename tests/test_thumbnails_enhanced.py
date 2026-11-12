@@ -69,11 +69,13 @@ class _FakeClient:
         self.replies = list(replies)
         self.calls = 0
 
-    def complete_json(self, system, user):
+    def complete_json(self, system, user, validate=None):
         self.calls += 1
         reply = self.replies.pop(0) if self.replies else _reply()
         if isinstance(reply, Exception):
             raise reply
+        if validate is not None:
+            validate(reply)
         return reply
 
 
@@ -239,6 +241,52 @@ def test_request_scene_brief_wraps_a_model_failure():
         request_scene_brief(
             client, book_title="B", chapter=_chapter(), cast=CAST, sheet_entry=None
         )
+
+
+def test_request_scene_brief_validates_the_reply_inside_the_client_so_models_rotate():
+    client = MagicMock()
+    client.complete_json.return_value = _reply()
+
+    request_scene_brief(
+        client, book_title="B", chapter=_chapter(), cast=CAST, sheet_entry=None
+    )
+
+    validate = client.complete_json.call_args.kwargs["validate"]
+    with pytest.raises(LLMError):
+        validate({"characters": [], "setting": "", "mood": "", "key_action": ""})
+    validate(_reply())  # a usable brief passes
+
+
+def test_an_unusable_brief_from_the_first_model_is_answered_by_the_next(monkeypatch):
+    from book2audio.attribution import llm_client
+
+    unusable = {"characters": [], "setting": "", "mood": "", "key_action": ""}
+    replies = [unusable, _reply()]
+    asked: list[str] = []
+
+    def post(url, **kwargs):
+        asked.append(kwargs["json"]["model"])
+        response = MagicMock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "choices": [{"message": {"content": json.dumps(replies.pop(0))}}]
+        }
+        return response
+
+    monkeypatch.setenv("FREELLMAPI_BASE_URL", "https://freellmapi.example.com/v1")
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "k")
+    monkeypatch.setattr(llm_client.httpx, "post", post)
+
+    brief = request_scene_brief(
+        llm_client.LLMClient(model="a,b"),
+        book_title="B",
+        chapter=_chapter(),
+        cast=CAST,
+        sheet_entry=None,
+    )
+
+    assert asked == ["a", "b"]
+    assert brief.characters
 
 
 def test_chapter_text_for_brief_keeps_a_short_chapter_whole():

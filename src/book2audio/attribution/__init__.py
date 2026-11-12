@@ -68,10 +68,12 @@ def build_attributor(
         raise ValueError(f"Unknown attributor {config.attributor!r}")
     return LLMAttributor(
         config.attributor,
-        LLMClient(),
+        LLMClient(task="attribution"),
         AttributionCache(os.path.join(config.work_dir, CACHE_FILENAME)),
         config.attribution_max_calls,
         only_chapters=only_chapters,
         on_progress=on_progress,
         gender_overrides=config.gender_overrides,
+        # Short, forgiving jobs: the light chain is cheaper than the attribution one.
+        judge_client=LLMClient(task="light"),
     )

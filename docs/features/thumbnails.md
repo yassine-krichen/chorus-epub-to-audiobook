@@ -129,8 +129,10 @@ Print the prompt for a chapter without calling the image service:
 
 - A separate switch, "Smarter thumbnails (AI reads the chapter first)", shown only while
   chapter thumbnails are on. The API and the render settings both refuse it without thumbnails.
-- One chat call per chapter, using the same model setting as AI speaker detection
-  (`FREELLMAPI_MODEL`). The brief lists the characters in the key scene (with their looks),
+- One chat call per chapter, using a cheap model list, `FREELLMAPI_MODEL_LIGHT`
+  (default `gemini-2.5-flash-lite`, `gpt-oss-20b`, `gpt-oss-120b`; `FREELLMAPI_MODEL` applies if
+  it is not set). A model that is rate limited is skipped for the rest of the job and the next
+  one answers; see [llm-model-chain.md](llm-model-chain.md). The brief lists the characters in the key scene (with their looks),
   setting, mood and key action. The cast genders come from the gender step, so "Sunny (male)"
   is not left to the model's guess.
 - The prompt is the Level 1 template with the brief in place of the raw excerpt. The style,
