@@ -269,8 +269,9 @@ sending any. The command line ignores `HOSTED_LLM_ATTRIBUTION`.
 - The AI can be wrong too. It only replaces guesses, never a name found in the text.
 - Book text for guessed lines, and sentences about unresolved characters, are sent to the
   freellmapi gateway.
-- The alias check is strict (it needs a quote naming both names) and small models often
-  answer "none". In the slice test it did not link Changing Star to Nephis; the offline
+- The alias check is strict (it needs a quote naming both names that says they are one
+  person, or two characters with the same resolved gender; at most 5 merges per book) and
+  small models often answer "none". In the slice test it did not link Changing Star to Nephis; the offline
   rule did when it could read the whole book, where the text says "Nephis, the Changing
   Star".
 - Still wrong: a line whose speaker is only a pronoun for someone who has not spoken yet

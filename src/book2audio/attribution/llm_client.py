@@ -75,6 +75,10 @@ _KEY_WIDE_STATUSES = frozenset({401})
 OUTAGE_COOLDOWN_SECONDS = 120.0
 # Status for an unknown model name: no later request can fix that.
 _UNKNOWN_MODEL_STATUS = 404
+# A 403 from one model may mean "not on your tier"; from this many models in a row
+# it means the key is refused, and rotating further only burns requests.
+MAX_FORBIDDEN_MODELS = 2
+_FORBIDDEN_STATUS = 403
 
 _FENCE = re.compile(r"^```[a-zA-Z0-9_-]*\s*\n?(.*?)\n?```\s*$", re.DOTALL)
 
@@ -94,12 +98,14 @@ class _ModelFailure(Exception):
         retry_after: float | None = None,
         bad_reply: bool = False,
         outage: bool = False,
+        forbidden: bool = False,
     ) -> None:
         super().__init__(message)
         self.retryable = retryable  # worth another attempt on the same model
         self.retry_after = retry_after  # seconds the provider asked us to wait
         self.bad_reply = bad_reply  # the model answered, but not usably
         self.outage = outage  # probably brief (timeout, 5xx): cool for a finite time
+        self.forbidden = forbidden  # HTTP 403: the model, or the whole key, is not allowed
 
 
 def require_llm_attribution_configured() -> None:
@@ -182,12 +188,19 @@ class LLMClient:
         :class:`LLMError` means every live model failed this request.
         """
         failures: list[str] = []
+        forbidden = 0
         for model in self._live_models():
             try:
                 reply = self._ask(model, system, user, validate)
             except _ModelFailure as failure:
                 self._cool(model, failure)
                 failures.append(f"{model}: {failure}")
+                forbidden += failure.forbidden
+                if forbidden >= MAX_FORBIDDEN_MODELS:
+                    # Two different models both refusing us is the key, not the models.
+                    raise LLMError(
+                        f"LLM request refused (HTTP 403) by {forbidden} models ({'; '.join(failures)})"
+                    ) from failure
                 continue
             self._bad_replies.pop(model, None)
             return reply
@@ -267,10 +280,14 @@ class LLMClient:
         # errors (timeouts, connect, protocol) are worth a retry; the rest
         # (too many redirects, bad URL, undecodable body) are not.
         except httpx.HTTPError as exc:
+            transport = isinstance(exc, httpx.TransportError)
+            # A broken request (redirect loop, bad URL, undecodable body) is not an
+            # outage: it takes a strike like an unusable reply instead of a rest.
             raise _ModelFailure(
                 f"{type(exc).__name__}: {exc}",
-                retryable=isinstance(exc, httpx.TransportError),
-                outage=True,
+                retryable=transport,
+                outage=transport,
+                bad_reply=not transport,
             ) from exc
         try:
             response.raise_for_status()
@@ -294,6 +311,8 @@ class LLMClient:
                     retry_after=retry_after,
                     outage=True,
                 ) from exc
+            if status == _FORBIDDEN_STATUS:
+                raise _ModelFailure(message, forbidden=True) from exc
             if status == _UNKNOWN_MODEL_STATUS:
                 # The name is wrong, and that stays true for the whole run.
                 raise _ModelFailure(message) from exc

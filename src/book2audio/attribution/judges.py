@@ -25,11 +25,14 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from book2audio.attribution.gender import GenderVerdict
+from book2audio.attribution.heuristic import epithet_shapes
 from book2audio.attribution.llm_client import LLMClient, LLMError
 from book2audio.models import Chapter, SegmentKind
 
 MAX_JUDGED_CHARACTERS = 12
 MAX_ALIAS_CHARACTERS = 30
+# A book has a handful of real aliases; more than this is the model guessing.
+MAX_ALIAS_MERGES = 5
 SENTENCES_PER_CHARACTER = 5
 MAX_SENTENCE_CHARS = 220
 MAX_EVIDENCE_CHARS = 400
@@ -161,6 +164,14 @@ def _normalise(text: str) -> str:
     return " ".join(text.translate(_QUOTE_CHARS).split())
 
 
+def _says_same_person(evidence: str, alias: str, name: str) -> bool:
+    """True when the passage ties the two names together in an identity shape."""
+    return any(
+        epithet_shapes(first, second).search(evidence)
+        for first, second in ((alias, name), (name, alias))
+    )
+
+
 def _contains_name(text: str, name: str) -> bool:
     return re.search(rf"(?<!\w){re.escape(name)}(?!\w)", text) is not None
 
@@ -193,7 +204,9 @@ class _Judge:
         validate: Callable[[object], list],
     ) -> list | None:
         """The model's answer list for this prompt, or None when there is none."""
-        key = prefix + hashlib.sha256(json.dumps([system, user]).encode("utf-8")).hexdigest()
+        # Sampling settings shape the answer, as they do for the window cache.
+        sampling = [getattr(self._client, "temperature", 0.0), getattr(self._client, "max_tokens", 0)]
+        key = prefix + hashlib.sha256(json.dumps([system, user, sampling]).encode("utf-8")).hexdigest()
         cached = self._cache.get(key) if self._cache else None
         if cached is not None:
             self.report.cache_hits += 1
@@ -238,6 +251,8 @@ class AliasJudge(_Judge):
                 # One merge per name per run: chains of guesses compound mistakes.
                 used.update((finding.alias, finding.name))
                 accepted.append(finding)
+                if len(accepted) >= MAX_ALIAS_MERGES:
+                    break
         return accepted
 
     @staticmethod
@@ -275,12 +290,22 @@ class AliasJudge(_Judge):
             return None
         if not (_contains_name(evidence, alias) and _contains_name(evidence, name)):
             return None
-        # "Sunny and Nephis" names two people together; so does "Sunny, Nephis".
-        a, b = re.escape(alias), re.escape(name)
-        if re.search(rf"{a}\s*(?:,|and|&|or)\s+(?:the\s+)?{b}|{b}\s*(?:,|and|&|or)\s+(?:the\s+)?{a}", evidence):
-            return None
         genders = {verdicts[n].gender for n in (alias, name) if n in verdicts}
         if genders >= {"m", "f"}:
+            return None
+        # Two names in one passage is not proof they are one person. The passage
+        # must say so ("Mara, the Silver Fox", "known as"); failing that, both
+        # characters must already have the same resolved gender, and the passage
+        # must not list them side by side ("Sunny and Nephis", "Sunny, Nephis").
+        if _says_same_person(evidence, alias, name):
+            return AliasFinding(alias=alias, name=name, evidence=evidence)
+        a, b = re.escape(alias), re.escape(name)
+        listed = re.search(
+            rf"{a}\s*(?:,|and|&|or)\s+(?:the\s+)?{b}|{b}\s*(?:,|and|&|or)\s+(?:the\s+)?{a}",
+            evidence,
+        )
+        same_gender = all(n in verdicts and verdicts[n].gender in ("m", "f") for n in (alias, name))
+        if listed or not same_gender:
             return None
         return AliasFinding(alias=alias, name=name, evidence=evidence)
 

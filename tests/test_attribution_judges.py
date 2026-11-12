@@ -45,7 +45,7 @@ def _chapters(*paragraphs: str) -> list[Chapter]:
 
 
 BOOK = _chapters(
-    "Mara walked in beside Tom. Under the lamp, the Silver Fox smiled.",
+    "Mara, the Silver Fox, walked in beside Tom. Under the lamp, the Silver Fox smiled.",
     "Tom said nothing. The weather was cold.",
     "Rin looked tired. She lowered her head and her hands shook.",
     "Pat waited by the door. He and she had met before, and Pat knew it.",
@@ -66,7 +66,7 @@ def _verdict(name, gender=None, male=0.0, female=0.0):
 # --- alias judge ------------------------------------------------------------------------
 
 
-def _alias_reply(alias="Silver Fox", name="Mara", evidence="Mara walked in beside Tom. Under the lamp, the Silver Fox smiled."):
+def _alias_reply(alias="Silver Fox", name="Mara", evidence="Mara, the Silver Fox, walked in beside Tom."):
     return {"same": [{"alias": alias, "name": name, "evidence": evidence}]}
 
 
@@ -75,6 +75,58 @@ def _find_aliases(reply, names=("Mara", "Tom", "Silver Fox"), verdicts=None, cac
     client = FakeClient(reply)
     found = AliasJudge(client, cache, report).find(list(names), BOOK, verdicts or {})
     return found, report, client
+
+
+def test_a_passage_naming_both_without_saying_they_are_one_person_is_dropped():
+    found, report, _ = _find_aliases(
+        _alias_reply(evidence="Mara walked in beside Tom. Under the lamp, the Silver Fox smiled."),
+        names=("Mara", "Tom", "Silver Fox"),
+    )
+
+    assert found == [] and report.rejected == 1
+
+
+def test_a_passage_naming_both_is_accepted_when_both_have_the_same_resolved_gender():
+    book = _chapters("Mara walked in beside Rin. Under the lamp, Silver Fox smiled.")
+    verdicts = {"Mara": _verdict("Mara", "f"), "Silver Fox": _verdict("Silver Fox", "f")}
+    client = FakeClient(
+        _alias_reply(evidence="Mara walked in beside Rin. Under the lamp, Silver Fox smiled.")
+    )
+
+    found = AliasJudge(client, None, JudgeReport()).find(["Mara", "Rin", "Silver Fox"], book, verdicts)
+
+    assert [(f.alias, f.name) for f in found] == [("Silver Fox", "Mara")]
+
+
+def test_at_most_five_aliases_are_merged_per_book():
+    names = [f"Name{i}" for i in range(7)] + [f"Epi{i} Title" for i in range(7)]
+    text = " ".join(f"Name{i}, the Epi{i} Title, nodded." for i in range(7))
+    book = _chapters(text)
+    reply = {
+        "same": [
+            {
+                "alias": f"Epi{i} Title",
+                "name": f"Name{i}",
+                "evidence": f"Name{i}, the Epi{i} Title, nodded.",
+            }
+            for i in range(7)
+        ]
+    }
+
+    found = AliasJudge(FakeClient(reply), None, JudgeReport()).find(names, book, {})
+
+    assert len(found) == 5
+
+
+def test_a_different_sampling_setting_does_not_reuse_a_cached_answer():
+    cache = AttributionCache(None)
+    _find_aliases(_alias_reply(), cache=cache)
+    other = FakeClient({"same": []})
+    other.temperature = 0.7
+
+    AliasJudge(other, cache, JudgeReport()).find(["Mara", "Tom", "Silver Fox"], BOOK, {})
+
+    assert len(other.calls) == 1
 
 
 def test_an_alias_with_a_verbatim_quote_naming_both_is_accepted():
@@ -123,7 +175,7 @@ def test_an_alias_naming_a_character_who_does_not_speak_is_dropped():
 def test_a_name_is_merged_at_most_once_per_run():
     reply = {
         "same": [
-            {"alias": "Silver Fox", "name": "Mara", "evidence": "Mara walked in beside Tom. Under the lamp, the Silver Fox smiled."},
+            {"alias": "Silver Fox", "name": "Mara", "evidence": "Mara, the Silver Fox, walked in beside Tom. Under the lamp, the Silver Fox smiled."},
             {"alias": "Tom", "name": "Mara", "evidence": "Mara walked in beside Tom."},
         ]
     }
@@ -303,9 +355,11 @@ def test_a_proven_alias_is_folded_and_the_text_is_relabelled():
             }
         ]
     }
-    # The tied-together shape "Mara, the Fox" is already folded offline; use a text without it.
+    # No identity shape offline ("Mara, the Fox"), so the AI has to find it; both are women.
     attributor, names, _ = _attribute(
         [reply, {"verdicts": []}],
+        *['Mara raised her hand. She smiled and her eyes were bright.'] * 3,
+        *['The Fox raised her hand. She smiled and her eyes were bright.'] * 3,
         '"Move," said Mara.',
         '"No," said Tom.',
         'Under the lamp, the Fox looked up and Mara smiled. Mara raised her hand.',
@@ -406,12 +460,12 @@ def test_the_alias_prompt_offers_runs_of_sentences_that_name_two_characters():
 
     _, user = client.calls[0]
     passages = user.split("Passages naming more than one of them:")[1]
-    assert "Mara walked in beside Tom. Under the lamp, the Silver Fox smiled." in passages
+    assert "Mara, the Silver Fox, walked in beside Tom. Under the lamp, the Silver Fox smiled." in passages
 
 
 def test_an_alias_quote_may_span_sentences():
     found, _, _ = _find_aliases(
-        _alias_reply(evidence="Mara walked in beside Tom. Under the lamp, the Silver Fox smiled.")
+        _alias_reply(evidence="Mara, the Silver Fox, walked in beside Tom. Under the lamp, the Silver Fox smiled.")
     )
 
     assert len(found) == 1

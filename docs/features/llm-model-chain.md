@@ -90,8 +90,12 @@ stateDiagram-v2
   the request, not the model: it takes a strike and is cooled only after two in a row.
   Only a 401 stops the call at once; a 403 moves on to the next model.
 - **One-time cache reset.** This release changes what the attribution and scene-brief
-  caches are keyed on, so the first resume of an existing job asks the models again for
-  every window once. After that the caches work as before.
+  caches are keyed on, and the speaker-detection instructions gained an "Unnamed"
+  answer, so the first resume of an existing job asks the models again for every window
+  once. After that the caches work as before. The new AI character checks cache under
+  their own keys, which also include the sampling settings.
+- Two different models answering 403 in one request stop the rotation: that is the key,
+  not the models.
 - One `LLMClient` is one run and is not thread-safe: give each thread its own.
 
 ## Defaults (when nothing is set)

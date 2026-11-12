@@ -297,15 +297,124 @@ def test_the_gender_evidence_of_an_epithet_counts_for_the_character():
     assert attributor.genders == {"Mara": "f"}
 
 
-def test_spelling_variants_that_share_a_chapter_merge_when_no_sentence_names_both():
+def test_spelling_variants_that_speak_in_different_scenes_of_one_chapter_merge():
     attributor, names, _ = _attribute(
         '"Hello," said Cassia.',
+        '***',
         '"Hi," said Cassie.',
         'Cassia smiled.',
     )
 
     assert attributor.aliases in ({"Cassia": "Cassie"}, {"Cassie": "Cassia"})
     assert len(names) == 1
+
+
+def test_two_names_one_vowel_apart_that_talk_to_each_other_stay_two_people():
+    attributor, names, _ = _attribute(
+        '"Where were you?" Ellen asked.',
+        '"Out," Allen said.',
+        '"Out where?" Ellen asked.',
+        '"Just out," Allen said.',
+    )
+
+    assert attributor.aliases == {} and sorted(names) == ["Allen", "Ellen"]
+
+
+def test_spelling_variants_of_opposite_gender_are_never_merged():
+    ellen = Chapter(
+        index=1,
+        title="One",
+        segments=segment_paragraphs(
+            ['"Hi," said Ellen.', *['Ellen raised her hand. She smiled and her eyes were bright.'] * 5]
+        ),
+    )
+    allen = Chapter(
+        index=2,
+        title="Two",
+        segments=segment_paragraphs(
+            ['"Hi," said Allen.', *['Allen raised his hand. He smiled and his eyes were bright.'] * 5]
+        ),
+    )
+    attributor = HeuristicAttributor()
+
+    names = attributor.attribute([ellen, allen])
+
+    assert attributor.aliases == {} and sorted(names) == ["Allen", "Ellen"]
+
+
+# --- epithet links must not fold two different people ------------------------------------
+
+
+def test_a_list_of_people_is_not_an_epithet_link():
+    attributor, names, _ = _attribute(
+        '"Come here," said Aunt Polly.',
+        '"I will not," said Tom.',
+        'Tom, Aunt Polly and Sid walked to church.',
+    )
+
+    assert attributor.aliases == {} and sorted(names) == ["Aunt Polly", "Tom"]
+
+
+def test_a_name_before_a_comma_is_not_an_epithet_without_the_article():
+    attributor, names, _ = _attribute(
+        '"Go away," said Rupe Collins.',
+        '"No," said Penrod.',
+        'After his first encounter with Rupe Collins, Penrod had become unbearable.',
+    )
+
+    assert attributor.aliases == {} and sorted(names) == ["Penrod", "Rupe Collins"]
+
+
+def test_a_comma_list_of_full_names_is_not_an_epithet_link():
+    attributor, names, _ = _attribute(
+        '"Hello," said Maurice Levy.',
+        '"Hi," said Georgie.',
+        'The party was Samuel Williams, Maurice Levy, Georgie Bassett, and Herman.',
+    )
+
+    assert attributor.aliases == {} and "Maurice Levy" in names
+
+
+def test_an_epithet_that_is_a_title_plus_a_name_is_never_an_epithet():
+    attributor, _, _ = _attribute(
+        '"Come here," said Aunt Polly.',
+        '"No," said Tom.',
+        'Tom, the Aunt Polly, laughed.',
+    )
+
+    assert attributor.aliases == {}
+
+
+def test_an_epithet_in_a_list_continuation_is_not_linked():
+    attributor, _, _ = _attribute(
+        '"Move," said Mara.',
+        '"Fine," said Silver Fox.',
+        'Then came Mara, the Silver Fox, Tom and Sid.',
+    )
+
+    assert attributor.aliases == {}
+
+
+def test_an_epithet_of_the_opposite_gender_is_not_folded():
+    attributor, names, _ = _attribute(
+        'Mara, the Silver Fox, was tired.',
+        '"Move," said Mara.',
+        '"Fine," said Silver Fox.',
+        *['Mara raised her hand. She smiled and her eyes were bright.'] * 5,
+        *['The Silver Fox raised his hand. He smiled and his eyes were bright.'] * 5,
+    )
+
+    assert attributor.aliases == {} and sorted(names) == ["Mara", "Silver Fox"]
+
+
+def test_a_sentence_start_the_still_ties_an_epithet_to_a_name():
+    attributor, _, _ = _attribute(
+        'The Silver Fox, Mara, was tired.',
+        '"Move," said Mara.',
+        '"Fine," said Silver Fox.',
+    )
+
+    assert attributor.aliases == {"Silver Fox": "Mara"}
 
 
 def test_spelling_variants_named_together_are_two_people():

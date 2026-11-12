@@ -233,6 +233,17 @@ def test_a_403_rotates_because_some_gateways_use_it_for_a_model_not_on_the_tier(
     assert asked == ["a", "b"]
 
 
+def test_two_models_in_a_row_answering_403_is_the_key_so_rotation_stops(monkeypatch):
+    asked = _gateway(
+        monkeypatch, {"a": _error(403), "b": _error(403), "c": _ok()}
+    )
+
+    with pytest.raises(LLMError, match="403"):
+        LLMClient(model="a,b,c").complete_json("sys", "user")
+
+    assert asked == ["a", "b"]
+
+
 def test_an_unknown_model_is_cooled_for_the_rest_of_the_run(monkeypatch):
     _gateway(monkeypatch, {"typo": _error(404), "b": _ok()})
     client = LLMClient(model="typo,b")
@@ -308,11 +319,26 @@ def test_a_429_without_retry_after_still_cools_for_the_rest_of_the_run(monkeypat
 
 def test_a_non_transport_http_error_rotates_without_a_retry(monkeypatch, _sleeps):
     asked = _gateway(monkeypatch, {"a": httpx.TooManyRedirects("loop"), "b": _ok()})
+    client = LLMClient(model="a,b")
 
-    LLMClient(model="a,b").complete_json("sys", "user")
+    client.complete_json("sys", "user")
 
     assert asked == ["a", "b"]
     assert _sleeps == []
+    assert client.cooled_models == ()  # a strike, not a rest
+
+
+def test_two_non_transport_http_errors_in_a_row_cool_the_model_for_good(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(llm_client.time, "monotonic", lambda: now[0])
+    _gateway(monkeypatch, {"a": httpx.DecodingError("bad gzip"), "b": _ok()})
+    client = LLMClient(model="a,b")
+
+    client.complete_json("sys", "one")
+    client.complete_json("sys", "two")
+
+    now[0] += 10**9
+    assert client.cooled_models == ("a",)
 
 
 def test_a_non_transport_http_error_on_every_model_is_an_llm_error(monkeypatch):

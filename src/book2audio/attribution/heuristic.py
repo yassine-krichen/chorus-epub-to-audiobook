@@ -127,43 +127,123 @@ def _speaker_stats(chapters: list[Chapter]) -> tuple[dict[str, int], dict[str, s
     return counts, chapters_of
 
 
+def _paragraph_texts(chapters: list[Chapter]) -> list[str]:
+    """Each paragraph's text (its segments joined); a segment of unknown paragraph stands alone."""
+    paragraphs: list[str] = []
+    for chapter in chapters:
+        current: list[str] = []
+        current_id: int | None = None
+        for seg in chapter.segments:
+            if seg.paragraph is None or seg.paragraph != current_id:
+                if current:
+                    paragraphs.append(" ".join(current))
+                current, current_id = [], seg.paragraph
+            current.append(seg.text)
+        if current:
+            paragraphs.append(" ".join(current))
+    return paragraphs
+
+
 def _mentioned_together(first: str, second: str, chapters: list[Chapter]) -> bool:
-    """True when some segment of text names both ``first`` and ``second``."""
+    """True when some paragraph of the book names both ``first`` and ``second``."""
     pattern_first = re.compile(rf"(?<!\w){re.escape(first)}(?!\w)")
     pattern_second = re.compile(rf"(?<!\w){re.escape(second)}(?!\w)")
     return any(
-        pattern_first.search(seg.text) and pattern_second.search(seg.text)
-        for chapter in chapters
-        for seg in chapter.segments
+        first in text
+        and second in text
+        and pattern_first.search(text)
+        and pattern_second.search(text)
+        for text in _paragraph_texts(chapters)
     )
+
+
+def _speak_in_one_scene(first: str, second: str, chapters: list[Chapter]) -> bool:
+    """True when both have a line in the same scene (between scene breaks)."""
+    for chapter in chapters:
+        speakers: set[str] = set()
+        for seg in [*chapter.segments, Segment(SegmentKind.SCENE_BREAK, "")]:
+            if seg.kind == SegmentKind.SCENE_BREAK:
+                if first in speakers and second in speakers:
+                    return True
+                speakers = set()
+            elif seg.kind == SegmentKind.DIALOGUE and seg.speaker in (first, second):
+                speakers.add(seg.speaker)
+    return False
+
+
+def _gender_conflict(names: list[str], chapters: list[Chapter]) -> bool:
+    """True when two names are both resolved from the text, to opposite genders."""
+    verdicts = resolve_genders(names, chapters)
+    return {v.gender for v in verdicts.values()} >= {"m", "f"}
+
+
+# A title or kinship word first makes a name a person ("Aunt Polly"), not an epithet.
+_PERSON_WORDS = frozenset(
+    "aunt uncle doctor dr mr mrs ms miss mister madam madame dame lady lord sir master "
+    "professor prof captain capt colonel col general gen reverend rev father mother "
+    "brother sister king queen prince princess saint st grandfather grandmother "
+    "grandpa grandma cousin".split()
+)
+# What may follow "Name, the Epithet" without turning it into a list of people.
+_LIST_CONTINUATION = re.compile(r"\s*(?:,|\band\b|\bor\b)\s+(?:the\s+)?[A-Z]")
+
+
+def epithet_shapes(epithet: str, name: str) -> re.Pattern[str]:
+    """The text shapes that tie an epithet to a name. The comma shapes need "the":
+
+    ``Nephis, the Changing Star`` is an appositive; ``Penrod, Rupe Collins`` and
+    ``Tom, Aunt Polly and Sid`` are lists of people.
+    """
+    e, n = re.escape(epithet), re.escape(name)
+    return re.compile(
+        rf"(?<!\w){n},\s+the\s+{e}(?!\w)"
+        rf"|(?<!\w)[Tt]he\s+{e},\s+{n}(?!\w)"
+        rf"|(?<!\w){e}\s+{n}(?!\w)"
+        rf"|(?<!\w){n},?\s+(?:also\s+)?(?:known|called|named|titled|dubbed)\s+as\s+(?:the\s+)?{e}(?!\w)"
+    )
+
+
+def _tied_by_text(epithet: str, name: str, narration: list[str]) -> bool:
+    shapes = epithet_shapes(epithet, name)
+    for text in narration:
+        # Plain substring tests first: almost no segment holds both names.
+        if epithet not in text or name not in text:
+            continue
+        for match in shapes.finditer(text):
+            if not _LIST_CONTINUATION.match(text, match.end()):
+                return True
+    return False
 
 
 def _epithet_links(names: list[str], chapters: list[Chapter]) -> list[tuple[str, str]]:
     """``(epithet, name)`` pairs the narration itself ties together.
 
-    The epithet has two or more words ("Changing Star"); the name is a one-word
-    speaker. Both must already be speakers, so nothing new is invented, and the
-    link needs one of these exact shapes in the text: ``Name, the Epithet``,
-    ``the Epithet, Name``, ``Epithet Name`` and ``Name, known as the Epithet``.
+    The epithet has two or more words ("Changing Star") and is not a person's
+    name ("Aunt Polly", "Rupe Collins"); the name is a one-word speaker. Both
+    must already be speakers, so nothing new is invented. The link needs one of
+    these shapes in the text: ``Name, the Epithet``, ``the Epithet, Name``,
+    ``Epithet Name`` and ``Name, known as the Epithet``, not followed by more
+    names in a list, and the two must not be of opposite gender.
     """
-    epithets = [n for n in names if " " in n and not n.split()[0].endswith(".")]
     singles = [n for n in names if " " not in n]
+    epithets = [
+        n
+        for n in names
+        if " " in n
+        and n.split()[0].lower().rstrip(".") not in _PERSON_WORDS
+        and not set(n.split()) & set(singles)  # "Georgie Bassett" holds a speaker's name
+    ]
     if not epithets or not singles:
         return []
-    links: list[tuple[str, str]] = []
     narration = [
         seg.text for c in chapters for seg in c.segments if seg.kind == SegmentKind.NARRATION
     ]
+    links: list[tuple[str, str]] = []
     for epithet in epithets:
         for name in singles:
-            e, n = re.escape(epithet), re.escape(name)
-            shapes = re.compile(
-                rf"(?<!\w){n},\s+(?:the\s+)?{e}(?!\w)"
-                rf"|(?<!\w)(?:the\s+)?{e},\s+{n}(?!\w)"
-                rf"|(?<!\w){e}\s+{n}(?!\w)"
-                rf"|(?<!\w){n},?\s+(?:also\s+)?(?:known|called|named|titled|dubbed)\s+as\s+(?:the\s+)?{e}(?!\w)"
-            )
-            if any(shapes.search(text) for text in narration):
+            if _tied_by_text(epithet, name, narration) and not _gender_conflict(
+                [epithet, name], chapters
+            ):
                 links.append((epithet, name))
     return links
 
@@ -309,8 +389,11 @@ class HeuristicAttributor:
                 if not _differ_by_one_vowel(first, second):
                     continue
                 if chapters_of.get(first, set()) & chapters_of.get(second, set()) and (
-                    _mentioned_together(first, second, chapters)
+                    _speak_in_one_scene(first, second, chapters)
+                    or _mentioned_together(first, second, chapters)
                 ):
+                    continue
+                if _gender_conflict([first, second], chapters):
                     continue
                 winner, loser = (
                     (first, second) if lines.get(first, 0) >= lines.get(second, 0)

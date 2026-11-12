@@ -150,7 +150,7 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
 | Old: characters with the right gender | 3 of 4 (Rain wrongly male) | 2 of 5 (Nephis and Changing Star wrongly male) |
 | New, offline: characters with the right gender, among those it decided | 3 of 3 | 3 of 3 |
 | New, offline: characters left to the narrator | 0 | 1 (Changing Star, 12 lines) |
-| New, AI speaker detection on: characters with the right gender | 4 of 4 | 4 of 4 (the AI gender check resolved Changing Star as female) |
+| New, AI speaker detection on: characters with the right gender | 4 of 4 | 4 of 5 (the AI gender check resolved Changing Star and Cassia as female; Cassie, 27 lines, stays unresolved and is read by the narrator, see the spelling limit below) |
 | New, offline, whole book as evidence: characters with the right gender | 3 of 3 | 3 of 3 (Changing Star is folded into Nephis) |
 | Old: lines in a wrong-gender voice, counting the speaker the app chose | 23 of 157 | 63 of 209 |
 | New: the same count, any mode | 0 of 157 | 0 of 209 |
@@ -184,17 +184,30 @@ tightest case. The real pipeline reads the whole book, which makes the scores hi
   narration mixes) are folded into one character, but only if they never speak in the same
   chapter. Two real characters usually share scenes, so Maria and Maris stay separate when
   they talk in one chapter. A swap of a final "a" for "o" (Maria and Mario, Julia and
-  Julio) is never merged. A pair that does speak in one chapter is also merged when no
-  sentence in the book names both (Shadow Slave spells Cassie both ways inside single
-  chapters). The rule still merges two different characters with names like Julie and
-  Julia when they are never named together, and then they share one voice and one gender.
-  There is no flag to undo a merge yet. The cast report shows only the merged name.
+  Julio) is never merged. A pair that does speak in one chapter is also merged when they
+  never speak in the same scene and no paragraph names both (Shadow Slave spells Cassie
+  both ways inside single chapters). Two names of opposite gender evidence are never
+  merged, and two names that take turns in one conversation (Ellen and Allen) stay two
+  people. The price is recall: with AI speaker detection on, the AI also labels lines with
+  both spellings of Cassie inside one scene, so in the chapter 36 to 43 test Cassia and
+  Cassie stay two characters (Cassie ends unresolved there), and in the whole book they
+  share a scene in chapter 44 as well. Precision wins: a wrong merge gives two people one
+  voice, an unresolved gender gives a narrator-read character. The rule still merges two different characters with names like Julie and Julia
+  when they are in separate scenes and never named together, and then they share one voice
+  and one gender. There is no flag to undo a merge yet. The cast report shows only the
+  merged name.
 - **Epithets are merged only when the text ties them to a name**: "Nephis, the Changing
-  Star", "Changing Star Nephis", "Nephis, known as the Changing Star". With only chapters
+  Star", "Changing Star Nephis", "Nephis, known as the Changing Star". The comma shapes
+  need the word "the", so a list of people ("Tom, Aunt Polly and Sid") or "after meeting
+  Rupe Collins, Penrod..." is never a link. Names that start with a title or kinship word
+  (Aunt Polly, Doctor Who), names that contain another speaker's name (Georgie Bassett),
+  and pairs of opposite gender evidence are never epithets. With only chapters
   36 to 43 as evidence the text has none of these, so the offline rule leaves Changing
   Star separate; the pipeline reads the whole book, where it does. With AI speaker
   detection on, an AI alias check can also link them, but only with a quote that names
-  both, and small models often decline.
+  both and says they are one person (the same shapes as above), or when both characters
+  already have the same resolved gender. It merges at most 5 names per book, and small
+  models often decline.
 - **The AI gender check is a second opinion, not proof.** It gives a score of 0.7 (below
   the 0.8 review line, so the cast report marks the character with `?`), keeps its quote
   as evidence, and is dropped when the quote is not in the book, does not name the

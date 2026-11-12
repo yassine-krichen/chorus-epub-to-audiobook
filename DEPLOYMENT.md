@@ -189,7 +189,8 @@ top of it. Verified 2026-09-05 against a real freellmapi deployment
 
 ### AI model chain: one-time cache reset
 
-The speaker-detection and scene-brief caches changed key in the model-chain release, so
+The speaker-detection and scene-brief caches changed key in the model-chain release, and
+the speaker-detection prompt changed in the attribution release (an "Unnamed" answer), so
 the first resume of a job that started before the upgrade re-asks every window once.
 Budget for that many extra requests on in-flight jobs. See
 `docs/features/llm-model-chain.md`.
