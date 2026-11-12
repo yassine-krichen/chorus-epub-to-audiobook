@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 MAX_JUDGED_CHARACTERS = 12
 MAX_KEPT_REASONS = 50
+MAX_LOGGED_NAME_CHARS = 40
 MAX_ALIAS_CHARACTERS = 30
 # A book has a handful of real aliases; more than this is the model guessing.
 MAX_ALIAS_MERGES = 5
@@ -92,6 +93,16 @@ _SENTENCE_SPLIT = re.compile(r"(?<=[.!?…])[\"')\]”’]*\s+")
 _QUOTE_CHARS = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"'})
 
 
+def _loggable(name: str) -> str:
+    """A model-supplied name made safe to log: printable characters only, no line breaks.
+
+    The model controls this string, so a newline in it must not be able to start a
+    forged log line.
+    """
+    cleaned = "".join(ch if ch.isprintable() else " " for ch in name)
+    return " ".join(cleaned.split())[:MAX_LOGGED_NAME_CHARS] or "?"
+
+
 @dataclass
 class JudgeReport:
     """What the judges did, for the run summary."""
@@ -108,6 +119,7 @@ class JudgeReport:
     reasons: list[str] = field(default_factory=list)
 
     def reject(self, kind: str, name: str, reason: str) -> None:
+        name = _loggable(name)
         self.rejected += 1
         if len(self.reasons) < MAX_KEPT_REASONS:
             self.reasons.append(f"{kind} {name}: {reason}")

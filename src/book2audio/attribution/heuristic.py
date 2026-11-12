@@ -422,11 +422,14 @@ class HeuristicAttributor:
         canonical = _resolve_targets(canonical)
         if not canonical:
             return names
-        self.aliases.update(canonical)
+        # An earlier call may already have folded X into Y; if Y now folds into Z,
+        # X must point at Z, not at a name that no longer speaks.
+        final = _resolve_targets({**self.aliases, **canonical})
+        self.aliases = final
         for chapter in chapters:
             for seg in chapter.segments:
                 if seg.speaker in canonical:
-                    seg.speaker = canonical[seg.speaker]
+                    seg.speaker = final[seg.speaker]
         return [n for n in names if n not in canonical]
 
     def drop_aliases_still_speaking(self, speakers: list[str]) -> None:

@@ -479,3 +479,20 @@ def test_a_three_letter_prefix_is_not_a_nickname():
     names = attributor.attribute(chapters)
 
     assert attributor.aliases == {} and sorted(names) == ["Cat", "Caterpillar"]
+
+
+def test_a_fold_that_chains_across_two_merge_calls_points_at_the_final_name():
+    first = [_tagged("Neph", 1), _tagged("Nephi", 2)]
+    second = [_tagged("Nephi", 2), _tagged("Nephis", 3, lines=3)]
+    chapters = [first[0], first[1], second[1]]
+    for chapter in chapters:
+        for seg in chapter.segments:
+            if seg.kind == SegmentKind.DIALOGUE:
+                seg.speaker = chapter.segments[chapter.segments.index(seg) + 1].text.split()[-1].rstrip(".")
+    attributor = HeuristicAttributor()
+
+    attributor.merge_aliases(["Neph", "Nephi"], chapters[:2])
+    assert attributor.aliases == {"Neph": "Nephi"}
+    attributor.merge_aliases(["Nephi", "Nephis"], chapters[1:])
+
+    assert attributor.aliases == {"Neph": "Nephis", "Nephi": "Nephis"}

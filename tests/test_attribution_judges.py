@@ -563,3 +563,22 @@ def test_the_adjacent_epithet_shape_needs_a_multi_word_epithet():
     found = AliasJudge(FakeClient(reply), None, JudgeReport()).find(["Mara", "Fox"], book, {})
 
     assert found == []
+
+
+def test_a_model_supplied_name_cannot_forge_a_log_line(caplog):
+    reply = {"verdicts": [{"name": "Ghost\nERROR forged line\r\x1b[31m", "gender": "f", "quote": "x"}]}
+
+    with caplog.at_level("INFO", logger="book2audio.attribution.judges"):
+        _, report, _ = _find_genders(reply)
+
+    assert all("\n" not in r.getMessage() and "\r" not in r.getMessage() for r in caplog.records)
+    assert "\x1b" not in caplog.text
+    assert report.reasons == ["gender Ghost ERROR forged line [31m: not a character that was asked about"]
+
+
+def test_a_name_with_nothing_printable_is_logged_as_a_question_mark():
+    report = JudgeReport()
+
+    report.reject("gender", "\n\x00", "because")
+
+    assert report.reasons == ["gender ?: because"]
