@@ -15,6 +15,7 @@ import shutil
 import socket
 import tempfile
 import threading
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -94,7 +95,6 @@ def _heartbeat_loop(worker_id: str, capabilities: list[str]) -> None:
     """
     stop = threading.Event()
     last_prune = 0.0
-    import time
 
     while not stop.is_set():
         try:
