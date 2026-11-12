@@ -209,4 +209,13 @@ export interface CastReport {
   /** Characters the review cannot list (a name over 80 characters, or beyond the busiest
    * 100). They keep their voice but cannot be fixed on the website. */
   omitted_characters?: number;
+  /** Cloned voices that a built-in voice read instead, and why. Absent in older reports. */
+  clone_fallbacks?: CloneFallback[];
+}
+
+/** A cloned voice that could not be used for this job: a built-in voice read instead. */
+export interface CloneFallback {
+  voice: string;
+  reason: string;
+  fallback_voice: string;
 }

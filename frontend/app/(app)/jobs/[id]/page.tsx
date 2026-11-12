@@ -11,6 +11,7 @@ import { JobErrorPanel } from "@/components/jobs/job-detail/job-error-panel";
 import { PartList } from "@/components/jobs/job-detail/part-list";
 import { useJobCast } from "@/hooks/use-job-cast";
 import { useJob } from "@/hooks/use-jobs";
+import { useVoices } from "@/hooks/use-voices";
 
 interface JobDetailPageProps {
   params: Promise<{ id: string }>;
@@ -19,6 +20,7 @@ interface JobDetailPageProps {
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = use(params);
   const { data: job, isLoading } = useJob(id);
+  const { data: voices } = useVoices();
   const { data: cast, isFetched: castFetched } = useJobCast(
     id,
     job?.status,
@@ -50,7 +52,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
       {!awaitingReview && cast && (
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-medium">Cast</h2>
-          <CastPanel report={cast} />
+          <CastPanel report={cast} voices={voices?.voices} />
         </div>
       )}
 

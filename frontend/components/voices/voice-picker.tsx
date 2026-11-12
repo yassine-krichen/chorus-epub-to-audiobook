@@ -8,10 +8,20 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  NEEDS_LOCAL_WORKER,
+  builtInVoices,
+  clonedVoices,
+  isSelectable,
+  labelForVoiceId,
+  voiceLabel,
+} from "@/lib/voices/voice-display";
 import type { VoiceInfo } from "@/types/voice";
 
 const NO_PREFERENCE = "__none__";
@@ -27,8 +37,9 @@ interface VoicePickerProps {
   disabled?: boolean;
 }
 
-/** Select wrapper for choosing a voice id from the curated `/voices` pool,
- * with an optional "No preference" option that maps to `null`. */
+/** Select wrapper for choosing a voice id from the curated `/voices` pool, with the user's
+ * own cloned voices in a group of their own, and an optional "No preference" option that
+ * maps to `null`. A cloned voice cannot be picked while no local worker can speak it. */
 export function VoicePicker({
   voices,
   value,
@@ -51,6 +62,41 @@ export function VoicePicker({
     });
   }
 
+  function renderVoice(voice: VoiceInfo) {
+    const canPlaySample = voice.sample_url && !brokenSamples.has(voice.id);
+    const selectable = isSelectable(voice);
+    return (
+      <SelectItem key={voice.id} value={voice.id} disabled={!selectable}>
+        <span className="flex flex-1 items-center justify-between gap-2">
+          <span className="flex flex-col">
+            {voiceLabel(voice)}
+            {!selectable && (
+              <span className="text-xs text-muted-foreground">{NEEDS_LOCAL_WORKER}</span>
+            )}
+          </span>
+          {canPlaySample && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Play sample for ${voiceLabel(voice)}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                playSample(voice.sample_url as string, voice.id);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <HugeiconsIcon icon={PlayIcon} strokeWidth={2} />
+            </Button>
+          )}
+        </span>
+      </SelectItem>
+    );
+  }
+
+  const own = clonedVoices(voices);
+
   return (
     <Select
       disabled={disabled}
@@ -58,36 +104,23 @@ export function VoicePicker({
       onValueChange={(next) => onChange(next === NO_PREFERENCE ? null : next)}
     >
       <SelectTrigger className="w-full">
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={placeholder}>
+          {(selected: string | null) =>
+            selected === null || selected === NO_PREFERENCE
+              ? noPreferenceLabel
+              : labelForVoiceId(voices, selected)
+          }
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {allowNoPreference && <SelectItem value={NO_PREFERENCE}>{noPreferenceLabel}</SelectItem>}
-        {voices.map((voice) => {
-          const canPlaySample = voice.sample_url && !brokenSamples.has(voice.id);
-          return (
-            <SelectItem key={voice.id} value={voice.id}>
-              <span className="flex flex-1 items-center justify-between gap-2">
-                {voice.id}
-                {canPlaySample && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`Play sample for ${voice.id}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      playSample(voice.sample_url as string, voice.id);
-                    }}
-                    onPointerDown={(event) => event.stopPropagation()}
-                  >
-                    <HugeiconsIcon icon={PlayIcon} strokeWidth={2} />
-                  </Button>
-                )}
-              </span>
-            </SelectItem>
-          );
-        })}
+        {builtInVoices(voices).map(renderVoice)}
+        {own.length > 0 && (
+          <SelectGroup>
+            <SelectLabel>Your voices</SelectLabel>
+            {own.map(renderVoice)}
+          </SelectGroup>
+        )}
       </SelectContent>
     </Select>
   );

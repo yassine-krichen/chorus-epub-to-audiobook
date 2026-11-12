@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -22,6 +23,12 @@ import {
   setCharacterOverride,
   type OverrideGender,
 } from "@/lib/jobs/character-overrides";
+import {
+  builtInVoices,
+  cloneProblemForConfig,
+  clonedVoices,
+  labelForVoiceId,
+} from "@/lib/voices/voice-display";
 import type { JobConfig } from "@/types/job";
 
 interface VoiceCastingSectionProps {
@@ -57,8 +64,13 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
     );
   }
 
-  const maleVoices = voices.voices.filter((v) => v.gender === "male" && !v.is_default_narrator);
-  const femaleVoices = voices.voices.filter((v) => v.gender === "female" && !v.is_default_narrator);
+  // The male/female pickers bias casting among the built-in voices only; a cloned voice is
+  // chosen as the narrator or for a named character.
+  const builtIn = builtInVoices(voices.voices);
+  const maleVoices = builtIn.filter((v) => v.gender === "male" && !v.is_default_narrator);
+  const femaleVoices = builtIn.filter((v) => v.gender === "female" && !v.is_default_narrator);
+  const hasClonedVoices = clonedVoices(voices.voices).length > 0;
+  const cloneProblem = cloneProblemForConfig(config, voices.voices);
   const overrides = listCharacterOverrides(config);
   const narratorOnly = config.voice_mode === "narrator_only";
 
@@ -142,6 +154,18 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
           value={config.narrator_voice ?? voices.narrator_voice}
           onChange={(value) => onChange({ narrator_voice: value })}
         />
+        <p className="text-xs text-muted-foreground">
+          {hasClonedVoices ? (
+            <>Your own voices are listed at the end. </>
+          ) : (
+            <>Want to narrate with your own voice? </>
+          )}
+          <Link href="/voices" className="underline underline-offset-2">
+            {hasClonedVoices ? "Manage your voices" : "Record your voice"}
+          </Link>
+          . Cloned voices are made on your local worker.
+        </p>
+        {cloneProblem && <p className="text-xs text-destructive">{cloneProblem}</p>}
       </div>
       {!narratorOnly && (
         <>
@@ -186,7 +210,7 @@ export function VoiceCastingSection({ config, onChange }: VoiceCastingSectionPro
                         {row.voice && (
                           <>
                             {" "}
-                            → <span className="font-mono">{row.voice}</span>
+                            → <span className="font-mono">{labelForVoiceId(voices.voices, row.voice)}</span>
                           </>
                         )}
                       </span>

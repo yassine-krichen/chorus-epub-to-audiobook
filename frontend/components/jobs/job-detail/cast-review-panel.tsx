@@ -27,6 +27,7 @@ import {
   valueToTreatAs,
   type DraftMap,
 } from "@/lib/jobs/cast-review";
+import { cloneProblemForConfig, labelForVoiceId } from "@/lib/voices/voice-display";
 import type { CastCharacter, CastReport, JobDetail } from "@/types/job";
 import type { VoiceInfo } from "@/types/voice";
 
@@ -52,7 +53,9 @@ function CharacterRow({ character, report, drafts, voices, disabled, onChange }:
   const allowNarrator = canBeReplaced(drafts, character.name);
   const shownGender = draft.gender ?? character.gender ?? "unsure";
   const automaticVoice =
-    character.voice_source === "narrator" ? "narrator voice" : character.voice;
+    character.voice_source === "narrator"
+      ? "narrator voice"
+      : labelForVoiceId(voices, character.voice);
 
   return (
     <li className="flex flex-col gap-3 rounded-lg border p-3">
@@ -206,6 +209,14 @@ export function CastReviewPanel({ job, report, settled }: CastReviewPanelProps) 
 
   const changes = changeCount(report, drafts);
   const limitProblem = overrideLimitProblem(report, drafts, job.config);
+  // A cloned voice picked here has to be usable now, as it is when creating a job.
+  const pickedVoices = Object.fromEntries(
+    Object.entries(drafts).flatMap(([name, draft]) => (draft.voice ? [[name, draft.voice]] : []))
+  );
+  const cloneProblem = cloneProblemForConfig(
+    { narrator_voice: null, voice_overrides: pickedVoices },
+    voices.voices
+  );
   const deadline = formatDeadline(job.cast_review_expires_at);
   const unsure = report.characters.filter((c) => c.gender === null).length;
   const omitted = report.omitted_characters ?? 0;
@@ -261,6 +272,7 @@ export function CastReviewPanel({ job, report, settled }: CastReviewPanelProps) 
           </p>
         )}
         {limitProblem && <p className="text-sm text-destructive">{limitProblem}</p>}
+        {cloneProblem && <p className="text-sm text-destructive">{cloneProblem}</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -269,7 +281,10 @@ export function CastReviewPanel({ job, report, settled }: CastReviewPanelProps) 
               ? `Waiting for you. If you do not start rendering by ${deadline}, this job is canceled and nothing is rendered.`
               : "Waiting for you. A job that is never confirmed is canceled after a while."}
           </p>
-          <Button onClick={handleStart} disabled={submitting || limitProblem !== null}>
+          <Button
+            onClick={handleStart}
+            disabled={submitting || limitProblem !== null || cloneProblem !== null}
+          >
             {submitting
               ? "Starting…"
               : changes > 0

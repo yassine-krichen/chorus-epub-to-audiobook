@@ -14,8 +14,10 @@ import { UploadStep } from "@/components/jobs/new-job-wizard/upload-step";
 import { VoiceCastingSection } from "@/components/jobs/new-job-wizard/voice-casting-section";
 import { useBookInspection } from "@/hooks/use-book-inspection";
 import { useUploadEpub } from "@/hooks/use-upload-epub";
+import { useVoices } from "@/hooks/use-voices";
 import { createJob } from "@/lib/api/jobs";
 import { inspectionStateOf } from "@/lib/jobs/inspection-state";
+import { cloneProblemForConfig } from "@/lib/voices/voice-display";
 import { validateFilenameTemplate } from "@/lib/validation/filename-template";
 import { DEFAULT_JOB_CONFIG, type JobConfig } from "@/types/job";
 
@@ -25,6 +27,7 @@ export function NewJobWizard() {
   const [config, setConfig] = useState<JobConfig>(DEFAULT_JOB_CONFIG);
   const [submitting, setSubmitting] = useState(false);
   const upload = useUploadEpub();
+  const { data: voices } = useVoices();
   // Only a finished upload can be read; a new file replaces the book being listed.
   const inspectionQuery = useBookInspection(upload.state === "done" ? upload.objectKey : null);
   const inspection = inspectionStateOf(upload.state === "done", inspectionQuery);
@@ -42,8 +45,15 @@ export function NewJobWizard() {
   const filenameError = config.filename_template
     ? validateFilenameTemplate(config.filename_template, config.batch_size)
     : "Filename template is required";
+  // A cloned voice is only usable while a local worker that can speak it is online: say so
+  // here instead of letting the server refuse the job.
+  const cloneProblem = voices ? cloneProblemForConfig(config, voices.voices) : null;
   const canSubmit =
-    upload.state === "done" && Boolean(upload.objectKey) && title.trim().length > 0 && !filenameError;
+    upload.state === "done" &&
+    Boolean(upload.objectKey) &&
+    title.trim().length > 0 &&
+    !filenameError &&
+    cloneProblem === null;
 
   async function handleSubmit() {
     if (!upload.objectKey) return;
@@ -94,9 +104,12 @@ export function NewJobWizard() {
         </CardContent>
       </Card>
 
-      <Button onClick={handleSubmit} disabled={!canSubmit || submitting} className="self-end">
-        {submitting ? "Creating job…" : "Create job"}
-      </Button>
+      <div className="flex flex-col items-end gap-2">
+        {cloneProblem && <p className="text-sm text-destructive">{cloneProblem}</p>}
+        <Button onClick={handleSubmit} disabled={!canSubmit || submitting}>
+          {submitting ? "Creating job…" : "Create job"}
+        </Button>
+      </div>
     </div>
   );
 }

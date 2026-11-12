@@ -1,3 +1,4 @@
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -13,7 +14,30 @@ import {
   isReadByNarrator,
   summarizeCast,
 } from "@/lib/jobs/cast-display";
+import { labelForVoiceId } from "@/lib/voices/voice-display";
 import type { CastCharacter, CastReport } from "@/types/job";
+import type { VoiceInfo } from "@/types/voice";
+
+/** Says so when a built-in voice stood in for the user's cloned one, and why. */
+function CloneFallbackNotice({ report, voices }: { report: CastReport; voices: VoiceInfo[] }) {
+  const fallbacks = report.clone_fallbacks ?? [];
+  if (fallbacks.length === 0) return null;
+  return (
+    <Alert>
+      <AlertTitle>A built-in voice read instead of your cloned voice</AlertTitle>
+      <AlertDescription>
+        <ul className="flex flex-col gap-1">
+          {fallbacks.map((fallback) => (
+            <li key={fallback.voice}>
+              {labelForVoiceId(voices, fallback.voice)} was read by {fallback.fallback_voice}:{" "}
+              {fallback.reason}.
+            </li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 function GenderBadge({ character }: { character: CastCharacter }) {
   return (
@@ -23,11 +47,19 @@ function GenderBadge({ character }: { character: CastCharacter }) {
   );
 }
 
-function VoiceCell({ character, narratorVoice }: { character: CastCharacter; narratorVoice: string }) {
+function VoiceCell({
+  character,
+  narratorVoice,
+  voices,
+}: {
+  character: CastCharacter;
+  narratorVoice: string;
+  voices: VoiceInfo[];
+}) {
   const narrator = isReadByNarrator(character, narratorVoice);
   return (
     <div className="flex flex-col">
-      <span className="font-mono text-xs">{character.voice}</span>
+      <span className="font-mono text-xs">{labelForVoiceId(voices, character.voice)}</span>
       {narrator && <span className="text-xs text-muted-foreground">Narrator reads this character</span>}
       {!narrator && character.voice_source === "override" && (
         <span className="text-xs text-muted-foreground">Your choice</span>
@@ -38,13 +70,17 @@ function VoiceCell({ character, narratorVoice }: { character: CastCharacter; nar
 
 /** Who speaks in the chapters being rendered, how often, and which voice reads each of
  * them. Characters the app is not sure about come first, so a quick look is enough. */
-export function CastPanel({ report }: { report: CastReport }) {
+export function CastPanel({ report, voices = [] }: { report: CastReport; voices?: VoiceInfo[] }) {
+  const fallbacks = <CloneFallbackNotice report={report} voices={voices} />;
   if (report.voice_mode === "narrator_only") {
     return (
-      <p className="text-sm text-muted-foreground">
-        The narrator ({report.narrator_voice}) reads every line, dialogue included. No character
-        voices were used for this job.
-      </p>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          The narrator ({labelForVoiceId(voices, report.narrator_voice)}) reads every line,
+          dialogue included. No character voices were used for this job.
+        </p>
+        {fallbacks}
+      </div>
     );
   }
 
@@ -61,6 +97,7 @@ export function CastPanel({ report }: { report: CastReport }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {fallbacks}
       <p className="text-sm text-muted-foreground">
         {summary.speakers} {summary.speakers === 1 ? "character speaks" : "characters speak"}.
         {summary.notSure > 0 && (
@@ -102,7 +139,11 @@ export function CastPanel({ report }: { report: CastReport }) {
                 </div>
               </TableCell>
               <TableCell>
-                <VoiceCell character={character} narratorVoice={report.narrator_voice} />
+                <VoiceCell
+                  character={character}
+                  narratorVoice={report.narrator_voice}
+                  voices={voices}
+                />
               </TableCell>
             </TableRow>
           ))}

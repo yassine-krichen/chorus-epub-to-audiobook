@@ -18,6 +18,7 @@ import {
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/jobs/new", label: "New job" },
+  { href: "/voices", label: "My voices" },
   { href: "/settings", label: "Settings" },
 ] as const;
 

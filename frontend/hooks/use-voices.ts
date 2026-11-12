@@ -10,6 +10,8 @@ export function useVoices() {
       const { data } = await fetchVoices();
       return data;
     },
-    staleTime: 5 * 60_000,
+    // Short: whether a local worker can speak the user's cloned voices changes while the page
+    // is open, and a stale "available" would let someone pick a voice nothing can read.
+    staleTime: 30_000,
   });
 }
