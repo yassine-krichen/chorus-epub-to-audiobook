@@ -54,8 +54,38 @@ _MAX_PROMPT_TEXT_CHARS = 2000
 _FALLBACK_VOICE = {"m": DEFAULT_NARRATOR_VOICE, "f": FEMALE_VOICES[0]}
 
 
+# The only reasons a user ever sees for a cloned voice being replaced by a Kokoro voice. They
+# are fixed sentences: what the engine or the libraries said (paths, tracebacks, memory sizes)
+# goes to the worker's log and nowhere else, because the reason travels to the cast report
+# and from there to the website.
+REASON_OOM = "the voice-cloning engine ran out of memory"
+REASON_STOPPED = "the voice-cloning engine stopped"
+REASON_NOT_INSTALLED = "the voice-cloning engine is not installed"
+REASON_TIMEOUT = "the voice-cloning engine timed out"
+REASON_RECORDING = "the voice recording could not be used"
+REASON_VOICE_GONE = "the voice no longer exists"
+FALLBACK_REASONS = frozenset(
+    {
+        REASON_OOM,
+        REASON_STOPPED,
+        REASON_NOT_INSTALLED,
+        REASON_TIMEOUT,
+        REASON_RECORDING,
+        REASON_VOICE_GONE,
+    }
+)
+
+
 class CloneEngineError(RuntimeError):
-    """The clone engine could not produce audio; the caller falls back to Kokoro."""
+    """The clone engine could not produce audio; the caller falls back to Kokoro.
+
+    ``str(error)`` is the technical detail, for logs only. ``reason`` is one of
+    :data:`FALLBACK_REASONS`, the only part that may be shown to a user.
+    """
+
+    def __init__(self, detail: str, *, reason: str = REASON_STOPPED) -> None:
+        super().__init__(detail)
+        self.reason = reason
 
 
 @dataclass(frozen=True)
@@ -196,7 +226,9 @@ class QwenCloneEngine:
         if reference.sha256 not in self._staged:
             digest = hashlib.sha256(Path(reference.wav_path).read_bytes()).hexdigest()
             if digest != reference.sha256:
-                raise CloneEngineError("the reference clip does not match its recorded hash")
+                raise CloneEngineError(
+                    "the reference clip does not match its recorded hash", reason=REASON_RECORDING
+                )
             shutil.copyfile(reference.wav_path, target)
             self._staged.add(reference.sha256)
         return name
@@ -257,7 +289,9 @@ class QwenCloneEngine:
                     bufsize=1,
                 )
             except OSError as exc:
-                raise CloneEngineError(f"could not start the clone engine: {exc}") from exc
+                raise CloneEngineError(
+                    f"could not start the clone engine: {exc}", reason=REASON_NOT_INSTALLED
+                ) from exc
         self._process = process
         self._replies = queue.Queue()
         threading.Thread(target=_pump_lines, args=(process, self._replies), daemon=True).start()
@@ -275,7 +309,10 @@ class QwenCloneEngine:
             detail = str(reply.get("detail", ""))[:200]
             if error in ("oom", "insufficient_memory"):
                 self._discard(process)
-            raise CloneEngineError(f"{error}: {detail}" if detail else error)
+            raise CloneEngineError(
+                f"{error}: {detail}" if detail else error,
+                reason=_REASON_FOR_ENGINE_ERROR.get(error, REASON_STOPPED),
+            )
         return reply
 
     @staticmethod
@@ -289,7 +326,7 @@ class QwenCloneEngine:
             line = self._replies.get(timeout=timeout)
         except queue.Empty:
             self._discard(process)
-            raise CloneEngineError("the clone engine timed out") from None
+            raise CloneEngineError("the clone engine timed out", reason=REASON_TIMEOUT) from None
         if line is None:
             self._discard(process)
             raise CloneEngineError(f"the clone engine stopped unexpectedly{self._log_tail()}")
@@ -316,6 +353,14 @@ class QwenCloneEngine:
         except OSError:
             return ""
         return f" ({tail.strip().splitlines()[-1]})" if tail.strip() else ""
+
+
+# What the engine process calls a failure, mapped to what a user may be told.
+_REASON_FOR_ENGINE_ERROR = {
+    "oom": REASON_OOM,
+    "insufficient_memory": REASON_OOM,
+    "bad_request": REASON_RECORDING,
+}
 
 
 def _pump_lines(process: subprocess.Popen[str], replies: queue.Queue[str | None]) -> None:
@@ -371,6 +416,7 @@ class RoutingEngine:
     # Parts read by Kokoro because an engine that was expected to work failed.
     fallback_count: int = 0
     _clone_failed: bool = False
+    _failure_reason: str = REASON_STOPPED
 
     def synthesize(self, text: str, voice: str, speed: float = 1.0) -> np.ndarray:
         if not is_clone_voice(voice):
@@ -383,7 +429,9 @@ class RoutingEngine:
                 return self.clone.synthesize_clone(text, reference)
             except CloneEngineError as exc:
                 self._clone_failed = True
-                self._record_fallback(voice, str(exc))
+                self._failure_reason = exc.reason
+                self._record_fallback(voice, exc.reason)
+                # The technical detail stays in the worker's log.
                 logger.warning("clone.engine_failed", extra={"voice": voice}, exc_info=True)
         else:
             self._record_fallback(voice, self._why_unavailable(reference))
@@ -414,10 +462,10 @@ class RoutingEngine:
 
     def _why_unavailable(self, reference: CloneReference | None) -> str:
         if reference is None:
-            return "the voice no longer exists"
+            return REASON_VOICE_GONE
         if self.clone is None:
-            return "this worker has no clone engine"
-        return "the clone engine failed earlier in this job"
+            return REASON_NOT_INSTALLED
+        return self._failure_reason  # the engine failed earlier in this job
 
     def _record_fallback(self, voice: str, reason: str) -> None:
         self.fallbacks.setdefault(voice, reason)

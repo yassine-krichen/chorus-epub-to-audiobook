@@ -18,6 +18,13 @@ import soundfile as sf
 
 import book2audio.tts.clone_engine as clone_engine
 from book2audio.tts.clone_engine import (
+    FALLBACK_REASONS,
+    REASON_NOT_INSTALLED,
+    REASON_OOM,
+    REASON_RECORDING,
+    REASON_STOPPED,
+    REASON_TIMEOUT,
+    REASON_VOICE_GONE,
     CloneCapability,
     CloneEngineError,
     CloneReference,
@@ -48,6 +55,11 @@ STUB = textwrap.dedent(
             reply({"ok": True}); continue
         if mode == "oom":
             reply({"ok": False, "error": "oom", "detail": "CUDA out of memory", "id": req["id"]}); continue
+        if mode == "oom_long":
+            secret = "C:/Users/someone/venv/torch/cuda.py token=sk-123 " + "x" * 5000
+            reply({"ok": False, "error": "oom", "detail": secret, "id": req["id"]}); continue
+        if mode == "bad_request":
+            reply({"ok": False, "error": "bad_request", "detail": "reference clip not found", "id": req["id"]}); continue
         if mode == "crash":
             sys.exit(3)
         if mode == "hang":
@@ -206,7 +218,7 @@ def test_routing_falls_back_to_a_kokoro_voice_of_the_same_gender_when_the_engine
 
     assert len(audio) == 100  # Kokoro's
     assert kokoro.calls[0][1].startswith("af_")
-    assert "oom" in router.fallbacks[female.voice_id]
+    assert router.fallbacks[female.voice_id] == REASON_OOM
     assert router.fallback_count == 1
 
 
@@ -234,7 +246,7 @@ def test_routing_without_an_engine_uses_kokoro_and_says_why(tmp_path):
     router.synthesize("Cloned.", reference.voice_id)
 
     assert kokoro.calls[0][1].startswith("am_")
-    assert "no clone engine" in router.fallbacks[reference.voice_id]
+    assert router.fallbacks[reference.voice_id] == REASON_NOT_INSTALLED
 
 
 def test_a_voice_that_no_longer_exists_falls_back_and_says_so():
@@ -244,7 +256,7 @@ def test_a_voice_that_no_longer_exists_falls_back_and_says_so():
 
     router.synthesize("Cloned.", gone)
 
-    assert "no longer exists" in router.fallbacks[gone]
+    assert router.fallbacks[gone] == REASON_VOICE_GONE
 
 
 def test_resolve_voice_reports_the_clone_voice_only_when_it_can_be_spoken(stub_engine, tmp_path):
@@ -301,3 +313,85 @@ def test_pruning_deletes_prompts_of_voices_that_no_longer_exist(tmp_path):
     assert (tmp_path / f"{keep}.safetensors").exists()
     assert not (tmp_path / f"{drop}.safetensors").exists()
     assert (tmp_path / "notes.txt").exists()
+
+
+# --- what a user may be told -------------------------------------------------------------
+
+
+def _reason_of(stub_engine, tmp_path, monkeypatch, mode):
+    monkeypatch.setenv("STUB_MODE", mode)
+    engine = stub_engine()
+    with pytest.raises(CloneEngineError) as caught:
+        engine.synthesize_clone("Hello there.", _reference(tmp_path))
+    return caught.value
+
+
+@pytest.mark.parametrize(
+    "mode, reason",
+    [
+        ("oom", REASON_OOM),
+        ("oom_long", REASON_OOM),
+        ("crash", REASON_STOPPED),
+        ("wrong_rate", REASON_STOPPED),
+        ("nan", REASON_STOPPED),
+        ("wrong_id", REASON_STOPPED),
+        ("bad_request", REASON_RECORDING),
+    ],
+)
+def test_every_engine_failure_maps_to_one_of_the_fixed_reasons(
+    stub_engine, tmp_path, monkeypatch, mode, reason
+):
+    error = _reason_of(stub_engine, tmp_path, monkeypatch, mode)
+
+    assert error.reason == reason
+    assert error.reason in FALLBACK_REASONS
+
+
+def test_a_hung_engine_is_reported_as_timed_out(stub_engine, tmp_path, monkeypatch):
+    monkeypatch.setenv("STUB_MODE", "hang")
+    engine = stub_engine()
+    engine.synth_timeout_s = 1
+
+    with pytest.raises(CloneEngineError) as caught:
+        engine.synthesize_clone("Hello there.", _reference(tmp_path))
+
+    assert caught.value.reason == REASON_TIMEOUT
+
+
+def test_an_engine_that_cannot_start_is_reported_as_not_installed(tmp_path):
+    engine = QwenCloneEngine(str(tmp_path / "no-such-python.exe"), str(tmp_path))
+    try:
+        with pytest.raises(CloneEngineError) as caught:
+            engine.synthesize_clone("Hello there.", _reference(tmp_path))
+    finally:
+        engine.close()
+
+    assert caught.value.reason == REASON_NOT_INSTALLED
+
+
+def test_a_tampered_reference_clip_is_reported_as_an_unusable_recording(stub_engine, tmp_path):
+    engine = stub_engine()
+    reference = _reference(tmp_path)
+    tampered = CloneReference(
+        reference.voice_id, reference.wav_path, reference.ref_text, "0" * 64, reference.gender
+    )
+
+    with pytest.raises(CloneEngineError) as caught:
+        engine.synthesize_clone("Hello.", tampered)
+
+    assert caught.value.reason == REASON_RECORDING
+
+
+def test_the_raw_engine_message_never_reaches_the_recorded_fallback(
+    stub_engine, tmp_path, monkeypatch
+):
+    monkeypatch.setenv("STUB_MODE", "oom_long")
+    reference = _reference(tmp_path)
+    router = RoutingEngine(FakeKokoro(), {reference.voice_id: reference}, stub_engine())
+
+    router.synthesize("Hello there.", reference.voice_id)
+    router.synthesize("Hello again.", reference.voice_id)
+
+    assert router.fallbacks == {reference.voice_id: REASON_OOM}
+    assert "someone" not in str(router.fallbacks) and "sk-123" not in str(router.fallbacks)
+    assert router.resolve_voice(reference.voice_id).startswith("af_")

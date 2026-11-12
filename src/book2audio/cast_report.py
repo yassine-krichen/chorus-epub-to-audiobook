@@ -20,6 +20,7 @@ from rich.table import Table
 
 from book2audio.attribution.gender import GENDER_CONFIDENCE_THRESHOLD, GenderVerdict
 from book2audio.models import Chapter, SegmentKind
+from book2audio.tts.clone_engine import FALLBACK_REASONS, REASON_STOPPED
 from book2audio.tts.voices import VoiceCast, is_clone_voice
 
 CAST_REPORT_FILENAME = "cast_report.json"
@@ -141,7 +142,7 @@ def cast_report_to_dict(
         "provider": VOICE_PROVIDER,
         "confidence_threshold": GENDER_CONFIDENCE_THRESHOLD,
         # Cloned voices that Kokoro voices read instead, and why (see tts.clone_engine).
-        "clone_fallbacks": [dict(item) for item in clone_fallbacks],
+        "clone_fallbacks": sanitize_clone_fallbacks(clone_fallbacks),
         "characters": [
             {
                 "name": e.name,
@@ -163,11 +164,31 @@ def cast_report_to_dict(
     }
 
 
+_MAX_CLONE_FALLBACKS = 20
+
+
+def sanitize_clone_fallbacks(items: Sequence[Mapping[str, str]]) -> list[dict[str, str]]:
+    """The fallback notes as they may be saved, uploaded and shown to a user.
+
+    The reason is one of the fixed sentences in :data:`~book2audio.tts.clone_engine.FALLBACK_REASONS`;
+    anything else (a raw engine message, a path, a traceback) becomes the generic one, and every
+    field is cut to the length the API accepts, so a note can never make the report unreadable.
+    """
+    return [
+        {
+            "voice": str(item.get("voice", ""))[:64],
+            "reason": reason if (reason := str(item.get("reason", ""))) in FALLBACK_REASONS else REASON_STOPPED,
+            "fallback_voice": str(item.get("fallback_voice", ""))[:40],
+        }
+        for item in list(items)[:_MAX_CLONE_FALLBACKS]
+    ]
+
+
 def record_clone_fallbacks(report_path: str, clone_fallbacks: Sequence[Mapping[str, str]]) -> None:
     """Add cloned voices that had to be replaced during the render to the saved report."""
     with open(report_path, encoding="utf-8") as report_file:
         payload = json.load(report_file)
-    payload["clone_fallbacks"] = [dict(item) for item in clone_fallbacks]
+    payload["clone_fallbacks"] = sanitize_clone_fallbacks(clone_fallbacks)
     with open(report_path, "w", encoding="utf-8") as report_file:
         json.dump(payload, report_file, indent=2, ensure_ascii=False)
         report_file.write("\n")

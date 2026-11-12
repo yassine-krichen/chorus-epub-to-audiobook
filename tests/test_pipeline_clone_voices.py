@@ -18,10 +18,23 @@ from book2audio.config import Config
 from book2audio.models import Book, BookMetadata, Chapter, Segment, SegmentKind
 from book2audio.pipeline import Pipeline
 from book2audio.state import RenderState
-from book2audio.tts.clone_engine import CloneEngineError, CloneReference, RoutingEngine
+from book2audio.api.jobs.schemas import CastReport
+from book2audio.cast_report import read_review_report, record_clone_fallbacks
+from book2audio.tts.clone_engine import (
+    FALLBACK_REASONS,
+    REASON_NOT_INSTALLED,
+    REASON_OOM,
+    REASON_STOPPED,
+    REASON_VOICE_GONE,
+    CloneEngineError,
+    CloneReference,
+    RoutingEngine,
+)
 from book2audio.tts.voices import VoiceCast, clone_voice_id
 
 CLONE_VOICE = clone_voice_id(uuid.uuid4())
+# What a real engine failure can look like: paths, a secret, and a very long message.
+DETAIL = "oom: CUDA out of memory C:/Users/someone/venv/torch/cuda.py token=sk-123 " + "x" * 5000
 
 
 class FakeKokoro:
@@ -42,7 +55,7 @@ class FakeClone:
     def synthesize_clone(self, text, reference):
         self.calls += 1
         if self.fail:
-            raise CloneEngineError("oom: CUDA out of memory")
+            raise CloneEngineError(DETAIL, reason=REASON_OOM)
         return np.full(300, 0.2, dtype=np.float32)
 
     def close(self):
@@ -150,7 +163,7 @@ def test_when_cloning_fails_the_chapter_still_renders_with_a_kokoro_voice(tmp_pa
     assert kokoro.voices and all(v.startswith("af_") for v in kokoro.voices)
     assert clone.calls == 1  # not tried again after the first failure
     [fallback] = pipeline.clone_fallbacks
-    assert fallback["voice"] == CLONE_VOICE and "oom" in fallback["reason"]
+    assert fallback["voice"] == CLONE_VOICE and fallback["reason"] == REASON_OOM
 
 
 def test_a_chapter_read_by_the_fallback_is_rendered_again_once_cloning_works(tmp_path):
@@ -202,9 +215,9 @@ def test_the_plan_says_which_cloned_voices_cannot_be_spoken_before_rendering(tmp
     ready = Pipeline(_config(tmp_path), clone_voices={CLONE_VOICE: _reference(tmp_path)})
     ready._clone_engine = FakeClone()
 
-    assert "no longer exists" in missing._planned_clone_fallbacks(cast)[0]["reason"]
+    assert missing._planned_clone_fallbacks(cast)[0]["reason"] == REASON_VOICE_GONE
     [plan] = engineless._planned_clone_fallbacks(cast)
-    assert "no voice-cloning engine" in plan["reason"] and plan["fallback_voice"].startswith("af_")
+    assert plan["reason"] == REASON_NOT_INSTALLED and plan["fallback_voice"].startswith("af_")
     assert ready._planned_clone_fallbacks(cast) == []
 
 
@@ -295,3 +308,56 @@ def test_the_router_is_a_routing_engine_when_cloned_voices_are_in_use(tmp_path):
     engine = pipeline._route_clone_voices(FakeKokoro(), VoiceCast(narrator_voice=CLONE_VOICE))
 
     assert isinstance(engine, RoutingEngine)
+
+
+# --- a failure's detail never reaches the report the website shows ----------------------------
+
+
+def test_a_long_engine_failure_reaches_the_website_report_as_a_fixed_reason(tmp_path):
+    pipeline = Pipeline(_config(tmp_path), clone_voices={CLONE_VOICE: _reference(tmp_path)})
+    pipeline._clone_engine = FakeClone(fail=True)
+    path = pipeline.report_cast([], VoiceCast(narrator_voice=CLONE_VOICE))
+
+    _render(tmp_path, pipeline, FakeKokoro())
+    pipeline._record_runtime_clone_fallbacks()
+    uploaded = read_review_report(path)  # exactly what the worker uploads for the job page
+
+    report = CastReport.model_validate_json(uploaded)
+    assert [f.reason for f in report.clone_fallbacks] == [REASON_OOM]
+    assert b"someone" not in uploaded and b"sk-123" not in uploaded and b"xxxx" not in uploaded
+
+
+def test_a_foreign_or_oversized_reason_is_replaced_and_the_report_stays_valid(tmp_path):
+    pipeline = Pipeline(_config(tmp_path), clone_voices={CLONE_VOICE: _reference(tmp_path)})
+    path = pipeline.report_cast([], VoiceCast(narrator_voice=CLONE_VOICE))
+
+    record_clone_fallbacks(
+        path,
+        [{"voice": CLONE_VOICE + "v" * 500, "reason": DETAIL, "fallback_voice": "am_michael" * 20}],
+    )
+
+    report = CastReport.model_validate_json(read_review_report(path))
+    [note] = report.clone_fallbacks
+    assert note.reason == REASON_STOPPED
+    assert len(note.voice) <= 64 and len(note.fallback_voice) <= 40
+
+
+def test_at_most_twenty_notes_are_kept(tmp_path):
+    pipeline = Pipeline(_config(tmp_path), clone_voices={CLONE_VOICE: _reference(tmp_path)})
+    path = pipeline.report_cast([], VoiceCast(narrator_voice=CLONE_VOICE))
+
+    record_clone_fallbacks(
+        path, [{"voice": CLONE_VOICE, "reason": REASON_OOM, "fallback_voice": "am_michael"}] * 50
+    )
+
+    assert len(CastReport.model_validate_json(read_review_report(path)).clone_fallbacks) == 20
+
+
+def test_every_planned_fallback_reason_is_one_of_the_fixed_ones(tmp_path):
+    cast = VoiceCast(narrator_voice=CLONE_VOICE)
+    for pipeline in (
+        Pipeline(_config(tmp_path)),
+        Pipeline(_config(tmp_path), clone_voices={CLONE_VOICE: _reference(tmp_path)}),
+    ):
+        for note in pipeline._planned_clone_fallbacks(cast):
+            assert note["reason"] in FALLBACK_REASONS

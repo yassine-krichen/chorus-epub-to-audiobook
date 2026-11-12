@@ -25,7 +25,7 @@ def test_a_report_with_a_cloned_voice_and_a_fallback_note_reaches_the_client(cli
         clone_fallbacks=[
             {
                 "voice": CLONED,
-                "reason": "this worker has no voice-cloning engine",
+                "reason": "the voice-cloning engine is not installed",
                 "fallback_voice": "am_michael",
             }
         ],

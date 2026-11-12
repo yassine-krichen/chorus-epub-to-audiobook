@@ -14,6 +14,7 @@ import {
   isReadByNarrator,
   summarizeCast,
 } from "@/lib/jobs/cast-display";
+import { fallbackReasonText, fallbackVoiceText } from "@/lib/voices/fallback-reason";
 import { labelForVoiceId } from "@/lib/voices/voice-display";
 import type { CastCharacter, CastReport } from "@/types/job";
 import type { VoiceInfo } from "@/types/voice";
@@ -29,8 +30,8 @@ function CloneFallbackNotice({ report, voices }: { report: CastReport; voices: V
         <ul className="flex flex-col gap-1">
           {fallbacks.map((fallback) => (
             <li key={fallback.voice}>
-              {labelForVoiceId(voices, fallback.voice)} was read by {fallback.fallback_voice}:{" "}
-              {fallback.reason}.
+              {labelForVoiceId(voices, fallback.voice)} was read by{" "}
+              {fallbackVoiceText(fallback.fallback_voice)}: {fallbackReasonText(fallback.reason)}.
             </li>
           ))}
         </ul>

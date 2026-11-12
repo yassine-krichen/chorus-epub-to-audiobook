@@ -45,7 +45,13 @@ from book2audio.models import NARRATOR, Book, BookMetadata, Chapter, Segment, Se
 from book2audio.state import RenderState
 from book2audio.text import normalize_for_tts, segment_paragraphs, speech_params
 from book2audio.tts import KokoroEngine, VoiceCast
-from book2audio.tts.clone_engine import CloneReference, QwenCloneEngine, RoutingEngine
+from book2audio.tts.clone_engine import (
+    REASON_NOT_INSTALLED,
+    REASON_VOICE_GONE,
+    CloneReference,
+    QwenCloneEngine,
+    RoutingEngine,
+)
 from book2audio.tts.engine import TtsEngine
 from book2audio.tts.voices import is_clone_voice
 
@@ -367,9 +373,9 @@ class Pipeline:
         for voice in self._used_clone_voices(cast):
             reference = self._clone_voices.get(voice)
             if reference is None:
-                reason = "the voice no longer exists"
+                reason = REASON_VOICE_GONE
             elif self._clone_engine is None:
-                reason = "this worker has no voice-cloning engine"
+                reason = REASON_NOT_INSTALLED
             else:
                 continue
             gender = reference.gender if reference is not None else "m"
